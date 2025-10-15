@@ -1,7 +1,6 @@
-import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import db from "../../database/db";
+import { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ensureDBInitialized, getDatabase } from '../../database/db';
 
 interface Project {
   id: string;
@@ -11,49 +10,76 @@ interface Project {
   progress: number;
 }
 
-export default function Home() {
+export default function HomeScreen() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const router = useRouter();
+  const [loading, setLoading] = useState(true);
+
+  const fetchProjects = async () => {
+    try {
+      await ensureDBInitialized();
+      const db = getDatabase();
+      
+      const allRows = await db.getAllAsync<Project>(
+        'SELECT * FROM projects ORDER BY name;'
+      );
+      
+      setProjects(allRows);
+    } catch (error) {
+      console.error('Error fetching projects:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    db.transaction(tx => {
-      tx.executeSql(
-        "SELECT * FROM projects;",
-        [],
-        (_, result) => setProjects(result.rows._array),
-        (_, error) => console.log(error)
-      );
-    });
+    fetchProjects();
   }, []);
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <Text>Loading projects...</Text>
+      </View>
+    );
+  }
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>🏗️ Projects</Text>
-      <FlatList
-        data={projects}
-        keyExtractor={item => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity style={styles.card} onPress={() => router.push({ pathname: "/AddProject", params: { id: item.id } })}>
-            <Text style={styles.name}>{item.name}</Text>
-            <Text>Client: {item.client}</Text>
-            <Text>Budget: ₹{item.budget}</Text>
-            <Text>Progress: {item.progress}%</Text>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={<Text>No projects added yet.</Text>}
-      />
-      <TouchableOpacity style={styles.addBtn} onPress={() => router.push("/AddProject")}>
-        <Text style={styles.addBtnText}>＋ Add Project</Text>
-      </TouchableOpacity>
-    </View>
+    <ScrollView style={styles.container}>
+      <Text style={styles.title}>Projects</Text>
+      {projects.length === 0 ? (
+        <Text>No projects found</Text>
+      ) : (
+        projects.map(project => (
+          <View key={project.id} style={styles.projectCard}>
+            <Text style={styles.projectName}>{project.name}</Text>
+            <Text>Client: {project.client}</Text>
+            <Text>Budget: ${project.budget}</Text>
+            <Text>Progress: {project.progress}%</Text>
+          </View>
+        ))
+      )}
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 16, backgroundColor: "#fff" },
-  title: { fontSize: 22, fontWeight: "bold", marginBottom: 10 },
-  card: { backgroundColor: "#f0f0f0", padding: 12, borderRadius: 8, marginBottom: 8 },
-  name: { fontSize: 18, fontWeight: "600" },
-  addBtn: { backgroundColor: "#007AFF", padding: 14, borderRadius: 10, alignItems: "center", marginTop: 12 },
-  addBtnText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
+  container: {
+    flex: 1,
+    padding: 16,
+  },
+  title: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 16,
+  },
+  projectCard: {
+    backgroundColor: '#f5f5f5',
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+  },
+  projectName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
 });

@@ -1,32 +1,61 @@
+import React, { useEffect, useState } from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import { PieChart } from "react-native-chart-kit";
-
+import { getDatabase, ensureDBInitialized } from "../../database/db";
+import { Project, SQLResult } from "../../database/types";
 
 const screenWidth = Dimensions.get("window").width;
 
-const data = [
-  { name: "Project A", population: 50000, color: "#007AFF", legendFontColor: "#333", legendFontSize: 14 },
-  { name: "Project B", population: 32000, color: "#34C759", legendFontColor: "#333", legendFontSize: 14 },
-];
+export default function Analytics() {
+  const [chartData, setChartData] = useState<any[]>([]);
 
-export default function AnalyticsScreen() {
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        await ensureDBInitialized();
+        const db = getDatabase();
+        const result = await db.execAsync("SELECT * FROM projects;") as SQLResult;
+        
+        if (result && result.length > 0) {
+          const projects = result[0] as Project[];
+          const data = projects.map(p => ({
+            name: p.name,
+            population: p.budget,
+            color: "#" + Math.floor(Math.random()*16777215).toString(16),
+            legendFontColor: "#333",
+            legendFontSize: 14
+          }));
+          setChartData(data);
+        }
+      } catch (error) {
+        console.error("Error loading projects:", error);
+      }
+    };
+    
+    loadData();
+  }, []);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Analytics</Text>
-      <PieChart
-        data={data}
-        width={screenWidth - 32}
-        height={220}
-        accessor={"population"}
-        backgroundColor={"transparent"}
-        paddingLeft={"16"}
-        chartConfig={{
-          backgroundColor: "#fff",
-          backgroundGradientFrom: "#fff",
-          backgroundGradientTo: "#fff",
-          color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-        }}
-      />
+      <Text style={styles.title}>📊 Analytics</Text>
+      {chartData.length > 0 ? (
+        <PieChart
+          data={chartData}
+          width={screenWidth - 32}
+          height={220}
+          accessor="population"
+          backgroundColor="transparent"
+          paddingLeft="16"
+          chartConfig={{
+            backgroundColor: "#fff",
+            backgroundGradientFrom: "#fff",
+            backgroundGradientTo: "#fff",
+            color: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
+          }}
+        />
+      ) : (
+        <Text>No project data yet.</Text>
+      )}
     </View>
   );
 }
