@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Dimensions, StyleSheet, Text, View } from "react-native";
 import { PieChart } from "react-native-chart-kit";
-import { getDatabase, ensureDBInitialized } from "../../database/db";
+import { ensureDBInitialized, getDatabase } from "../../database/db";
 import { Project, SQLResult } from "../../database/types";
 
 const screenWidth = Dimensions.get("window").width;

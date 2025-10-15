@@ -1,4 +1,3 @@
-import * as SQLite from 'expo-sqlite';
 
 export type SQLResult = Record<string, any>[][];
 

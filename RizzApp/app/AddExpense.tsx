@@ -2,7 +2,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useState } from "react";
 import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import uuid from "react-native-uuid";
-import { getDatabase, ensureDBInitialized } from "../database/db";
+import { ensureDBInitialized, getDatabase } from "../database/db";
 
 export default function AddExpenseScreen() {
   const router = useRouter();

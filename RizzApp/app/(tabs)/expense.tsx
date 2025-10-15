@@ -1,7 +1,7 @@
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { getDatabase, ensureDBInitialized } from "../../database/db";
+import { ensureDBInitialized, getDatabase } from "../../database/db";
 import { Expense, SQLResult } from "../../database/types";
 
 export default function ExpenseScreen() {
