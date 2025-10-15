@@ -1,8 +1,8 @@
-import { useRouter } from 'expo-router';
-import React, { useState, useCallback } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
+import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ensureDBInitialized, getDatabase } from '../../database/db';
 import { SQLResult } from '../../database/types';
 

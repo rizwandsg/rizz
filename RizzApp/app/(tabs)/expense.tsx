@@ -1,7 +1,7 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ensureDBInitialized, getDatabase } from "../../database/db";
 import { Expense, Project, SQLResult } from "../../database/types";
 

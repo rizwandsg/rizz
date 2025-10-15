@@ -1,9 +1,9 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
-import { PieChart, LineChart } from "react-native-chart-kit";
-import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LineChart, PieChart } from "react-native-chart-kit";
 import { ensureDBInitialized, getDatabase } from "../../database/db";
-import { Project, Expense, SQLResult } from "../../database/types";
+import { Expense, Project, SQLResult } from "../../database/types";
 
 const screenWidth = Dimensions.get("window").width;
 
