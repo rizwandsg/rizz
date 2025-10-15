@@ -48,24 +48,27 @@ export default function AddProject() {
   }, [id]);
 
   const saveProject = async () => {
-    // Validate input fields
-    if (!name?.trim()) {
-      Alert.alert("Error", "Please enter a project name");
-      return;
-    }
-    if (!client?.trim()) {
-      Alert.alert("Error", "Please enter a client name");
-      return;
-    }
-    if (!budget) {
-      Alert.alert("Error", "Please enter a budget");
-      return;
-    }
-
-    // Show loading state
+    // Reset loading state
     setLoading(true);
-    
+
     try {
+      // Validate input fields
+      if (!name?.trim()) {
+        throw new Error("Please enter a project name");
+      }
+      if (!client?.trim()) {
+        throw new Error("Please enter a client name");
+      }
+      if (!budget) {
+        throw new Error("Please enter a budget");
+      }
+
+      // Validate budget
+      const parsedBudget = parseFloat(budget);
+      if (isNaN(parsedBudget) || parsedBudget < 0) {
+        throw new Error("Please enter a valid budget amount");
+      }
+
       console.log('Starting project save...');
       
       // Initialize database
@@ -73,76 +76,91 @@ export default function AddProject() {
       await ensureDBInitialized();
 
       const db = getDatabase();
-      console.log('Database connection obtained');
-
-      // Validate budget
-      const parsedBudget = parseFloat(budget);
-      if (isNaN(parsedBudget) || parsedBudget < 0) {
-        Alert.alert("Error", "Please enter a valid budget amount");
-        setLoading(false);
-        return;
+      if (!db) {
+        throw new Error('Could not connect to database');
       }
 
       // Generate new ID for new projects
       const projectId = id || uuid.v4().toString();
-      const projectDate = date || new Date().toISOString().split('T')[0];
+      const today = new Date().toISOString().split('T')[0];
       
-      console.log('Saving project:', {
+      // Create the project object
+      const project = {
         id: projectId,
         name: name.trim(),
         client: client.trim(),
         budget: parsedBudget,
-        date: projectDate
-      });
+        date: today,
+        progress: 0
+      };
+      
+      console.log('Saving project:', project);
 
       try {
-        // Save the project
-        const cleanName = name.trim().replace(/'/g, "''");
-        const cleanClient = client.trim().replace(/'/g, "''");
+        // First verify the table exists
+        const tableCheck = await db.execAsync(
+          "SELECT name FROM sqlite_master WHERE type='table' AND name='projects';"
+        );
         
-        let query: string;
-        if (id) {
-          query = "UPDATE projects SET " +
-                  "name = '" + cleanName + "', " +
-                  "client = '" + cleanClient + "', " +
-                  "budget = " + parsedBudget + ", " +
-                  "date = '" + projectDate + "' " +
-                  "WHERE id = '" + projectId + "'";
-        } else {
-          query = "INSERT INTO projects (id, name, client, budget, progress, date) " +
-                  "VALUES ('" + projectId + "', '" + 
-                  cleanName + "', '" + 
-                  cleanClient + "', " + 
-                  parsedBudget + ", 0, '" + 
-                  projectDate + "')";
+        if (!tableCheck?.[0]?.length) {
+          throw new Error('Projects table does not exist');
         }
 
+        // Simple insert or update query
+        const query = id 
+          ? `UPDATE projects 
+             SET name = '${project.name.replace(/'/g, "''")}',
+                 client = '${project.client.replace(/'/g, "''")}',
+                 budget = ${project.budget},
+                 date = '${project.date}'
+             WHERE id = '${project.id}';`
+          : `INSERT INTO projects (id, name, client, budget, progress, date)
+             VALUES (
+               '${project.id}',
+               '${project.name.replace(/'/g, "''")}',
+               '${project.client.replace(/'/g, "''")}',
+               ${project.budget},
+               ${project.progress},
+               '${project.date}'
+             );`;
+
+        // Execute the save query
         console.log('Executing query:', query);
         await db.execAsync(query);
 
-        // Verify the save
-        const verifyQuery = "SELECT * FROM projects WHERE id = '" + projectId + "'";
-        const verifyResult = await db.execAsync(verifyQuery);
+        // Verify the save by selecting the project
+        const verifyResult = await db.execAsync(
+          `SELECT * FROM projects WHERE id = '${project.id}';`
+        );
         
+        console.log('Verify result:', JSON.stringify(verifyResult, null, 2));
+
         if (!verifyResult?.[0]?.[0]) {
-          throw new Error('Project was not saved properly');
+          throw new Error('Failed to verify saved project');
         }
 
         console.log('Project saved successfully:', verifyResult[0][0]);
+        
+        // Show success message and navigate back
         Alert.alert(
           "Success", 
           "Project saved successfully!",
-          [{ text: "OK", onPress: () => router.back() }]
+          [{ 
+            text: "OK",
+            onPress: () => router.back()
+          }]
         );
       } catch (dbError: any) {
-        console.error('Database error:', dbError);
-        throw new Error(dbError?.message || 'Failed to save to database');
+        console.error('Database operation failed:', dbError);
+        throw new Error(
+          dbError?.message || 'Failed to save project to database'
+        );
       }
     } catch (error: any) {
       console.error('Error in saveProject:', error);
       Alert.alert(
         "Error",
-        "Failed to save project: " + (error?.message || 'Unknown error')
+        error?.message || "An unexpected error occurred"
       );
     } finally {
       setLoading(false);
