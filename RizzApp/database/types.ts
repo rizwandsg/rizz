@@ -7,6 +7,7 @@ export interface Project {
   client: string;
   budget: number;
   progress: number;
+  date: string;
 }
 
 export interface Expense {
