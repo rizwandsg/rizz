@@ -1,0 +1,37 @@
+import { FlatList, StyleSheet, Text, View } from "react-native";
+
+const expenses = [
+  { id: "1", project: "Project A", cost: 12000, date: "2025-10-10" },
+  { id: "2", project: "Project B", cost: 8000, date: "2025-10-11" },
+];
+
+export default function ExpenseScreen() {
+  return (
+    <View style={styles.container}>
+      <Text style={styles.title}>Project Expenses</Text>
+      <FlatList
+        data={expenses}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <View style={styles.card}>
+            <Text style={styles.project}>{item.project}</Text>
+            <Text>₹{item.cost}</Text>
+            <Text>{item.date}</Text>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: "#fff", padding: 16 },
+  title: { fontSize: 22, fontWeight: "bold", marginBottom: 10 },
+  card: {
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  project: { fontSize: 18, fontWeight: "600" },
+});
