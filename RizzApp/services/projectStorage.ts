@@ -1,5 +1,5 @@
 import { Project } from '../database/types';
-import { initGoogleDrive, uploadFile, downloadFile, findOrCreateAppFolder } from './googleDriveService';
+import { downloadFile, findOrCreateAppFolder, initGoogleDrive, uploadFile } from './googleDriveService';
 
 const PROJECTS_FILE = 'rizzapp_projects.json';
 let appFolderId: string | null = null;

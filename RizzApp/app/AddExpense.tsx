@@ -3,8 +3,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity } from "react-native";
 import uuid from "react-native-uuid";
-import { Storage } from "../services/projectStorage";
 import { Project } from "../database/types";
+import { Storage } from "../services/projectStorage";
 
 export default function AddExpenseScreen() {
   const router = useRouter();

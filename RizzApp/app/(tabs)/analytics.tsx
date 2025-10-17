@@ -2,8 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LineChart, PieChart } from "react-native-chart-kit";
-import { Storage } from "../../services/projectStorage";
 import { Expense, Project } from "../../database/types";
+import { Storage } from "../../services/projectStorage";
 
 const screenWidth = Dimensions.get("window").width;
 

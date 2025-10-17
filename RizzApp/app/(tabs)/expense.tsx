@@ -2,8 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Expense } from "../../database/types";
 import { Storage } from "../../services/projectStorage";
-import { Expense, Project } from "../../database/types";
 
 export default function ExpenseScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
