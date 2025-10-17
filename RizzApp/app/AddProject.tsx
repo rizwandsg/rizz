@@ -1,8 +1,7 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import uuid from "react-native-uuid";
-import { ensureDBInitialized, getDatabase } from "../database/db";
+import { getProjectById, saveProject } from "../database/projectService";
 
 export default function AddProject() {
   const router = useRouter();
@@ -17,38 +16,30 @@ export default function AddProject() {
     const loadProject = async () => {
       if (id) {
         try {
-          await ensureDBInitialized();
-          const db = getDatabase();
-          const escapedId = id.toString().replace(/'/g, "''");
-          const query = `SELECT * FROM projects WHERE id='${escapedId}';`;
-          console.log('Loading project with query:', query);
-          const result = await db.execAsync(query);
-          
-          if (result?.length > 0 && Array.isArray(result[0])) {
-            const rows = result[0];
-            if (rows.length > 0) {
-              const p = rows[0];
-              console.log('Loaded project:', p);
-              setName(p.name || '');
-              setClient(p.client || '');
-              setBudget(p.budget?.toString() || '');
-              setDate(p.date || new Date().toISOString().split('T')[0]);
-            } else {
-              console.log('No project found with id:', id);
-            }
+          const project = await getProjectById(id.toString());
+          if (project) {
+            console.log('Loaded project:', project);
+            setName(project.name);
+            setClient(project.client);
+            setBudget(project.budget.toString());
+            setDate(project.date);
+          } else {
+            console.log('No project found with id:', id);
+            Alert.alert('Error', 'Project not found');
           }
         } catch (error) {
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          console.error('Error loading project:', errorMessage);
-          Alert.alert('Error', 'Failed to load project: ' + errorMessage);
+          console.error('Error loading project:', error);
+          Alert.alert(
+            'Error',
+            'Failed to load project: ' + (error instanceof Error ? error.message : String(error))
+          );
         }
       }
     };
     loadProject();
   }, [id]);
 
-  const saveProject = async () => {
-    // Reset loading state
+  const handleSave = async () => {
     setLoading(true);
 
     try {
@@ -69,98 +60,34 @@ export default function AddProject() {
         throw new Error("Please enter a valid budget amount");
       }
 
-      console.log('Starting project save...');
-      
-      // Initialize database
-      console.log('Ensuring database is initialized...');
-      await ensureDBInitialized();
-
-      const db = getDatabase();
-      if (!db) {
-        throw new Error('Could not connect to database');
-      }
-
-      // Generate new ID for new projects
-      const projectId = id || uuid.v4().toString();
-      const today = new Date().toISOString().split('T')[0];
-      
       // Create the project object
-      const project = {
-        id: projectId,
+      const projectData = {
+        id: id?.toString(),
         name: name.trim(),
         client: client.trim(),
         budget: parsedBudget,
-        date: today,
+        date: date,
         progress: 0
       };
       
-      console.log('Saving project:', project);
+      console.log('Saving project:', projectData);
+      
+      const savedProject = await saveProject(projectData);
+      console.log('Project saved successfully:', savedProject);
 
-      try {
-        // First verify the table exists
-        const tableCheck = await db.execAsync(
-          "SELECT name FROM sqlite_master WHERE type='table' AND name='projects';"
-        );
-        
-        if (!tableCheck?.[0]?.length) {
-          throw new Error('Projects table does not exist');
-        }
-
-        // Simple insert or update query
-        const query = id 
-          ? `UPDATE projects 
-             SET name = '${project.name.replace(/'/g, "''")}',
-                 client = '${project.client.replace(/'/g, "''")}',
-                 budget = ${project.budget},
-                 date = '${project.date}'
-             WHERE id = '${project.id}';`
-          : `INSERT INTO projects (id, name, client, budget, progress, date)
-             VALUES (
-               '${project.id}',
-               '${project.name.replace(/'/g, "''")}',
-               '${project.client.replace(/'/g, "''")}',
-               ${project.budget},
-               ${project.progress},
-               '${project.date}'
-             );`;
-
-        // Execute the save query
-        console.log('Executing query:', query);
-        await db.execAsync(query);
-
-        // Verify the save by selecting the project
-        const verifyResult = await db.execAsync(
-          `SELECT * FROM projects WHERE id = '${project.id}';`
-        );
-        
-        console.log('Verify result:', JSON.stringify(verifyResult, null, 2));
-
-        if (!verifyResult?.[0]?.[0]) {
-          throw new Error('Failed to verify saved project');
-        }
-
-        console.log('Project saved successfully:', verifyResult[0][0]);
-        
-        // Show success message and navigate back
-        Alert.alert(
-          "Success", 
-          "Project saved successfully!",
-          [{ 
-            text: "OK",
-            onPress: () => router.back()
-          }]
-        );
-      } catch (dbError: any) {
-        console.error('Database operation failed:', dbError);
-        throw new Error(
-          dbError?.message || 'Failed to save project to database'
-        );
-      }
-    } catch (error: any) {
-      console.error('Error in saveProject:', error);
+      Alert.alert(
+        "Success", 
+        "Project saved successfully!",
+        [{ 
+          text: "OK",
+          onPress: () => router.back()
+        }]
+      );
+    } catch (error) {
+      console.error('Error saving project:', error);
       Alert.alert(
         "Error",
-        error?.message || "An unexpected error occurred"
+        error instanceof Error ? error.message : "Failed to save project"
       );
     } finally {
       setLoading(false);
@@ -201,7 +128,7 @@ export default function AddProject() {
       />
       <TouchableOpacity 
         style={[styles.btn, loading && styles.btnDisabled]} 
-        onPress={saveProject}
+        onPress={handleSave}
         disabled={loading}
       >
         {loading ? (

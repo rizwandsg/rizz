@@ -2,18 +2,9 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { ensureDBInitialized, getDatabase } from '../../database/db';
-import { SQLResult } from '../../database/types';
-
-interface Project {
-  id: string;
-  name: string;
-  client: string;
-  budget: number;
-  progress: number;
-  date: string;
-}
+import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { getAllProjects } from '../../database/projectService';
+import { Project } from '../../database/types';
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -22,19 +13,18 @@ export default function HomeScreen() {
 
   const fetchProjects = async () => {
     try {
-      await ensureDBInitialized();
-      const db = getDatabase();
+      setLoading(true);
       console.log('Fetching projects...');
-      const result = await db.execAsync('SELECT * FROM projects ORDER BY name;') as SQLResult;
-      console.log('Database query result:', JSON.stringify(result, null, 2));
-      if (result && result.length > 0) {
-        console.log('Projects found:', result[0]);
-        setProjects(result[0] as Project[]);
-      } else {
-        console.log('No projects found in database');
-      }
+      
+      const loadedProjects = await getAllProjects();
+      console.log(`Found ${loadedProjects.length} projects`);
+      setProjects(loadedProjects);
     } catch (error) {
-      console.error('Error fetching projects:', error);
+      console.error('Error in fetchProjects:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load projects. Please try again.'
+      );
     } finally {
       setLoading(false);
     }

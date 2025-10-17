@@ -2,8 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { ensureDBInitialized, getDatabase } from "../../database/db";
-import { Expense, Project, SQLResult } from "../../database/types";
+import { Storage } from "../../services/projectStorage";
+import { Expense, Project } from "../../database/types";
 
 export default function ExpenseScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -13,27 +13,17 @@ export default function ExpenseScreen() {
 
   const loadData = async () => {
     try {
-      await ensureDBInitialized();
-      const db = getDatabase();
-      
       // Load projects for mapping
-      const projectResult = await db.execAsync("SELECT id, name FROM projects;") as SQLResult;
-      if (projectResult && projectResult.length > 0) {
-        const projectMap = (projectResult[0] as Project[]).reduce((acc, project) => {
-          acc[project.id] = project.name;
-          return acc;
-        }, {} as {[key: string]: string});
-        setProjects(projectMap);
-      }
+      const projects = await Storage.getProjects();
+      const projectMap = projects.reduce((acc, project) => {
+        acc[project.id] = project.name;
+        return acc;
+      }, {} as {[key: string]: string});
+      setProjects(projectMap);
 
-      // Load expenses with project names
-      const expenseResult = await db.execAsync(
-        "SELECT e.*, p.name as projectName FROM expenses e LEFT JOIN projects p ON e.projectId = p.id ORDER BY e.date DESC;"
-      ) as SQLResult;
-      
-      if (expenseResult && expenseResult.length > 0) {
-        setExpenses(expenseResult[0] as Expense[]);
-      }
+      // Load expenses
+      const expenses = await Storage.getExpenses();
+      setExpenses(expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {

@@ -3,14 +3,8 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { Alert, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity } from "react-native";
 import uuid from "react-native-uuid";
-import { ensureDBInitialized, getDatabase } from "../database/db";
-import { SQLResult } from "../database/types";
-
-interface Project {
-  id: string;
-  name: string;
-  client: string;
-}
+import { Storage } from "../services/projectStorage";
+import { Project } from "../database/types";
 
 export default function AddExpenseScreen() {
   const router = useRouter();
@@ -24,12 +18,8 @@ export default function AddExpenseScreen() {
   useEffect(() => {
     const loadProjects = async () => {
       try {
-        await ensureDBInitialized();
-        const db = getDatabase();
-        const result = await db.execAsync('SELECT id, name, client FROM projects ORDER BY name;') as SQLResult;
-        if (result && result.length > 0) {
-          setProjects(result[0] as Project[]);
-        }
+        const projects = await Storage.getProjects();
+        setProjects(projects);
       } catch (error) {
         console.error('Error loading projects:', error);
         Alert.alert('Error', 'Failed to load projects');
@@ -45,14 +35,17 @@ export default function AddExpenseScreen() {
     }
 
     try {
-      await ensureDBInitialized();
-      const db = getDatabase();
       const expenseId = uuid.v4().toString();
 
-      const insertQuery = `INSERT INTO expenses (id, projectId, description, cost, date) 
-        VALUES ('${expenseId}', '${selectedProjectId}', '${description}', ${parseFloat(cost)}, '${date}');`;
+      const expense = {
+        id: expenseId,
+        projectId: selectedProjectId,
+        description,
+        cost: parseFloat(cost),
+        date
+      };
       
-      await db.execAsync(insertQuery);
+      await Storage.addExpense(expense);
       Alert.alert("Success", "Expense saved successfully!");
       router.back();
     } catch (error) {

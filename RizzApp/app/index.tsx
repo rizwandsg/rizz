@@ -1,18 +1,5 @@
-import { useEffect } from 'react';
-import { initDB } from '../database/db';
+import { View } from 'react-native';
 
 export default function App() {
-  useEffect(() => {
-    const initializeApp = async () => {
-      try {
-        await initDB();
-      } catch (error) {
-        console.error('Failed to initialize database:', error);
-      }
-    };
-
-    initializeApp();
-  }, []);
-
-
+  return <View />; // Redirect to root layout
 }

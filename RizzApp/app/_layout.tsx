@@ -1,29 +1,28 @@
 import { Stack } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Text, View } from 'react-native'; // Add these imports
-import { initDB } from '../database/db';
+import { Text, View } from 'react-native';
+import { initGoogleDrive } from '../services/googleDriveService';
 
 export default function RootLayout() {
-  const [dbReady, setDbReady] = useState(false);
+  const [storageReady, setStorageReady] = useState(false);
 
   useEffect(() => {
-    const initializeDB = async () => {
+    const initializeStorage = async () => {
       try {
-        await initDB();
-        setDbReady(true);
+        await initGoogleDrive();
+        setStorageReady(true);
       } catch (error) {
-        console.error('Failed to initialize database:', error);
-        setDbReady(true); // Still set to true to avoid blocking the app
+        console.error('Failed to initialize Google Drive:', error);
       }
     };
 
-    initializeDB();
+    initializeStorage();
   }, []);
 
-  if (!dbReady) {
+  if (!storageReady) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Loading...</Text>
+        <Text>Initializing storage...</Text>
       </View>
     );
   }
@@ -31,8 +30,10 @@ export default function RootLayout() {
   return (
     <Stack>
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="AddProject" options={{ title: 'Add Project' }} />
-      <Stack.Screen name="ProjectDetails" options={{ title: 'Project Details' }} />
+      <Stack.Screen name="AddExpense" options={{ title: "Add Expense" }} />
+      <Stack.Screen name="AddProject" options={{ title: "Add Project" }} />
     </Stack>
   );
+
+  return <Stack />;
 }

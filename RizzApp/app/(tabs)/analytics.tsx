@@ -2,8 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LineChart, PieChart } from "react-native-chart-kit";
-import { ensureDBInitialized, getDatabase } from "../../database/db";
-import { Expense, Project, SQLResult } from "../../database/types";
+import { Storage } from "../../services/projectStorage";
+import { Expense, Project } from "../../database/types";
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -19,7 +19,7 @@ const chartConfig = {
   decimalPlaces: 0
 };
 
-export default function AnalyticsScreen() {
+const AnalyticsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [projectData, setProjectData] = useState<any[]>([]);
   const [expenseData, setExpenseData] = useState<any[]>([]);
@@ -29,38 +29,28 @@ export default function AnalyticsScreen() {
   useEffect(() => {
     const loadData = async () => {
       try {
-        setError(null);
-        await ensureDBInitialized();
-        const db = getDatabase();
-        
-        // Fetch projects
-        const projectResult = await db.execAsync("SELECT * FROM projects;") as SQLResult;
-        if (projectResult && projectResult.length > 0) {
-          const projects = projectResult[0] as Project[];
-          const total = projects.reduce((sum, p) => sum + p.budget, 0);
-          setTotalBudget(total);
+        // Load projects
+        const projects = await Storage.getProjects();
+        const projectTotal = projects.reduce((sum: number, p: Project) => sum + p.budget, 0);
+        setTotalBudget(projectTotal);
           
-          setProjectData(projects.map(p => ({
-            name: p.name,
-            population: p.budget,
-            color: '#' + (Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0'),
-            legendFontColor: "#333",
-            legendFontSize: 14
-          })));
-        }
+        setProjectData(projects.map(p => ({
+          name: p.name,
+          population: p.budget,
+          color: '#' + (Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0'),
+          legendFontColor: "#333",
+          legendFontSize: 14
+        })));
 
-        // Fetch expenses
-        const expenseResult = await db.execAsync("SELECT * FROM expenses ORDER BY date DESC;") as SQLResult;
-        if (expenseResult && expenseResult.length > 0) {
-          const expenses = expenseResult[0] as Expense[];
-          const total = expenses.reduce((sum, e) => sum + e.cost, 0);
-          setTotalExpenses(total);
-          
-          setExpenseData(expenses);
-        }
+        // Load expenses
+        const expenses = await Storage.getExpenses();
+        const expenseTotal = expenses.reduce((sum: number, e: Expense) => sum + e.cost, 0);
+        setTotalExpenses(expenseTotal);
+        
+        setExpenseData(expenses);
       } catch (error) {
         console.error("Error loading data:", error);
-        setError(error instanceof Error ? error.message : "Failed to load analytics data");
+        alert(error instanceof Error ? error.message : "Failed to load analytics data");
       } finally {
         setLoading(false);
       }
@@ -258,3 +248,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   }
 });
+
+export default AnalyticsScreen;
