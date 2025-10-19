@@ -2,8 +2,16 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Expense } from "../../database/types";
-import { Storage } from "../../services/projectStorage";
+import type { Project } from "../../database/projectService";
+import Storage from "../../services/projectStorage";
+
+interface Expense {
+  id: string;
+  projectId: string;
+  description: string;
+  cost: number;
+  date: string;
+}
 
 export default function ExpenseScreen() {
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -14,16 +22,18 @@ export default function ExpenseScreen() {
   const loadData = async () => {
     try {
       // Load projects for mapping
-      const projects = await Storage.getProjects();
-      const projectMap = projects.reduce((acc, project) => {
-        acc[project.id] = project.name;
+      const projects = await Storage.loadProjects();
+      const projectMap = projects.reduce<{[key: string]: string}>((acc, project: Project) => {
+        if (project.id) { // Check if id exists
+          acc[project.id] = project.name;
+        }
         return acc;
-      }, {} as {[key: string]: string});
+      }, {});
       setProjects(projectMap);
 
       // Load expenses
-      const expenses = await Storage.getExpenses();
-      setExpenses(expenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
+      const expenses = await Storage.loadExpenses();
+      setExpenses(expenses.sort((a: Expense, b: Expense) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {

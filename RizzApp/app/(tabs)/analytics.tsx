@@ -2,8 +2,24 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LineChart, PieChart } from "react-native-chart-kit";
-import { Expense, Project } from "../../database/types";
-import { Storage } from "../../services/projectStorage";
+import { Project } from "../../database/projectService";
+import Storage from "../../services/projectStorage";
+
+interface ChartDataPoint {
+  name: string;
+  population: number;
+  color: string;
+  legendFontColor: string;
+  legendFontSize: number;
+}
+
+interface ExpenseData {
+  id: string;
+  projectId: string;
+  description: string;
+  cost: number;
+  date: string;
+}
 
 const screenWidth = Dimensions.get("window").width;
 
@@ -19,22 +35,23 @@ const chartConfig = {
   decimalPlaces: 0
 };
 
-const AnalyticsScreen = () => {
+export default function AnalyticsScreen() {
   const [loading, setLoading] = useState(true);
-  const [projectData, setProjectData] = useState<any[]>([]);
-  const [expenseData, setExpenseData] = useState<any[]>([]);
+  const [projectData, setProjectData] = useState<ChartDataPoint[]>([]);
+  const [expenseData, setExpenseData] = useState<ExpenseData[]>([]);
   const [totalBudget, setTotalBudget] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
       try {
         // Load projects
-        const projects = await Storage.getProjects();
+        const projects = await Storage.loadProjects();
         const projectTotal = projects.reduce((sum: number, p: Project) => sum + p.budget, 0);
         setTotalBudget(projectTotal);
           
-        setProjectData(projects.map(p => ({
+        setProjectData(projects.map((p: Project) => ({
           name: p.name,
           population: p.budget,
           color: '#' + (Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0'),
@@ -43,11 +60,17 @@ const AnalyticsScreen = () => {
         })));
 
         // Load expenses
-        const expenses = await Storage.getExpenses();
-        const expenseTotal = expenses.reduce((sum: number, e: Expense) => sum + e.cost, 0);
+        const expenses = await Storage.loadExpenses();
+        const expenseTotal = expenses.reduce((sum: number, e: ExpenseData) => sum + e.cost, 0);
         setTotalExpenses(expenseTotal);
         
         setExpenseData(expenses);
+        
+        if (projects.length === 0 && expenses.length === 0) {
+          setError('No data available yet. Add some projects and expenses to see analytics.');
+        } else {
+          setError(null);
+        }
       } catch (error) {
         console.error("Error loading data:", error);
         alert(error instanceof Error ? error.message : "Failed to load analytics data");
@@ -58,8 +81,6 @@ const AnalyticsScreen = () => {
     
     loadData();
   }, []);
-
-  const [error, setError] = useState<string | null>(null);
 
   if (loading) {
     return (
@@ -80,7 +101,7 @@ const AnalyticsScreen = () => {
   }
 
   // Prepare expense data for line chart
-  const expensesByMonth = expenseData.reduce((acc: { [key: string]: number }, expense) => {
+  const expensesByMonth = expenseData.reduce<{ [key: string]: number }>((acc, expense) => {
     const date = new Date(expense.date);
     const monthYear = `${date.getMonth() + 1}/${date.getFullYear()}`;
     acc[monthYear] = (acc[monthYear] || 0) + expense.cost;
@@ -249,4 +270,3 @@ const styles = StyleSheet.create({
   }
 });
 
-export default AnalyticsScreen;

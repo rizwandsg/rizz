@@ -49,6 +49,9 @@
       "typedRoutes": true,
       "reactCompiler": true
     },
+    "web": {
+      "bundler": "metro"
+    },
     "extra": {
       "router": {
         "origin": false

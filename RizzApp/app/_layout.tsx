@@ -19,20 +19,25 @@ export default function RootLayout() {
     initializeStorage();
   }, []);
 
-  if (!storageReady) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <Text>Initializing storage...</Text>
-      </View>
-    );
-  }
-
   return (
-    <Stack>
-      <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen name="AddExpense" options={{ title: "Add Expense" }} />
-      <Stack.Screen name="AddProject" options={{ title: "Add Project" }} />
-    </Stack>
+    <>
+      {!storageReady ? (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+          <Text>Initializing storage...</Text>
+        </View>
+      ) : (
+        <Stack screenOptions={{
+          headerShown: true,
+          headerStyle: {
+            backgroundColor: '#fff',
+          },
+          headerShadowVisible: false,
+        }}>
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+          <Stack.Screen name="AddExpense" options={{ title: "Add Expense" }} />
+          <Stack.Screen name="AddProject" options={{ title: "Add Project" }} />
+        </Stack>
+      )}
+    </>
   );
-
 }

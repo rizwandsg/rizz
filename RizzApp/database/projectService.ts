@@ -1,7 +1,15 @@
 ﻿import 'react-native-get-random-values'; // Ensure compatibility with React Native
 import { v4 as uuidv4 } from 'uuid';
 import projectStorage from '../services/projectStorage';
-import { Project } from './types';
+// Define Project locally to avoid parse errors in external './types' module
+export interface Project {
+    id: string;
+    name: string;
+    client: string;
+    budget: number;
+    progress?: number;
+    date?: string;
+}
 
 // Validate project payload
 const validateProject = (project: Partial<Project>): void => {

@@ -28,6 +28,11 @@ module.exports = {
     web: {
       favicon: './assets/favicon.png'
     },
+    extra: {
+      eas: {
+        projectId: 'c50bdb29-edbf-4aa1-9ff2-505cb7567378'
+      }
+    },
     plugins: [
       "@react-native-google-signin/google-signin",
       ["expo-build-properties", {
