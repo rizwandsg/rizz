@@ -5,7 +5,7 @@ export default function RootLayout() {
   return (
     <ProtectedRoute>
       <Stack screenOptions={{
-        headerShown: true,
+        headerShown: false,
         headerStyle: {
           backgroundColor: '#fff',
         },
