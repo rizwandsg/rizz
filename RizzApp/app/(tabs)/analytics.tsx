@@ -2,8 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LineChart, PieChart } from "react-native-chart-kit";
-import { Project } from "../../database/projectService";
-import Storage from "../../services/projectStorage";
+import { getProjects, Project } from "../../api/projectsApi";
+import { getExpenses, Expense } from "../../api/expensesApi";
 
 interface ChartDataPoint {
   name: string;
@@ -35,7 +35,7 @@ const chartConfig = {
   decimalPlaces: 0
 };
 
-export default function AnalyticsScreen() {
+function AnalyticsRoute() {
   const [loading, setLoading] = useState(true);
   const [projectData, setProjectData] = useState<ChartDataPoint[]>([]);
   const [expenseData, setExpenseData] = useState<ExpenseData[]>([]);
@@ -47,24 +47,32 @@ export default function AnalyticsScreen() {
     const loadData = async () => {
       try {
         // Load projects
-        const projects = await Storage.loadProjects();
-        const projectTotal = projects.reduce((sum: number, p: Project) => sum + p.budget, 0);
-        setTotalBudget(projectTotal);
+        const projects = await getProjects();
+        // Since API projects don't have budget, we'll calculate from expenses per project
+        setTotalBudget(projects.length * 100000); // Mock budget for now
           
         setProjectData(projects.map((p: Project) => ({
           name: p.name,
-          population: p.budget,
+          population: 100000, // Mock budget per project
           color: '#' + (Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0'),
           legendFontColor: "#333",
           legendFontSize: 14
         })));
 
         // Load expenses
-        const expenses = await Storage.loadExpenses();
-        const expenseTotal = expenses.reduce((sum: number, e: ExpenseData) => sum + e.cost, 0);
+        const expenses = await getExpenses();
+        const expenseTotal = expenses.reduce((sum: number, e: Expense) => sum + (e.amount ?? 0), 0);
         setTotalExpenses(expenseTotal);
         
-        setExpenseData(expenses);
+        // Convert Expense to ExpenseData format
+        const expenseDataList: ExpenseData[] = expenses.map(e => ({
+          id: e.id || '',
+          projectId: e.project_id || '',
+          description: e.description,
+          cost: e.amount || 0,
+          date: e.expense_date
+        }));
+        setExpenseData(expenseDataList);
         
         if (projects.length === 0 && expenses.length === 0) {
           setError('No data available yet. Add some projects and expenses to see analytics.');
@@ -270,3 +278,4 @@ const styles = StyleSheet.create({
   }
 });
 
+export default AnalyticsRoute;

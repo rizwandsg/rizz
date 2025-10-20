@@ -3,10 +3,10 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { getAllProjects } from '../../database/projectService';
-import { Project } from '../../database/types';
+import { LinearGradient } from 'expo-linear-gradient';
+import { getProjects, Project } from '../../api/projectsApi';
 
-export default function HomeScreen() {
+export default function Home() {
   const router = useRouter();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -16,7 +16,7 @@ export default function HomeScreen() {
       setLoading(true);
       console.log('Fetching projects...');
       
-      const loadedProjects = await getAllProjects();
+      const loadedProjects = await getProjects();
       console.log(`Found ${loadedProjects.length} projects`);
       setProjects(loadedProjects);
     } catch (error) {
@@ -36,72 +36,157 @@ export default function HomeScreen() {
     }, [])
   );
 
-  const getProgressColor = (progress: number) => {
-    if (progress < 30) return '#FF3B30';
-    if (progress < 70) return '#FFCC00';
-    return '#34C759';
+  const getProgressColor = (status?: string): [string, string] => {
+    if (status === 'completed') return ['#6BCF7F', '#34C759'];
+    if (status === 'cancelled') return ['#FF6B6B', '#FF3B30'];
+    if (status === 'on-hold') return ['#FFD93D', '#FFA500'];
+    return ['#667eea', '#764ba2'];  // active
+  };
+
+  const getStatusIcon = (status?: string) => {
+    if (status === 'completed') return 'check-decagram';
+    if (status === 'cancelled') return 'close-circle-outline';
+    if (status === 'on-hold') return 'pause-circle-outline';
+    return 'progress-clock';  // active
   };
 
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#667eea" />
         <Text style={styles.loadingText}>Loading projects...</Text>
       </View>
     );
   }
 
+  const activeProjects = projects.filter(p => p.status === 'active').length;
+  const completedProjects = projects.filter(p => p.status === 'completed').length;
+
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.title}>🏗️ Projects Overview</Text>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => router.push("/AddProject")}
-        >
-          <MaterialCommunityIcons name="plus" size={24} color="white" />
-        </TouchableOpacity>
-      </View>
+      {/* Gradient Header */}
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerGreeting}>Projects</Text>
+            <Text style={styles.headerSubtitle}>{projects.length} total projects</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => router.push("/AddProject")}
+          >
+            <MaterialCommunityIcons name="plus" size={28} color="#fff" />
+          </TouchableOpacity>
+        </View>
 
-      <ScrollView style={styles.content}>
+        {/* Stats Cards Row */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <MaterialCommunityIcons name="briefcase-clock" size={24} color="#FFD93D" />
+            <Text style={styles.statNumber}>{activeProjects}</Text>
+            <Text style={styles.statLabel}>Active</Text>
+          </View>
+          <View style={styles.statCard}>
+            <MaterialCommunityIcons name="check-circle" size={24} color="#6BCF7F" />
+            <Text style={styles.statNumber}>{completedProjects}</Text>
+            <Text style={styles.statLabel}>Completed</Text>
+          </View>
+          <View style={styles.statCard}>
+            <MaterialCommunityIcons name="chart-line" size={24} color="#FF6B6B" />
+            <Text style={styles.statNumber}>{activeProjects + completedProjects}</Text>
+            <Text style={styles.statLabel}>Total</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {projects.length === 0 ? (
           <View style={styles.emptyState}>
-            <MaterialCommunityIcons name="folder-open-outline" size={64} color="#ccc" />
+            <MaterialCommunityIcons name="folder-open-outline" size={80} color="#ccc" />
             <Text style={styles.emptyText}>No projects yet</Text>
-            <Text style={styles.emptySubtext}>Tap the + button to add your first project</Text>
+            <Text style={styles.emptySubtext}>Tap the + button to create your first project</Text>
           </View>
         ) : (
-          <View style={styles.tableContainer}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Project Name</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 2 }]}>Client Name</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1.5 }]}>Date</Text>
-              <Text style={[styles.tableHeaderCell, { flex: 1 }]}>Status</Text>
-            </View>
+          <View style={styles.projectsGrid}>
+            {projects.map((project, index) => {
+              const [gradientStart, gradientEnd] = getProgressColor(project.status);
+              const statusIcon = getStatusIcon(project.status);
+              
+              return (
+                <TouchableOpacity
+                  key={project.id}
+                  style={[styles.projectCard, { marginTop: index === 0 ? 0 : 16 }]}
+                  onPress={() => router.push({
+                    pathname: "/ProjectDetails",
+                    params: { id: project.id }
+                  })}
+                  activeOpacity={0.7}
+                >
+                  {/* Card Header with Gradient */}
+                  <LinearGradient
+                    colors={[gradientStart, gradientEnd]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.cardHeader}
+                  >
+                    <View style={styles.cardHeaderContent}>
+                      <View style={styles.projectIcon}>
+                        <MaterialCommunityIcons name="briefcase" size={24} color="#fff" />
+                      </View>
+                      <View style={styles.cardHeaderRight}>
+                        <MaterialCommunityIcons name={statusIcon} size={20} color="#fff" />
+                      </View>
+                    </View>
+                  </LinearGradient>
 
-            {/* Table Rows */}
-            {projects.map(project => (
-              <TouchableOpacity
-                key={project.id}
-                style={styles.tableRow}
-                onPress={() => router.push({
-                  pathname: "/ProjectDetails",
-                  params: { id: project.id }
-                })}
-              >
-                <Text style={[styles.tableCell, { flex: 2 }]} numberOfLines={1}>{project.name}</Text>
-                <Text style={[styles.tableCell, { flex: 2 }]} numberOfLines={1}>{project.client}</Text>
-                <Text style={[styles.tableCell, { flex: 1.5 }]}>
-                  {new Date(project.date).toLocaleDateString()}
-                </Text>
-                <View style={[styles.tableCell, { flex: 1, alignItems: 'center' }]}>
-                  <View style={[styles.statusBadge, { backgroundColor: getProgressColor(project.progress) }]}>
-                    <Text style={styles.statusText}>{project.progress}%</Text>
+                  {/* Card Body */}
+                  <View style={styles.cardBody}>
+                    <Text style={styles.projectName} numberOfLines={1}>{project.name}</Text>
+                    {project.description && (
+                      <View style={styles.clientRow}>
+                        <MaterialCommunityIcons name="text" size={16} color="#666" />
+                        <Text style={styles.clientName} numberOfLines={2}>{project.description}</Text>
+                      </View>
+                    )}
+                    <View style={styles.dateRow}>
+                      <MaterialCommunityIcons name="calendar-start" size={16} color="#666" />
+                      <Text style={styles.dateText}>
+                        {new Date(project.start_date).toLocaleDateString('en-US', { 
+                          month: 'short', 
+                          day: 'numeric', 
+                          year: 'numeric' 
+                        })}
+                      </Text>
+                      {project.end_date && (
+                        <>
+                          <MaterialCommunityIcons name="arrow-right" size={14} color="#999" style={{ marginLeft: 8 }} />
+                          <Text style={styles.dateText}>
+                            {new Date(project.end_date).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric'
+                            })}
+                          </Text>
+                        </>
+                      )}
+                    </View>
+
+                    {/* Status Badge */}
+                    <View style={styles.statusBadgeContainer}>
+                      <View style={[styles.statusBadge, { backgroundColor: gradientStart }]}>
+                        <Text style={styles.statusBadgeText}>
+                          {project.status?.charAt(0).toUpperCase() + (project.status?.slice(1) || '')}
+                        </Text>
+                      </View>
+                    </View>
                   </View>
-                </View>
-              </TouchableOpacity>
-            ))}
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -112,104 +197,213 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#f5f7fa',
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f7fa',
   },
   loadingText: {
-    marginTop: 10,
+    marginTop: 12,
     color: '#666',
+    fontSize: 16,
   },
-  header: {
+  headerGradient: {
+    paddingTop: 16,
+    paddingBottom: 24,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    elevation: 8,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  headerContent: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e4e8',
+    paddingHorizontal: 20,
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 24,
+  headerGreeting: {
+    fontSize: 32,
     fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.9)',
   },
   addButton: {
-    backgroundColor: '#007AFF',
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+  },
+  statCard: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  statNumber: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 4,
   },
   content: {
     flex: 1,
-    padding: 16,
+    padding: 20,
+    paddingTop: 24,
   },
   emptyState: {
-    flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginTop: '50%',
+    justifyContent: 'center',
+    marginTop: '40%',
   },
   emptyText: {
-    fontSize: 18,
+    fontSize: 20,
+    fontWeight: '600',
     color: '#666',
-    marginTop: 16,
+    marginTop: 20,
   },
   emptySubtext: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#999',
     marginTop: 8,
+    textAlign: 'center',
   },
-  tableContainer: {
+  projectsGrid: {
+    paddingBottom: 20,
+  },
+  projectCard: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 20,
     overflow: 'hidden',
-    elevation: 2,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
   },
-  tableHeader: {
+  cardHeader: {
+    padding: 20,
+    paddingBottom: 16,
+  },
+  cardHeaderContent: {
     flexDirection: 'row',
-    backgroundColor: '#f8f9fa',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#e1e4e8',
-  },
-  tableHeaderCell: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#666',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-    backgroundColor: '#fff',
-  },
-  tableCell: {
-    fontSize: 15,
-    color: '#1c1c1e',
-    paddingRight: 8,
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    minWidth: 50,
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  statusText: {
-    color: '#fff',
-    fontSize: 12,
+  projectIcon: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  cardHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardBody: {
+    padding: 20,
+    paddingTop: 16,
+  },
+  projectName: {
+    fontSize: 20,
     fontWeight: 'bold',
+    color: '#1c1c1e',
+    marginBottom: 12,
+  },
+  clientRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  clientName: {
+    fontSize: 15,
+    color: '#666',
+    marginLeft: 8,
+    flex: 1,
+  },
+  dateRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  dateText: {
+    fontSize: 14,
+    color: '#999',
+    marginLeft: 8,
+  },
+  progressContainer: {
+    marginTop: 4,
+  },
+  progressHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  progressLabel: {
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '600',
+  },
+  progressPercent: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#1c1c1e',
+  },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  progressBarFill: {
+    height: '100%',
+    borderRadius: 4,
+  },
+  statusBadgeContainer: {
+    marginTop: 12,
+  },
+  statusBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#fff',
   }
 });

@@ -6,6 +6,7 @@ module.exports = {
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
+    scheme: 'com.rizz.app',
     splash: {
       image: './assets/splash.png',
       resizeMode: 'contain',
@@ -31,7 +32,15 @@ module.exports = {
     extra: {
       eas: {
         projectId: 'c50bdb29-edbf-4aa1-9ff2-505cb7567378'
-      }
+      },
+      router: {
+        scheme: 'com.rizz.app'
+      },
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      supabaseKey: process.env.EXPO_PUBLIC_SUPABASE_KEY,
+      apiUrl: process.env.EXPO_PUBLIC_API_URL,
+      appEnv: process.env.EXPO_PUBLIC_APP_ENV,
+      appName: process.env.EXPO_PUBLIC_APP_NAME
     },
     plugins: [
       "@react-native-google-signin/google-signin",

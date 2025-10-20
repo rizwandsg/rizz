@@ -5,7 +5,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "rizzapp",
+    "scheme": "com.rizz.app",
     "userInterfaceStyle": "automatic",
     "plugins": [
       "@react-native-google-signin/google-signin",
@@ -54,7 +54,8 @@
     },
     "extra": {
       "router": {
-        "origin": false
+        "origin": false,
+        "scheme": "com.rizz.app"
       },
       "eas": {
         "projectId": "c50bdb29-edbf-4aa1-9ff2-505cb7567378"
