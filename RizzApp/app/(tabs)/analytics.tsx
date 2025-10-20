@@ -2,8 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LineChart, PieChart } from "react-native-chart-kit";
+import { Expense, getExpenses } from "../../api/expensesApi";
 import { getProjects, Project } from "../../api/projectsApi";
-import { getExpenses, Expense } from "../../api/expensesApi";
 
 interface ChartDataPoint {
   name: string;

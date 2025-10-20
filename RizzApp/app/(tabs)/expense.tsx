@@ -1,9 +1,9 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { LinearGradient } from 'expo-linear-gradient';
-import { getExpenses, Expense } from "../../api/expensesApi";
+import { Expense, getExpenses } from "../../api/expensesApi";
 import { getProjects } from "../../api/projectsApi";
 
 export default function ExpenseScreen() {

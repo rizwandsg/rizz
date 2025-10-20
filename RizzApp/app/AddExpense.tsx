@@ -1,11 +1,11 @@
 ﻿import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { getProjects, Project } from "../api/projectsApi";
 import { createExpense, Expense } from "../api/expensesApi";
+import { getProjects, Project } from "../api/projectsApi";
 
 export default function AddExpense() {
   const router = useRouter();

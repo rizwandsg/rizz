@@ -1,18 +1,18 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ActivityIndicator,
-  ScrollView,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { getCurrentUser, logout, User } from '../../api/authApi';
-import { getProjects } from '../../api/projectsApi';
 import { getExpenses } from '../../api/expensesApi';
+import { getProjects } from '../../api/projectsApi';
 
 export default function ProfileScreen() {
   const router = useRouter();
