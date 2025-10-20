@@ -99,18 +99,9 @@ export default function AddProject() {
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>{id ? "Edit Project" : "New Project"}</Text>
-            <Text style={styles.headerSubtitle}>Manage your project details</Text>
-          </View>
-          <View style={styles.headerSpacer} />
+        <View style={styles.headerContentCentered}>
+          <Text style={styles.headerTitle}>{id ? "Edit Project" : "New Project"}</Text>
+          <Text style={styles.headerSubtitle}>Manage your project details</Text>
         </View>
       </LinearGradient>
 
@@ -294,26 +285,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  headerContentCentered: {
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  headerTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 24,
@@ -326,9 +301,6 @@ const styles = StyleSheet.create({
     color: 'rgba(255,255,255,0.9)',
     marginTop: 2,
     letterSpacing: 0.3,
-  },
-  headerSpacer: {
-    width: 40,
   },
   scrollContent: {
     flex: 1,

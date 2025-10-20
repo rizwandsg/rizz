@@ -22,6 +22,8 @@ export default function AddExpense() {
   const [loading, setLoading] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingExpense, setLoadingExpense] = useState(false);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [projectSearchQuery, setProjectSearchQuery] = useState("");
 
   useEffect(() => {
     loadProjects();
@@ -141,34 +143,96 @@ export default function AddExpense() {
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
-        <View style={styles.headerContent}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>{id ? "Edit Expense" : "Add Expense"}</Text>
-            <Text style={styles.headerSubtitle}>Track your project costs</Text>
-          </View>
-          <View style={styles.headerSpacer} />
+        <View style={styles.headerContentCentered}>
+          <Text style={styles.headerTitle}>{id ? "Edit Expense" : "Add Expense"}</Text>
+          <Text style={styles.headerSubtitle}>Track your project costs</Text>
         </View>
       </LinearGradient>
 
       <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
       <View style={styles.form}>
+        {/* Project Dropdown */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Project *</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.projectScroll}>
-            {projects.map((project) => (
-              <TouchableOpacity key={project.id} style={[styles.projectChip, selectedProjectId === project.id && styles.projectChipSelected]} onPress={() => project.id && setSelectedProjectId(project.id)}>
-                <MaterialCommunityIcons name={selectedProjectId === project.id ? "check-circle" : "circle-outline"} size={18} color={selectedProjectId === project.id ? "#fff" : "#667eea"} />
-                <Text style={[styles.projectChipText, selectedProjectId === project.id && styles.projectChipTextSelected]}>{project.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          <TouchableOpacity 
+            style={styles.dropdownButton}
+            onPress={() => setShowProjectDropdown(!showProjectDropdown)}
+            disabled={loading}
+          >
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons name="briefcase" size={20} color="#667eea" />
+            </View>
+            <Text style={[styles.dropdownText, !selectedProjectId && styles.dropdownPlaceholder]}>
+              {selectedProjectId 
+                ? projects.find(p => p.id === selectedProjectId)?.name 
+                : "Select a project"}
+            </Text>
+            <MaterialCommunityIcons 
+              name={showProjectDropdown ? "chevron-up" : "chevron-down"} 
+              size={24} 
+              color="#999" 
+            />
+          </TouchableOpacity>
+
+          {/* Dropdown List */}
+          {showProjectDropdown && (
+            <View style={styles.dropdownList}>
+              {/* Search Input */}
+              <View style={styles.searchContainer}>
+                <MaterialCommunityIcons name="magnify" size={20} color="#999" />
+                <TextInput
+                  style={styles.searchInput}
+                  placeholder="Search projects..."
+                  value={projectSearchQuery}
+                  onChangeText={setProjectSearchQuery}
+                  placeholderTextColor="#999"
+                />
+                {projectSearchQuery.length > 0 && (
+                  <TouchableOpacity onPress={() => setProjectSearchQuery("")}>
+                    <MaterialCommunityIcons name="close-circle" size={20} color="#999" />
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Project List */}
+              <ScrollView style={styles.dropdownScroll} nestedScrollEnabled>
+                {projects
+                  .filter(project => 
+                    project.name.toLowerCase().includes(projectSearchQuery.toLowerCase())
+                  )
+                  .map((project) => (
+                    <TouchableOpacity
+                      key={project.id}
+                      style={[
+                        styles.dropdownItem,
+                        selectedProjectId === project.id && styles.dropdownItemSelected
+                      ]}
+                      onPress={() => {
+                        if (project.id) {
+                          setSelectedProjectId(project.id);
+                          setShowProjectDropdown(false);
+                          setProjectSearchQuery("");
+                        }
+                      }}
+                    >
+                      <MaterialCommunityIcons 
+                        name={selectedProjectId === project.id ? "check-circle" : "circle-outline"} 
+                        size={20} 
+                        color={selectedProjectId === project.id ? "#667eea" : "#ccc"} 
+                      />
+                      <Text style={[
+                        styles.dropdownItemText,
+                        selectedProjectId === project.id && styles.dropdownItemTextSelected
+                      ]}>
+                        {project.name}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+              </ScrollView>
+            </View>
+          )}
         </View>
+
         {/* Description */}
         <View style={styles.inputGroup}>
           <Text style={styles.label}>Description *</Text>
@@ -259,26 +323,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
-  headerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  headerContentCentered: {
     alignItems: 'center',
     paddingHorizontal: 20,
     marginBottom: 12,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.5)',
-  },
-  headerTitleContainer: {
-    flex: 1,
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 24,
@@ -399,40 +447,85 @@ const styles = StyleSheet.create({
     color: "#333",
     letterSpacing: 0.3
   },
-  projectScroll: { 
-    marginTop: 8 
+  dropdownButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    shadowColor: '#f093fb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+    gap: 12,
   },
-  projectChip: { 
-    flexDirection: "row", 
-    alignItems: "center", 
-    paddingHorizontal: 16, 
-    paddingVertical: 10, 
-    borderRadius: 20, 
-    backgroundColor: "#fff", 
-    borderWidth: 1.5, 
-    borderColor: "#667eea", 
-    marginRight: 10, 
-    gap: 6,
-    shadowColor: "#667eea",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 2
+  dropdownText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+    letterSpacing: 0.3,
+    fontWeight: '600',
   },
-  projectChipSelected: { 
-    backgroundColor: "#667eea", 
-    borderColor: "#667eea",
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+  dropdownPlaceholder: {
+    color: '#999',
+    fontWeight: '400',
   },
-  projectChipText: { 
-    fontSize: 14, 
-    fontWeight: "600", 
-    color: "#667eea",
-    letterSpacing: 0.3
+  dropdownList: {
+    marginTop: 8,
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#e8e8e8',
+    maxHeight: 300,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
-  projectChipTextSelected: { 
-    color: "#fff" 
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+    gap: 10,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+    padding: 0,
+  },
+  dropdownScroll: {
+    maxHeight: 200,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    gap: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f5f5f5',
+  },
+  dropdownItemSelected: {
+    backgroundColor: '#F5F5FF',
+  },
+  dropdownItemText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+    letterSpacing: 0.3,
+  },
+  dropdownItemTextSelected: {
+    color: '#667eea',
+    fontWeight: '600',
   },
   categoryGrid: { 
     flexDirection: "row", 
