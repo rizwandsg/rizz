@@ -1,7 +1,8 @@
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -11,16 +12,16 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
+import { Expense, getExpensesByProject } from "../api/expensesApi";
 import {
   deleteProject,
   getProjectById,
   Project,
 } from "../api/projectsApi";
-import { getExpensesByProject, Expense } from "../api/expensesApi";
 
 export default function ProjectDetails() {
   const router = useRouter();
+  const navigation = useNavigation();
   const { id } = useLocalSearchParams();
   const [project, setProject] = useState<Project | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -37,7 +38,7 @@ export default function ProjectDetails() {
       ]);
       setProject(projectData);
       setExpenses(expensesData || []);
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to load project details");
       router.back();
     } finally {
@@ -48,14 +49,15 @@ export default function ProjectDetails() {
   useFocusEffect(
     React.useCallback(() => {
       loadProjectData();
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])
   );
 
-  const handleEdit = () => {
+  const handleEdit = useCallback(() => {
     router.push({ pathname: "/AddProject", params: { id: id } });
-  };
+  }, [router, id]);
 
-  const handleDelete = () => {
+  const handleDelete = useCallback(() => {
     Alert.alert(
       "Delete Project",
       "Are you sure you want to delete this project?",
@@ -71,7 +73,7 @@ export default function ProjectDetails() {
               Alert.alert("Success", "Project deleted", [
                 { text: "OK", onPress: () => router.back() },
               ]);
-            } catch (error) {
+            } catch {
               Alert.alert("Error", "Failed to delete project");
             } finally {
               setDeleting(false);
@@ -80,11 +82,31 @@ export default function ProjectDetails() {
         },
       ]
     );
-  };
+  }, [id, router]);
 
   const handleAddExpense = () => {
     router.push({ pathname: "/AddExpense", params: { projectId: id } });
   };
+
+  // Set header buttons
+  React.useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <View style={{ flexDirection: 'row', marginRight: 8 }}>
+          <TouchableOpacity onPress={handleEdit} style={{ padding: 8, marginRight: 8 }}>
+            <MaterialCommunityIcons name="pencil" size={22} color="#667eea" />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={handleDelete} disabled={deleting} style={{ padding: 8 }}>
+            {deleting ? (
+              <ActivityIndicator size="small" color="#667eea" />
+            ) : (
+              <MaterialCommunityIcons name="delete" size={22} color="#FF3B30" />
+            )}
+          </TouchableOpacity>
+        </View>
+      ),
+    });
+  }, [navigation, deleting, handleEdit, handleDelete]);
 
   const getStatusColor = (status?: string) => {
     switch (status) {
@@ -149,61 +171,35 @@ export default function ProjectDetails() {
   const statusIcon = getStatusIcon(project.status);
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Project Info Card */}
       <LinearGradient
         colors={[statusColor, statusColor + "DD"]}
-        style={styles.header}
+        style={styles.headerCard}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
       >
-        <View style={styles.headerTop}>
-          <TouchableOpacity
-            onPress={() => router.back()}
-            style={styles.backButton}
-          >
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
-          <View style={styles.headerActions}>
-            <TouchableOpacity onPress={handleEdit} style={styles.iconButton}>
-              <MaterialCommunityIcons name="pencil" size={22} color="#fff" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleDelete}
-              style={styles.iconButton}
-              disabled={deleting}
-            >
-              {deleting ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <MaterialCommunityIcons name="delete" size={22} color="#fff" />
-              )}
-            </TouchableOpacity>
-          </View>
+        <View style={styles.projectIcon}>
+          <MaterialCommunityIcons name="briefcase" size={32} color="#fff" />
         </View>
-        <View style={styles.headerContent}>
-          <View style={styles.projectIcon}>
-            <MaterialCommunityIcons name="briefcase" size={32} color="#fff" />
-          </View>
-          <Text style={styles.projectName}>{project.name}</Text>
-          {project.description && (
-            <Text style={styles.projectDescription}>{project.description}</Text>
-          )}
-          <View style={styles.statusBadge}>
-            <MaterialCommunityIcons
-              name={statusIcon as any}
-              size={16}
-              color="#fff"
-            />
-            <Text style={styles.statusText}>
-              {project.status?.charAt(0).toUpperCase() +
-                (project.status?.slice(1) || "")}
-            </Text>
-          </View>
+        <Text style={styles.projectName}>{project.name}</Text>
+        {project.description && (
+          <Text style={styles.projectDescription}>{project.description}</Text>
+        )}
+        <View style={styles.statusBadge}>
+          <MaterialCommunityIcons
+            name={statusIcon as any}
+            size={16}
+            color="#fff"
+          />
+          <Text style={styles.statusText}>
+            {project.status?.charAt(0).toUpperCase() +
+              (project.status?.slice(1) || "")}
+          </Text>
         </View>
       </LinearGradient>
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Project Information</Text>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Project Information</Text>
           <View style={styles.infoRow}>
             <MaterialCommunityIcons
               name="calendar-start"
@@ -344,8 +340,7 @@ export default function ProjectDetails() {
             ))}
           </View>
         )}
-      </ScrollView>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -353,6 +348,19 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
+  },
+  headerCard: {
+    marginHorizontal: 20,
+    marginTop: 16,
+    marginBottom: 20,
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
   },
   loadingContainer: {
     flex: 1,

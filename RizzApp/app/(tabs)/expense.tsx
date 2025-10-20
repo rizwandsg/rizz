@@ -3,32 +3,70 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpenses } from "../../api/expensesApi";
 import { getProjects } from "../../api/projectsApi";
 
+interface ProjectExpenseSummary {
+  projectId: string;
+  projectName: string;
+  totalAmount: number;
+  expenseCount: number;
+  expenses: Expense[];
+  lastExpenseDate: string;
+}
+
 export default function ExpenseScreen() {
-  const [expenses, setExpenses] = useState<Expense[]>([]);
+  const insets = useSafeAreaInsets();
+  const [projectSummaries, setProjectSummaries] = useState<ProjectExpenseSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [projects, setProjects] = useState<{[key: string]: string}>({});
   const router = useRouter();
 
   const loadData = async () => {
     try {
-      // Load projects for mapping
+      // Load projects and expenses
       const projectsList = await getProjects();
-      const projectMap = projectsList.reduce<{[key: string]: string}>((acc, project) => {
-        if (project.id) {
-          acc[project.id] = project.name;
-        }
-        return acc;
-      }, {});
-      setProjects(projectMap);
-
-      // Load expenses
       const expensesList = await getExpenses();
-      setExpenses(expensesList.sort((a, b) => 
-        new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime()
-      ));
+
+      // Group expenses by project
+      const projectMap = new Map<string, ProjectExpenseSummary>();
+
+      // Initialize all projects with zero expenses
+      projectsList.forEach(project => {
+        if (project.id) {
+          projectMap.set(project.id, {
+            projectId: project.id,
+            projectName: project.name,
+            totalAmount: 0,
+            expenseCount: 0,
+            expenses: [],
+            lastExpenseDate: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Add expenses to their respective projects
+      expensesList.forEach(expense => {
+        if (expense.project_id && projectMap.has(expense.project_id)) {
+          const summary = projectMap.get(expense.project_id)!;
+          summary.totalAmount += expense.amount || 0;
+          summary.expenseCount += 1;
+          summary.expenses.push(expense);
+          
+          // Update last expense date
+          if (expense.expense_date && 
+              new Date(expense.expense_date) > new Date(summary.lastExpenseDate)) {
+            summary.lastExpenseDate = expense.expense_date;
+          }
+        }
+      });
+
+      // Convert to array and sort by total amount (highest first)
+      const summaries = Array.from(projectMap.values())
+        .filter(s => s.expenseCount > 0) // Only show projects with expenses
+        .sort((a, b) => b.totalAmount - a.totalAmount);
+
+      setProjectSummaries(summaries);
     } catch (error) {
       console.error("Error loading data:", error);
     } finally {
@@ -48,25 +86,6 @@ export default function ExpenseScreen() {
     });
   };
 
-  const getCategoryColor = (category?: string): [string, string] => {
-    // You can add category logic here if expenses have categories
-    const colors: { [key: string]: [string, string] } = {
-      'food': ['#FF6B6B', '#FF3B30'],
-      'transport': ['#4ECDC4', '#00A896'],
-      'utilities': ['#FFD93D', '#FFA500'],
-      'materials': ['#6BCF7F', '#34C759'],
-      'equipment': ['#A8E6CF', '#56C596'],
-      'default': ['#667eea', '#764ba2'],
-    };
-    return colors[category?.toLowerCase() || 'default'] || colors['default'];
-  };
-
-  const getCategoryIcon = (amount: number) => {
-    if (amount > 50000) return 'alert-circle';
-    if (amount > 20000) return 'trending-up';
-    return 'cash';
-  };
-
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -76,9 +95,10 @@ export default function ExpenseScreen() {
     );
   }
 
-  const totalExpenses = expenses.reduce((sum, exp) => sum + (exp.amount || 0), 0);
-  const avgExpense = expenses.length > 0 ? totalExpenses / expenses.length : 0;
-  const highestExpense = expenses.length > 0 ? Math.max(...expenses.map(e => e.amount || 0)) : 0;
+  const totalExpenses = projectSummaries.reduce((sum, project) => sum + project.totalAmount, 0);
+  const totalTransactions = projectSummaries.reduce((sum, project) => sum + project.expenseCount, 0);
+  const avgExpensePerProject = projectSummaries.length > 0 ? totalExpenses / projectSummaries.length : 0;
+  const highestProjectExpense = projectSummaries.length > 0 ? Math.max(...projectSummaries.map(p => p.totalAmount)) : 0;
 
   return (
     <View style={styles.container}>
@@ -87,12 +107,12 @@ export default function ExpenseScreen() {
         colors={['#f093fb', '#f5576c']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
+        style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
         <View style={styles.headerContent}>
           <View>
-            <Text style={styles.headerGreeting}>Expenses</Text>
-            <Text style={styles.headerSubtitle}>{expenses.length} transactions</Text>
+            <Text style={styles.headerGreeting}>Project Expenses</Text>
+            <Text style={styles.headerSubtitle}>{projectSummaries.length} projects • {totalTransactions} transactions</Text>
           </View>
           <TouchableOpacity
             style={styles.addButton}
@@ -111,31 +131,39 @@ export default function ExpenseScreen() {
           </View>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="chart-line" size={22} color="#6BCF7F" />
-            <Text style={styles.statNumber}>₹{(avgExpense / 1000).toFixed(1)}K</Text>
-            <Text style={styles.statLabel}>Average</Text>
+            <Text style={styles.statNumber}>₹{(avgExpensePerProject / 1000).toFixed(1)}K</Text>
+            <Text style={styles.statLabel}>Avg/Project</Text>
           </View>
           <View style={styles.statCard}>
             <MaterialCommunityIcons name="trending-up" size={22} color="#FF6B6B" />
-            <Text style={styles.statNumber}>₹{(highestExpense / 1000).toFixed(1)}K</Text>
+            <Text style={styles.statNumber}>₹{(highestProjectExpense / 1000).toFixed(1)}K</Text>
             <Text style={styles.statLabel}>Highest</Text>
           </View>
         </View>
       </LinearGradient>
 
       <FlatList
-        data={expenses}
-        keyExtractor={item => item.id || ''}
+        data={projectSummaries}
+        keyExtractor={item => item.projectId}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         renderItem={({ item, index }) => {
-          const [gradientStart, gradientEnd] = getCategoryColor(item.category);
-          const categoryIcon = getCategoryIcon(item.amount || 0);
+          // Use gradient colors based on total amount
+          const gradientColors: [string, string] = item.totalAmount > 50000 
+            ? ['#FF6B6B', '#FF3B30']
+            : item.totalAmount > 20000
+            ? ['#FFD93D', '#FFA500']
+            : ['#667eea', '#764ba2'];
           
           return (
-            <View style={[styles.card, { marginTop: index === 0 ? 20 : 0 }]}>
+            <TouchableOpacity 
+              style={[styles.card, { marginTop: index === 0 ? 20 : 0 }]}
+              onPress={() => router.push(`/ProjectDetails?id=${item.projectId}`)}
+              activeOpacity={0.7}
+            >
               {/* Colored Left Border */}
               <LinearGradient
-                colors={[gradientStart, gradientEnd]}
+                colors={gradientColors}
                 style={styles.cardLeftBorder}
               />
               
@@ -144,41 +172,43 @@ export default function ExpenseScreen() {
                 <View style={styles.cardHeader}>
                   <View style={styles.projectTagContainer}>
                     <LinearGradient
-                      colors={[gradientStart, gradientEnd]}
+                      colors={gradientColors}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.projectTag}
                     >
-                      <MaterialCommunityIcons name="folder" size={14} color="#fff" />
-                      <Text style={styles.projectName}>{projects[item.project_id || ''] || 'General'}</Text>
+                      <MaterialCommunityIcons name="briefcase" size={14} color="#fff" />
+                      <Text style={styles.projectName}>{item.projectName}</Text>
                     </LinearGradient>
                   </View>
                   <View style={styles.dateContainer}>
                     <MaterialCommunityIcons name="calendar" size={14} color="#999" />
-                    <Text style={styles.date}>{formatDate(item.expense_date)}</Text>
+                    <Text style={styles.date}>{formatDate(item.lastExpenseDate)}</Text>
                   </View>
                 </View>
 
-                {/* Description */}
-                <Text style={styles.description} numberOfLines={2}>{item.description}</Text>
+                {/* Description - Show expense count */}
+                <Text style={styles.description} numberOfLines={2}>
+                  {item.expenseCount} {item.expenseCount === 1 ? 'expense' : 'expenses'} recorded
+                </Text>
 
                 {/* Footer Row */}
                 <View style={styles.cardFooter}>
                   <View style={styles.iconContainer}>
                     <LinearGradient
-                      colors={[gradientStart, gradientEnd]}
+                      colors={gradientColors}
                       style={styles.iconGradient}
                     >
-                      <MaterialCommunityIcons name={categoryIcon} size={20} color="#fff" />
+                      <MaterialCommunityIcons name="chart-bar" size={20} color="#fff" />
                     </LinearGradient>
                   </View>
                   <View style={styles.costContainer}>
                     <Text style={styles.currencySymbol}>₹</Text>
-                    <Text style={styles.cost}>{(item.amount || 0).toLocaleString()}</Text>
+                    <Text style={styles.cost}>{item.totalAmount.toLocaleString()}</Text>
                   </View>
                 </View>
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
         ListEmptyComponent={
@@ -210,10 +240,9 @@ const styles = StyleSheet.create({
     fontSize: 16
   },
   headerGradient: {
-    paddingTop: 16,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 30,
-    borderBottomRightRadius: 30,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     elevation: 8,
     shadowColor: '#f093fb',
     shadowOffset: { width: 0, height: 4 },
@@ -225,10 +254,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   headerGreeting: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 4,

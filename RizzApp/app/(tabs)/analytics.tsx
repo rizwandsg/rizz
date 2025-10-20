@@ -2,6 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LineChart, PieChart } from "react-native-chart-kit";
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpenses } from "../../api/expensesApi";
 import { getProjects, Project } from "../../api/projectsApi";
 
@@ -36,6 +37,7 @@ const chartConfig = {
 };
 
 function AnalyticsRoute() {
+  const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
   const [projectData, setProjectData] = useState<ChartDataPoint[]>([]);
   const [expenseData, setExpenseData] = useState<ExpenseData[]>([]);
@@ -126,8 +128,12 @@ function AnalyticsRoute() {
   };
 
   return (
-    <ScrollView style={styles.container}>
-      <Text style={styles.title}>📊 Financial Overview</Text>
+    <View style={{ flex: 1, backgroundColor: '#f5f7fa' }}>
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <Text style={styles.headerTitle}>Analytics</Text>
+        <Text style={styles.headerSubtitle}>Financial Overview</Text>
+      </View>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       
       <View style={styles.summaryContainer}>
         <View style={styles.summaryCard}>
@@ -183,6 +189,7 @@ function AnalyticsRoute() {
         )}
       </View>
     </ScrollView>
+    </View>
   );
 }
 
@@ -190,6 +197,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingHorizontal: 16,
+  },
+  header: {
+    backgroundColor: '#667eea',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 4,
+  },
+  headerSubtitle: {
+    fontSize: 15,
+    color: 'rgba(255,255,255,0.9)',
   },
   loadingContainer: {
     flex: 1,
