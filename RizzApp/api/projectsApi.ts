@@ -1,14 +1,198 @@
 import { database, TABLES } from '../services/databaseService';
 import { getCurrentUser } from './authApi';
 
+export type ScopeOfWork = 
+    | 'Carpentry Work'
+    | 'Painting Work'
+    | 'Aluminium Work'
+    | 'Electrical Work'
+    | 'Plumbing Work'
+    | 'Flooring Work'
+    | 'False Ceiling Work'
+    | 'Masonry Work'
+    | 'Tiling Work'
+    | 'Glazing Work'
+    | 'Door & Window Work'
+    | 'Kitchen & Modular Work'
+    | 'Interior Decoration'
+    | 'Exterior Decoration'
+    | 'Landscaping Work'
+    | 'HVAC Work'
+    | 'Waterproofing Work'
+    | 'Structural Work'
+    | 'Civil Work'
+    | 'Plastering Work'
+    | 'Wallpaper Work'
+    | 'Furniture Work'
+    | 'Lighting Work'
+    | 'Partition Work'
+    | 'Plaster of Paris Work'
+    | 'Wood Flooring'
+    | 'Marble & Granite Work'
+    | 'Steel Fabrication'
+    | 'Railing Work'
+    | 'Staircase Work'
+    | 'Bathroom Fitting'
+    | 'Wardrobe Work'
+    | 'Curtain & Blinds'
+    | 'Wall Cladding'
+    | 'Roofing Work'
+    | 'Insulation Work'
+    | 'Demolition Work'
+    | 'Site Preparation'
+    | 'Complete Interior Fit-out'
+    | 'Complete Renovation'
+    | 'Turnkey Project';
+
+export interface ScopeCategory {
+    name: string;
+    icon: string;
+    color: string;
+    scopes: {
+        value: ScopeOfWork;
+        icon: string;
+    }[];
+}
+
+export const SCOPE_CATEGORIES: ScopeCategory[] = [
+    {
+        name: 'Carpentry & Woodwork',
+        icon: 'hammer-screwdriver',
+        color: '#8B4513',
+        scopes: [
+            { value: 'Carpentry Work', icon: 'hammer-screwdriver' },
+            { value: 'Furniture Work', icon: 'table-furniture' },
+            { value: 'Wardrobe Work', icon: 'wardrobe' },
+            { value: 'Wood Flooring', icon: 'pine-tree' },
+            { value: 'Door & Window Work', icon: 'door' },
+            { value: 'Staircase Work', icon: 'stairs' },
+        ]
+    },
+    {
+        name: 'Painting & Finishes',
+        icon: 'format-paint',
+        color: '#FF6B6B',
+        scopes: [
+            { value: 'Painting Work', icon: 'format-paint' },
+            { value: 'Wallpaper Work', icon: 'wallpaper' },
+            { value: 'Wall Cladding', icon: 'wall-sconce-flat' },
+            { value: 'Plastering Work', icon: 'texture' },
+            { value: 'Plaster of Paris Work', icon: 'spray' },
+        ]
+    },
+    {
+        name: 'Metalwork',
+        icon: 'wrench',
+        color: '#546E7A',
+        scopes: [
+            { value: 'Aluminium Work', icon: 'window-closed-variant' },
+            { value: 'Steel Fabrication', icon: 'wrench' },
+            { value: 'Railing Work', icon: 'fence' },
+        ]
+    },
+    {
+        name: 'Civil & Structural',
+        icon: 'home-variant',
+        color: '#34495E',
+        scopes: [
+            { value: 'Structural Work', icon: 'home-variant' },
+            { value: 'Civil Work', icon: 'hard-hat' },
+            { value: 'Masonry Work', icon: 'wall' },
+            { value: 'Demolition Work', icon: 'hammer-wrench' },
+            { value: 'Site Preparation', icon: 'excavator' },
+        ]
+    },
+    {
+        name: 'Flooring & Tiling',
+        icon: 'grid',
+        color: '#16A085',
+        scopes: [
+            { value: 'Flooring Work', icon: 'floor-plan' },
+            { value: 'Tiling Work', icon: 'grid' },
+            { value: 'Marble & Granite Work', icon: 'square' },
+        ]
+    },
+    {
+        name: 'Electrical & Lighting',
+        icon: 'flash',
+        color: '#F39C12',
+        scopes: [
+            { value: 'Electrical Work', icon: 'flash' },
+            { value: 'Lighting Work', icon: 'lightbulb-on' },
+        ]
+    },
+    {
+        name: 'Plumbing & Sanitary',
+        icon: 'pipe',
+        color: '#3498DB',
+        scopes: [
+            { value: 'Plumbing Work', icon: 'pipe' },
+            { value: 'Bathroom Fitting', icon: 'shower' },
+            { value: 'Waterproofing Work', icon: 'water-off' },
+        ]
+    },
+    {
+        name: 'Ceiling & Partition',
+        icon: 'ceiling-light',
+        color: '#9B59B6',
+        scopes: [
+            { value: 'False Ceiling Work', icon: 'ceiling-light' },
+            { value: 'Partition Work', icon: 'view-split-vertical' },
+            { value: 'Glazing Work', icon: 'window-open-variant' },
+        ]
+    },
+    {
+        name: 'Interior & Decor',
+        icon: 'sofa',
+        color: '#E91E63',
+        scopes: [
+            { value: 'Interior Decoration', icon: 'sofa' },
+            { value: 'Kitchen & Modular Work', icon: 'countertop' },
+            { value: 'Curtain & Blinds', icon: 'blinds' },
+        ]
+    },
+    {
+        name: 'Exterior & Outdoor',
+        icon: 'home-city',
+        color: '#27AE60',
+        scopes: [
+            { value: 'Exterior Decoration', icon: 'home-city' },
+            { value: 'Landscaping Work', icon: 'tree' },
+            { value: 'Roofing Work', icon: 'home-roof' },
+        ]
+    },
+    {
+        name: 'Mechanical & HVAC',
+        icon: 'air-conditioner',
+        color: '#00BCD4',
+        scopes: [
+            { value: 'HVAC Work', icon: 'air-conditioner' },
+            { value: 'Insulation Work', icon: 'thermometer' },
+        ]
+    },
+    {
+        name: 'Complete Projects',
+        icon: 'key-variant',
+        color: '#667eea',
+        scopes: [
+            { value: 'Complete Interior Fit-out', icon: 'home-modern' },
+            { value: 'Complete Renovation', icon: 'home-edit' },
+            { value: 'Turnkey Project', icon: 'key-variant' },
+        ]
+    },
+];
+
 export interface Project {
     id?: string;
     user_id?: string;
     name: string;
+    client_name?: string;
     description?: string;
     start_date: string;
     end_date?: string;
     status?: string;
+    total_project_cost?: number;
+    scope_of_work?: ScopeOfWork[]; // Array to support multiple selections
     created_at?: string;
     updated_at?: string;
 }

@@ -15,6 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const TABLES = {
     PROJECTS: 'projects',
     EXPENSES: 'expenses',
+    PAYMENTS: 'payments',
 };
 
 export interface QueryOptions {
@@ -28,6 +29,7 @@ export interface DatabaseService {
     loadData: <T>(table: string, options?: QueryOptions) => Promise<T[] | null>;
     loadDataById: <T>(table: string, id: string) => Promise<T | null>;
     upsertData: <T>(table: string, data: T) => Promise<T>;
+    updateData: <T>(table: string, id: string, data: Partial<T>) => Promise<T>;
     deleteData: (table: string, id: string) => Promise<void>;
 }
 
@@ -130,6 +132,23 @@ export const database: DatabaseService = {
         } catch (error) {
             console.error(`Failed to upsert data in ${table}:`, error);
             throw new Error(`Failed to upsert data in ${table}`);
+        }
+    },
+
+    updateData: async <T>(table: string, id: string, data: Partial<T>): Promise<T> => {
+        try {
+            const { data: result, error } = await supabase
+                .from(table)
+                .update(data)
+                .eq('id', id)
+                .select()
+                .single();
+
+            if (error) throw error;
+            return result as T;
+        } catch (error) {
+            console.error(`Failed to update data in ${table}:`, error);
+            throw new Error(`Failed to update data in ${table}`);
         }
     },
 

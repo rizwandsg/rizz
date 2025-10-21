@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getProjects, Project } from '../../api/projectsApi';
+import { getProjects, Project, deleteProject } from '../../api/projectsApi';
 
 export default function Home() {
   const router = useRouter();
@@ -50,6 +50,33 @@ export default function Home() {
     if (status === 'cancelled') return 'close-circle-outline';
     if (status === 'on-hold') return 'pause-circle-outline';
     return 'progress-clock';  // active
+  };
+
+  const handleDeleteProject = (projectId: string, projectName: string) => {
+    Alert.alert(
+      'Delete Project',
+      `Are you sure you want to delete "${projectName}"? This action cannot be undone.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteProject(projectId);
+              Alert.alert('Success', 'Project deleted successfully');
+              fetchProjects(); // Refresh the list
+            } catch {
+              Alert.alert('Error', 'Failed to delete project');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const handleEditProject = (projectId: string) => {
+    router.push({ pathname: '/AddProject', params: { id: projectId } });
   };
 
   if (loading) {
@@ -120,15 +147,18 @@ export default function Home() {
               const statusIcon = getStatusIcon(project.status);
               
               return (
-                <TouchableOpacity
+                <View
                   key={project.id}
                   style={[styles.projectCard, { marginTop: index === 0 ? 0 : 16 }]}
-                  onPress={() => router.push({
-                    pathname: "/ProjectDetails",
-                    params: { id: project.id }
-                  })}
-                  activeOpacity={0.7}
                 >
+                  <TouchableOpacity
+                    onPress={() => router.push({
+                      pathname: "/ProjectDetails",
+                      params: { id: project.id }
+                    })}
+                    activeOpacity={0.7}
+                    style={{ flex: 1 }}
+                  >
                   {/* Card Header with Gradient */}
                   <LinearGradient
                     colors={[gradientStart, gradientEnd]}
@@ -149,6 +179,52 @@ export default function Home() {
                   {/* Card Body */}
                   <View style={styles.cardBody}>
                     <Text style={styles.projectName} numberOfLines={1}>{project.name}</Text>
+                    
+                    {/* Client Name */}
+                    {project.client_name && (
+                      <View style={styles.clientRow}>
+                        <MaterialCommunityIcons name="account-tie" size={16} color="#666" />
+                        <Text style={styles.clientName} numberOfLines={1}>{project.client_name}</Text>
+                      </View>
+                    )}
+                    
+                    {/* Total Project Cost */}
+                    {project.total_project_cost !== undefined && (
+                      <View style={styles.clientRow}>
+                        <MaterialCommunityIcons name="currency-usd" size={16} color="#4CAF50" />
+                        <Text style={[styles.clientName, { color: '#4CAF50', fontWeight: '600' }]}>
+                          {new Intl.NumberFormat("en-IN", {
+                            style: "currency",
+                            currency: "INR",
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          }).format(project.total_project_cost)}
+                        </Text>
+                      </View>
+                    )}
+                    
+                    {/* Scope of Work */}
+                    {project.scope_of_work && project.scope_of_work.length > 0 && (
+                      <View style={styles.scopeSection}>
+                        <View style={styles.scopeHeader}>
+                          <MaterialCommunityIcons name="file-document-outline" size={14} color="#667eea" />
+                          <Text style={styles.scopeLabel}>Scope ({project.scope_of_work.length})</Text>
+                        </View>
+                        <View style={styles.scopeTags}>
+                          {project.scope_of_work.slice(0, 3).map((scope, idx) => (
+                            <View key={idx} style={styles.scopeTag}>
+                              <Text style={styles.scopeTagText} numberOfLines={1}>{scope}</Text>
+                            </View>
+                          ))}
+                          {project.scope_of_work.length > 3 && (
+                            <View style={[styles.scopeTag, styles.scopeTagMore]}>
+                              <Text style={[styles.scopeTagText, { color: '#fff' }]}>+{project.scope_of_work.length - 3}</Text>
+                            </View>
+                          )}
+                        </View>
+                      </View>
+                    )}
+                    
                     {project.description && (
                       <View style={styles.clientRow}>
                         <MaterialCommunityIcons name="text" size={16} color="#666" />
@@ -186,7 +262,27 @@ export default function Home() {
                       </View>
                     </View>
                   </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
+
+                  {/* Action Buttons */}
+                  <View style={styles.cardActions}>
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => project.id && handleEditProject(project.id)}
+                    >
+                      <MaterialCommunityIcons name="pencil" size={18} color="#667eea" />
+                      <Text style={styles.actionButtonText}>Edit</Text>
+                    </TouchableOpacity>
+                    <View style={styles.actionDivider} />
+                    <TouchableOpacity
+                      style={styles.actionButton}
+                      onPress={() => project.id && handleDeleteProject(project.id, project.name)}
+                    >
+                      <MaterialCommunityIcons name="delete" size={18} color="#FF3B30" />
+                      <Text style={[styles.actionButtonText, { color: '#FF3B30' }]}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
               );
             })}
           </View>
@@ -406,5 +502,64 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     color: '#fff',
-  }
+  },
+  scopeSection: {
+    marginBottom: 12,
+  },
+  scopeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 4,
+  },
+  scopeLabel: {
+    fontSize: 12,
+    color: '#667eea',
+    fontWeight: '600',
+  },
+  scopeTags: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+  },
+  scopeTag: {
+    backgroundColor: '#F5F7FF',
+    borderWidth: 1,
+    borderColor: '#667eea',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    maxWidth: '48%',
+  },
+  scopeTagMore: {
+    backgroundColor: '#667eea',
+  },
+  scopeTagText: {
+    fontSize: 10,
+    color: '#667eea',
+    fontWeight: '600',
+  },
+  cardActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    paddingTop: 0,
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 6,
+  },
+  actionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#667eea',
+  },
+  actionDivider: {
+    width: 1,
+    backgroundColor: '#f0f0f0',
+  },
 });

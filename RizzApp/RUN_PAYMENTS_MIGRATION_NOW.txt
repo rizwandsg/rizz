@@ -1,0 +1,88 @@
+=====================================================
+🚀 RUN THIS MIGRATION TO FIX THE ERROR
+=====================================================
+
+ERROR YOU'RE SEEING:
+"Could not find the table 'public.payments' in the schema cache"
+
+SOLUTION - Follow these steps:
+
+=====================================================
+STEP 1: Open Supabase Dashboard
+=====================================================
+
+1. Go to: https://supabase.com/dashboard
+2. Select your project: "RizzApp" (or your project name)
+3. Click on "SQL Editor" in the left sidebar
+
+=====================================================
+STEP 2: Run the Migration Script
+=====================================================
+
+1. Click "New Query" button
+2. Open this file in your project:
+   📁 migrations/create_payments_table.sql
+3. Copy ALL the content (283 lines)
+4. Paste it into the SQL Editor
+5. Click "RUN" button (or press Ctrl+Enter)
+
+=====================================================
+STEP 3: Verify Success
+=====================================================
+
+You should see these messages in the output:
+✓ payments table created successfully
+✓ Payment indexes created successfully
+✓ Payment views created successfully
+✓ RLS policies created successfully
+✓ Trigger created successfully
+
+=====================================================
+STEP 4: Restart Your App
+=====================================================
+
+After running the migration, restart your Expo app:
+
+PowerShell command:
+npx expo start --clear
+
+Then open any project - the error should be GONE! ✅
+
+=====================================================
+WHAT THIS MIGRATION DOES
+=====================================================
+
+Creates the "payments" table with these columns:
+- id (UUID, Primary Key)
+- project_id (Reference to projects)
+- user_id (User who recorded payment)
+- amount (Payment amount, must be >= 0)
+- payment_date (Date payment received)
+- payment_type (Advance, Milestone, Final, Partial, Other)
+- payment_mode (Cash, UPI, Bank Transfer, Check, Card, Online)
+- reference_number (Transaction reference)
+- notes (Additional details)
+- received_from (Client/person name)
+- created_at, updated_at (Timestamps)
+
+Also creates:
+- 4 indexes for fast queries
+- 2 views for payment summaries
+- Row Level Security (RLS) policies
+- Auto-update trigger for updated_at
+
+=====================================================
+AFTER MIGRATION - TEST IT
+=====================================================
+
+1. Open any project
+2. Scroll to "Payments" section
+3. Click "Record" button
+4. Fill in payment details:
+   - Amount: 5000
+   - Payment Type: Advance
+   - Payment Mode: UPI
+   - Reference: TXN123456
+5. Save and verify it appears in the list! 🎉
+
+=====================================================

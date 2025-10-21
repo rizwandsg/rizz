@@ -3,15 +3,20 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Alert, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createExpense, Expense, getExpenseById, updateExpense } from "../api/expensesApi";
-import { getProjects, Project } from "../api/projectsApi";
+import { createExpense, Expense, getExpenseById, updateExpense, getUniqueVendors, VendorInfo, PAYMENT_METHODS, PAYMENT_STATUS_OPTIONS, PaymentMethod, PaymentStatus } from "../api/expensesApi";
+import { getProjects, Project, ScopeOfWork } from "../api/projectsApi";
+import { getCategoriesForScope, ExpenseCategory } from "../api/expenseCategoriesApi";
 
 export default function AddExpense() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id, projectId: initialProjectId } = useLocalSearchParams();
+  
+  // Feature flag - set to true after running database migration
+  const VENDOR_PAYMENT_ENABLED = true; // Vendor and payment tracking enabled
+  
   const [description, setDescription] = useState("");
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("general");
@@ -19,19 +24,44 @@ export default function AddExpense() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId as string || null);
+  const [selectedScope, setSelectedScope] = useState<ScopeOfWork | 'Other' | null>(null);
+  const [availableScopes, setAvailableScopes] = useState<ScopeOfWork[]>([]);
+  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
+  
+  // Vendor and payment fields
+  const [vendorName, setVendorName] = useState("");
+  const [vendorContact, setVendorContact] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("Cash");
+  const [paymentStatus, setPaymentStatus] = useState<PaymentStatus>("Unpaid");
+  const [vendors, setVendors] = useState<VendorInfo[]>([]);
+  const [showVendorDropdown, setShowVendorDropdown] = useState(false);
+  const [showPaymentMethodDropdown, setShowPaymentMethodDropdown] = useState(false);
+  const [showPaymentStatusDropdown, setShowPaymentStatusDropdown] = useState(false);
+  
   const [loading, setLoading] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
   const [loadingExpense, setLoadingExpense] = useState(false);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [showScopeDropdown, setShowScopeDropdown] = useState(false);
   const [projectSearchQuery, setProjectSearchQuery] = useState("");
 
   useEffect(() => {
     loadProjects();
+    loadVendors();
     if (id) {
       loadExpense();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  const loadVendors = async () => {
+    try {
+      const vendorsList = await getUniqueVendors();
+      setVendors(vendorsList);
+    } catch (error) {
+      console.error('Failed to load vendors:', error);
+    }
+  };
 
   const loadExpense = async () => {
     try {
@@ -44,12 +74,28 @@ export default function AddExpense() {
           setCategory(expense.category || "general");
           setExpenseDate(new Date(expense.expense_date));
           setSelectedProjectId(expense.project_id);
+          if (expense.scope_of_work) {
+            setSelectedScope(expense.scope_of_work);
+          }
+          // Load vendor and payment info
+          if (expense.vendor_name) {
+            setVendorName(expense.vendor_name);
+          }
+          if (expense.vendor_contact) {
+            setVendorContact(expense.vendor_contact);
+          }
+          if (expense.payment_method) {
+            setPaymentMethod(expense.payment_method);
+          }
+          if (expense.payment_status) {
+            setPaymentStatus(expense.payment_status);
+          }
         } else {
           Alert.alert("Error", "Expense not found");
           router.back();
         }
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to load expense");
       router.back();
     } finally {
@@ -72,22 +118,71 @@ export default function AddExpense() {
     }
   };
 
+  // Load scopes when project changes
+  useEffect(() => {
+    if (selectedProjectId) {
+      const project = projects.find(p => p.id === selectedProjectId);
+      if (project?.scope_of_work && project.scope_of_work.length > 0) {
+        setAvailableScopes(project.scope_of_work);
+        // Auto-select first scope if not already selected
+        if (!selectedScope && project.scope_of_work.length === 1) {
+          setSelectedScope(project.scope_of_work[0]);
+        }
+      } else {
+        setAvailableScopes([]);
+        setSelectedScope(null);
+      }
+    }
+  }, [selectedProjectId, projects, selectedScope]);
+
+  // Load categories when scope changes
+  useEffect(() => {
+    if (selectedScope) {
+      const categories = getCategoriesForScope(selectedScope);
+      setExpenseCategories(categories);
+      // Reset category to first available category or empty
+      if (categories.length > 0) {
+        setCategory(categories[0].name);
+      } else {
+        setCategory('');
+      }
+    } else {
+      setExpenseCategories([]);
+      setCategory('general'); // Reset to general when no scope
+    }
+  }, [selectedScope]);
+
   const handleSave = async () => {
     setLoading(true);
     try {
       if (!description?.trim()) throw new Error("Please enter a description");
       if (!amount) throw new Error("Please enter an amount");
       if (!selectedProjectId) throw new Error("Please select a project");
+      if (!selectedScope) throw new Error("Please select a scope of work");
       const amountValue = parseFloat(amount);
       if (isNaN(amountValue) || amountValue <= 0) throw new Error("Please enter a valid amount");
       
+      // Build expense data - only include vendor/payment fields if they have values
       const expenseData: Partial<Expense> = {
         project_id: selectedProjectId,
         description: description.trim(),
         amount: amountValue,
         category: category,
-        expense_date: expenseDate.toISOString().split("T")[0]
+        expense_date: expenseDate.toISOString().split("T")[0],
+        scope_of_work: selectedScope,
       };
+
+      // Only add vendor/payment fields if database has been migrated
+      // This prevents errors if migration hasn't been run yet
+      if (vendorName.trim()) {
+        expenseData.vendor_name = vendorName.trim();
+      }
+      if (vendorContact.trim()) {
+        expenseData.vendor_contact = vendorContact.trim();
+      }
+      // Add payment fields (database migration completed)
+      expenseData.payment_method = paymentMethod;
+      expenseData.payment_status = paymentStatus;
 
       if (id) {
         await updateExpense(id.toString(), expenseData);
@@ -135,7 +230,11 @@ export default function AddExpense() {
   }
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView 
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+    >
       {/* Gradient Header */}
       <LinearGradient
         colors={['#f093fb', '#f5576c']}
@@ -149,7 +248,7 @@ export default function AddExpense() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
       <View style={styles.form}>
         {/* Project Dropdown */}
         <View style={styles.inputGroup}>
@@ -286,15 +385,280 @@ export default function AddExpense() {
           </TouchableOpacity>
         </View>
           {showDatePicker && <DateTimePicker value={expenseDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selectedDate) => { setShowDatePicker(Platform.OS === "ios"); if (selectedDate) setExpenseDate(selectedDate); }} maximumDate={new Date()} />}
+          
+          {/* Scope of Work */}
+          {availableScopes.length > 0 && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Scope of Work *</Text>
+              <TouchableOpacity 
+                style={styles.dropdownButton} 
+                onPress={() => setShowScopeDropdown(!showScopeDropdown)}
+                disabled={loading}
+              >
+                <MaterialCommunityIcons name="hammer-wrench" size={20} color="#f093fb" />
+                <Text style={[styles.dropdownText, !selectedScope && { color: '#999' }]}>
+                  {selectedScope || 'Select scope of work'}
+                </Text>
+                <MaterialCommunityIcons name={showScopeDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
+              </TouchableOpacity>
+              
+              {showScopeDropdown && (
+                <View style={styles.dropdownList}>
+                  {availableScopes.map((scope) => (
+                    <TouchableOpacity
+                      key={scope}
+                      style={[
+                        styles.dropdownItem,
+                        selectedScope === scope && styles.dropdownItemSelected
+                      ]}
+                      onPress={() => {
+                        setSelectedScope(scope);
+                        setShowScopeDropdown(false);
+                      }}
+                    >
+                      <Text style={[
+                        styles.dropdownItemText,
+                        selectedScope === scope && styles.dropdownItemTextSelected
+                      ]}>
+                        {scope}
+                      </Text>
+                      {selectedScope === scope && (
+                        <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Vendor/Supplier Selection - Only show if feature enabled */}
+          {VENDOR_PAYMENT_ENABLED && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Vendor/Supplier (Optional)</Text>
+              <TouchableOpacity 
+                style={styles.dropdownButton} 
+                onPress={() => setShowVendorDropdown(!showVendorDropdown)}
+                disabled={loading}
+              >
+                <MaterialCommunityIcons name="store" size={20} color="#f093fb" />
+                <Text style={[styles.dropdownText, !vendorName && { color: '#999' }]}>
+                  {vendorName || 'Select or enter vendor'}
+              </Text>
+              <MaterialCommunityIcons name={showVendorDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
+            </TouchableOpacity>
+            
+            {showVendorDropdown && (
+              <View style={styles.dropdownList}>
+                {/* Manual entry option */}
+                <View style={styles.manualEntryContainer}>
+                  <TextInput
+                    style={styles.manualEntryInput}
+                    placeholder="Enter new vendor name"
+                    value={vendorName}
+                    onChangeText={setVendorName}
+                    placeholderTextColor="#999"
+                  />
+                </View>
+                
+                {/* Recent vendors */}
+                {vendors.length > 0 && (
+                  <>
+                    <View style={styles.dropdownDivider} />
+                    <Text style={styles.dropdownSectionTitle}>Recent Vendors</Text>
+                    {vendors.map((vendor) => (
+                      <TouchableOpacity
+                        key={vendor.vendor_name}
+                        style={[
+                          styles.dropdownItem,
+                          vendorName === vendor.vendor_name && styles.dropdownItemSelected
+                        ]}
+                        onPress={() => {
+                          setVendorName(vendor.vendor_name);
+                          setVendorContact(vendor.vendor_contact || '');
+                          setShowVendorDropdown(false);
+                        }}
+                      >
+                        <View style={styles.vendorItemContent}>
+                          <View style={styles.vendorInfo}>
+                            <Text style={[
+                              styles.dropdownItemText,
+                              vendorName === vendor.vendor_name && styles.dropdownItemTextSelected
+                            ]}>
+                              {vendor.vendor_name}
+                            </Text>
+                            {vendor.vendor_contact && (
+                              <Text style={styles.vendorContact}>
+                                {vendor.vendor_contact}
+                              </Text>
+                            )}
+                          </View>
+                          <View style={styles.vendorStats}>
+                            <Text style={styles.vendorStatsText}>
+                              {vendor.total_expenses} expense{vendor.total_expenses !== 1 ? 's' : ''}
+                            </Text>
+                          </View>
+                        </View>
+                        {vendorName === vendor.vendor_name && (
+                          <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </>
+                )}
+              </View>
+            )}
+            </View>
+          )}
+
+          {/* Vendor Contact */}
+          {VENDOR_PAYMENT_ENABLED && vendorName.trim() && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Vendor Contact (Optional)</Text>
+              <View style={styles.inputContainer}>
+                <MaterialCommunityIcons name="phone" size={20} color="#f093fb" />
+                <TextInput
+                  style={styles.textInput}
+                  placeholder="Phone or email"
+                  value={vendorContact}
+                  onChangeText={setVendorContact}
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </View>
+          )}
+
+          {/* Payment Method */}
+          {VENDOR_PAYMENT_ENABLED && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Payment Method</Text>
+              <TouchableOpacity 
+                style={styles.dropdownButton} 
+                onPress={() => setShowPaymentMethodDropdown(!showPaymentMethodDropdown)}
+                disabled={loading}
+              >
+                <MaterialCommunityIcons 
+                  name={(PAYMENT_METHODS.find(m => m.value === paymentMethod)?.icon || 'cash') as any}
+                  size={20} 
+                  color={PAYMENT_METHODS.find(m => m.value === paymentMethod)?.color || '#f093fb'} 
+                />
+                <Text style={styles.dropdownText}>{paymentMethod}</Text>
+                <MaterialCommunityIcons name={showPaymentMethodDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
+              </TouchableOpacity>
+              
+              {showPaymentMethodDropdown && (
+                <View style={styles.dropdownList}>
+                  {PAYMENT_METHODS.map((method) => (
+                    <TouchableOpacity
+                      key={method.value}
+                      style={[
+                        styles.dropdownItem,
+                        paymentMethod === method.value && styles.dropdownItemSelected
+                      ]}
+                      onPress={() => {
+                        setPaymentMethod(method.value);
+                        setShowPaymentMethodDropdown(false);
+                      }}
+                    >
+                      <MaterialCommunityIcons 
+                        name={method.icon as any}
+                        size={20} 
+                        color={method.color} 
+                      />
+                      <Text style={[
+                        styles.dropdownItemText,
+                        paymentMethod === method.value && styles.dropdownItemTextSelected
+                      ]}>
+                        {method.label}
+                      </Text>
+                      {paymentMethod === method.value && (
+                        <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Payment Status */}
+          {VENDOR_PAYMENT_ENABLED && (
+            <View style={styles.inputGroup}>
+              <Text style={styles.label}>Payment Status</Text>
+              <TouchableOpacity 
+                style={styles.dropdownButton} 
+                onPress={() => setShowPaymentStatusDropdown(!showPaymentStatusDropdown)}
+                disabled={loading}
+              >
+                <View style={[
+                  styles.statusDot, 
+                  { backgroundColor: PAYMENT_STATUS_OPTIONS.find(s => s.value === paymentStatus)?.color || '#999' }
+                ]} />
+                <Text style={styles.dropdownText}>{paymentStatus}</Text>
+                <MaterialCommunityIcons name={showPaymentStatusDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
+              </TouchableOpacity>
+              
+              {showPaymentStatusDropdown && (
+                <View style={styles.dropdownList}>
+                  {PAYMENT_STATUS_OPTIONS.map((status) => (
+                    <TouchableOpacity
+                      key={status.value}
+                      style={[
+                        styles.dropdownItem,
+                        paymentStatus === status.value && styles.dropdownItemSelected
+                      ]}
+                      onPress={() => {
+                        setPaymentStatus(status.value);
+                        setShowPaymentStatusDropdown(false);
+                      }}
+                    >
+                      <View style={[styles.statusDot, { backgroundColor: status.color }]} />
+                      <Text style={[
+                        styles.dropdownItemText,
+                        paymentStatus === status.value && styles.dropdownItemTextSelected
+                      ]}>
+                        {status.label}
+                      </Text>
+                      {paymentStatus === status.value && (
+                        <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                      )}
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>Category</Text>
+            <Text style={styles.label}>Category *</Text>
             <View style={styles.categoryGrid}>
-              {categories.map((cat) => (
-                <TouchableOpacity key={cat.value} style={[styles.categoryCard, category === cat.value && { backgroundColor: cat.color, borderColor: cat.color }]} onPress={() => setCategory(cat.value)} disabled={loading}>
-                  <MaterialCommunityIcons name={cat.icon as any} size={24} color={category === cat.value ? "#fff" : cat.color} />
-                  <Text style={[styles.categoryLabel, category === cat.value && { color: "#fff" }]}>{cat.label}</Text>
-                </TouchableOpacity>
-              ))}
+              {(expenseCategories.length > 0 ? expenseCategories : categories).map((cat) => {
+                const catName = 'name' in cat ? cat.name : cat.value;
+                const catLabel = 'name' in cat ? cat.name : cat.label;
+                return (
+                  <TouchableOpacity 
+                    key={catName} 
+                    style={[
+                      styles.categoryCard, 
+                      category === catName && { backgroundColor: cat.color, borderColor: cat.color }
+                    ]} 
+                    onPress={() => setCategory(catName)} 
+                    disabled={loading}
+                  >
+                    <MaterialCommunityIcons 
+                      name={cat.icon as any} 
+                      size={24} 
+                      color={category === catName ? "#fff" : cat.color} 
+                    />
+                    <Text style={[
+                      styles.categoryLabel, 
+                      category === catName && { color: "#fff" }
+                    ]}>
+                      {catLabel}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           </View>
           <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSave} disabled={loading}>
@@ -304,7 +668,7 @@ export default function AddExpense() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -582,5 +946,71 @@ const styles = StyleSheet.create({
     fontSize: 16, 
     fontWeight: "bold",
     letterSpacing: 0.5
-  }
+  },
+  manualEntryContainer: {
+    padding: 16,
+    backgroundColor: '#f8f8f8',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  manualEntryInput: {
+    fontSize: 15,
+    color: '#333',
+    padding: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  dropdownDivider: {
+    height: 1,
+    backgroundColor: '#e0e0e0',
+    marginVertical: 8,
+  },
+  dropdownSectionTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#999',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: '#f8f8f8',
+  },
+  vendorItemContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  vendorInfo: {
+    flex: 1,
+  },
+  vendorContact: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  vendorStats: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  vendorStatsText: {
+    fontSize: 11,
+    color: '#666',
+    fontWeight: '600',
+  },
+  textInput: {
+    flex: 1,
+    fontSize: 15,
+    color: '#333',
+    padding: 0,
+    marginLeft: 12,
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
 });

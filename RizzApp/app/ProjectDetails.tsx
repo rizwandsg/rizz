@@ -4,20 +4,27 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { Expense, getExpensesByProject } from "../api/expensesApi";
 import {
-  deleteProject,
-  getProjectById,
-  Project,
+    deleteProject,
+    getProjectById,
+    Project,
 } from "../api/projectsApi";
+import {
+    getPaymentsByProject,
+    getPaymentSummary,
+    Payment,
+    PaymentSummary,
+    PAYMENT_TYPES,
+} from "../api/paymentsApi";
 
 export default function ProjectDetails() {
   const router = useRouter();
@@ -25,6 +32,8 @@ export default function ProjectDetails() {
   const { id } = useLocalSearchParams();
   const [project, setProject] = useState<Project | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
 
@@ -32,13 +41,29 @@ export default function ProjectDetails() {
     if (!id) return;
     try {
       setLoading(true);
-      const [projectData, expensesData] = await Promise.all([
+      const [projectData, expensesData, paymentsData] = await Promise.all([
         getProjectById(id.toString()),
         getExpensesByProject(id.toString()),
+        getPaymentsByProject(id.toString()),
       ]);
+      console.log('Loaded project data:', projectData);
+      console.log('Project scope_of_work:', projectData?.scope_of_work);
+      console.log('Loaded expenses:', expensesData);
+      console.log('Loaded payments:', paymentsData);
       setProject(projectData);
       setExpenses(expensesData || []);
-    } catch {
+      setPayments(paymentsData || []);
+      
+      // Calculate payment summary
+      const totalExpenses = (expensesData || []).reduce((sum, exp) => sum + exp.amount, 0);
+      const summary = await getPaymentSummary(
+        id.toString(),
+        projectData?.total_project_cost || 0,
+        totalExpenses
+      );
+      setPaymentSummary(summary);
+    } catch (error) {
+      console.error('Error loading project details:', error);
       Alert.alert("Error", "Failed to load project details");
       router.back();
     } finally {
@@ -200,6 +225,60 @@ export default function ProjectDetails() {
       </LinearGradient>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Project Information</Text>
+          
+          {/* Client Name */}
+          {project.client_name && (
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons
+                name="account-tie"
+                size={20}
+                color="#667eea"
+              />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Client Name</Text>
+                <Text style={styles.infoValue}>{project.client_name}</Text>
+              </View>
+            </View>
+          )}
+          
+          {/* Total Project Cost */}
+          {project.total_project_cost !== undefined && (
+            <View style={styles.infoRow}>
+              <MaterialCommunityIcons
+                name="currency-usd"
+                size={20}
+                color="#667eea"
+              />
+              <View style={styles.infoContent}>
+                <Text style={styles.infoLabel}>Total Project Cost</Text>
+                <Text style={styles.infoValue}>
+                  {formatCurrency(project.total_project_cost)}
+                </Text>
+              </View>
+            </View>
+          )}
+          
+          {/* Scope of Work */}
+          {project.scope_of_work && project.scope_of_work.length > 0 && (
+            <View style={styles.infoRowColumn}>
+              <View style={styles.infoRowHeader}>
+                <MaterialCommunityIcons
+                  name="file-document-outline"
+                  size={20}
+                  color="#667eea"
+                />
+                <Text style={styles.infoLabel}>Scope of Work ({project.scope_of_work.length})</Text>
+              </View>
+              <View style={styles.scopeBadgesContainer}>
+                {project.scope_of_work.map((scope, index) => (
+                  <View key={index} style={styles.scopeBadge}>
+                    <Text style={styles.scopeBadgeText}>{scope}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
+          
           <View style={styles.infoRow}>
             <MaterialCommunityIcons
               name="calendar-start"
@@ -253,6 +332,200 @@ export default function ProjectDetails() {
             </View>
           </View>
         </View>
+
+        {/* Payment Summary Section */}
+        {paymentSummary && (
+          <View style={styles.card}>
+            <View style={styles.cardTitleRow}>
+              <MaterialCommunityIcons
+                name="cash-check"
+                size={20}
+                color="#4CAF50"
+              />
+              <Text style={styles.cardTitle}>Payment Summary</Text>
+            </View>
+            <View style={styles.summaryGrid}>
+              <View style={styles.summaryItem}>
+                <View style={styles.summaryItemHeader}>
+                  <MaterialCommunityIcons
+                    name="currency-inr"
+                    size={16}
+                    color="#667eea"
+                  />
+                  <Text style={styles.summaryLabel}>Project Cost</Text>
+                </View>
+                <Text style={styles.summaryValue}>
+                  {formatCurrency(paymentSummary.project_cost)}
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <View style={styles.summaryItemHeader}>
+                  <MaterialCommunityIcons
+                    name="cash-check"
+                    size={16}
+                    color="#4CAF50"
+                  />
+                  <Text style={styles.summaryLabel}>Received</Text>
+                </View>
+                <Text style={[styles.summaryValue, styles.receivedValue]}>
+                  {formatCurrency(paymentSummary.total_received)}
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <View style={styles.summaryItemHeader}>
+                  <MaterialCommunityIcons
+                    name="clock-alert-outline"
+                    size={16}
+                    color="#FF9800"
+                  />
+                  <Text style={styles.summaryLabel}>Remaining</Text>
+                </View>
+                <Text style={[styles.summaryValue, styles.remainingValue]}>
+                  {formatCurrency(paymentSummary.remaining_amount)}
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <View style={styles.summaryItemHeader}>
+                  <MaterialCommunityIcons
+                    name="cart-outline"
+                    size={16}
+                    color="#F44336"
+                  />
+                  <Text style={styles.summaryLabel}>Total Expenses</Text>
+                </View>
+                <Text style={styles.summaryValue}>
+                  {formatCurrency(paymentSummary.total_expenses)}
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <View style={styles.summaryItemHeader}>
+                  <MaterialCommunityIcons
+                    name={paymentSummary.profit_loss >= 0 ? "trending-up" : "trending-down"}
+                    size={16}
+                    color={paymentSummary.profit_loss >= 0 ? "#4CAF50" : "#F44336"}
+                  />
+                  <Text style={styles.summaryLabel}>Profit/Loss</Text>
+                </View>
+                <Text
+                  style={[
+                    styles.summaryValue,
+                    paymentSummary.profit_loss >= 0
+                      ? styles.profitValue
+                      : styles.lossValue,
+                  ]}
+                >
+                  {paymentSummary.profit_loss >= 0 ? "+" : ""}
+                  {formatCurrency(Math.abs(paymentSummary.profit_loss))}
+                </Text>
+              </View>
+              <View style={styles.summaryItem}>
+                <View style={styles.summaryItemHeader}>
+                  <MaterialCommunityIcons
+                    name="counter"
+                    size={16}
+                    color="#2196F3"
+                  />
+                  <Text style={styles.summaryLabel}>Payments</Text>
+                </View>
+                <Text style={styles.summaryValue}>
+                  {paymentSummary.payment_count}
+                </Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Payments Section */}
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleRow}>
+            <MaterialCommunityIcons
+              name="cash-plus"
+              size={24}
+              color="#4CAF50"
+            />
+            <Text style={styles.sectionTitle}>Payments</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => router.push({ pathname: "/AddPayment", params: { projectId: id } })}
+            style={[styles.addExpenseButton, styles.recordPaymentButton]}
+          >
+            <MaterialCommunityIcons name="plus" size={20} color="#fff" />
+            <Text style={styles.addExpenseText}>Record</Text>
+          </TouchableOpacity>
+        </View>
+        
+        {payments.length === 0 ? (
+          <View style={styles.emptyPayments}>
+            <MaterialCommunityIcons
+              name="cash-remove"
+              size={60}
+              color="#ccc"
+            />
+            <Text style={styles.emptyExpensesText}>No payments recorded</Text>
+            <Text style={styles.emptyExpensesSubtext}>
+              Record client payments to track project revenue
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.paymentsList}>
+            {payments.map((payment) => {
+              const paymentType = PAYMENT_TYPES.find((t) => t.value === payment.payment_type);
+              return (
+                <TouchableOpacity
+                  key={payment.id}
+                  style={styles.paymentCard}
+                  onPress={() =>
+                    router.push({
+                      pathname: "/AddPayment",
+                      params: { id: payment.id, projectId: id },
+                    })
+                  }
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.paymentHeader}>
+                    <MaterialCommunityIcons
+                      name={(paymentType?.icon || "cash") as any}
+                      size={24}
+                      color={paymentType?.color || "#4CAF50"}
+                    />
+                    <View style={styles.paymentInfo}>
+                      <Text style={styles.paymentAmount}>
+                        {formatCurrency(payment.amount)}
+                      </Text>
+                      <Text style={styles.paymentDate}>
+                        {new Date(payment.payment_date).toLocaleDateString("en-US", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </Text>
+                    </View>
+                    <View style={styles.paymentBadge}>
+                      <Text
+                        style={[
+                          styles.paymentBadgeText,
+                          { color: paymentType?.color || "#4CAF50" },
+                        ]}
+                      >
+                        {payment.payment_type}
+                      </Text>
+                    </View>
+                  </View>
+                  {payment.received_from && (
+                    <Text style={styles.paymentFrom}>From: {payment.received_from}</Text>
+                  )}
+                  {payment.payment_mode && (
+                    <Text style={styles.paymentMode}>
+                      via {payment.payment_mode}
+                      {payment.reference_number && ` • ${payment.reference_number}`}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        )}
+
         <View style={styles.sectionHeader}>
           <View style={styles.sectionTitleRow}>
             <MaterialCommunityIcons
@@ -294,50 +567,93 @@ export default function ProjectDetails() {
           </View>
         ) : (
           <View style={styles.expenseList}>
-            {expenses.map((expense) => (
-              <View key={expense.id} style={styles.expenseCard}>
-                <View style={styles.expenseHeader}>
-                  <View style={styles.expenseIcon}>
-                    <MaterialCommunityIcons
-                      name={
-                        expense.category === "materials"
-                          ? "package-variant"
-                          : expense.category === "labor"
-                          ? "account-hard-hat"
-                          : expense.category === "equipment"
-                          ? "tools"
-                          : "receipt"
-                      }
-                      size={20}
-                      color="#667eea"
-                    />
-                  </View>
-                  <View style={styles.expenseInfo}>
-                    <Text style={styles.expenseDescription}>
-                      {expense.description}
-                    </Text>
-                    <Text style={styles.expenseDate}>
-                      {new Date(expense.expense_date).toLocaleDateString(
-                        "en-US",
-                        { day: "numeric", month: "short", year: "numeric" }
-                      )}
+            {/* Group expenses by scope */}
+            {(() => {
+              const expensesByScope: Record<string, Expense[]> = {};
+              expenses.forEach((exp) => {
+                const scope = exp.scope_of_work || 'Uncategorized';
+                if (!expensesByScope[scope]) {
+                  expensesByScope[scope] = [];
+                }
+                expensesByScope[scope].push(exp);
+              });
+
+              return Object.entries(expensesByScope).map(([scope, scopeExpenses]) => (
+                <View key={scope} style={styles.scopeGroup}>
+                  <View style={styles.scopeGroupHeader}>
+                    <MaterialCommunityIcons name="hammer-wrench" size={18} color="#667eea" />
+                    <Text style={styles.scopeGroupTitle}>{scope}</Text>
+                    <View style={styles.scopeGroupBadge}>
+                      <Text style={styles.scopeGroupCount}>{scopeExpenses.length}</Text>
+                    </View>
+                    <Text style={styles.scopeGroupTotal}>
+                      {formatCurrency(scopeExpenses.reduce((sum, e) => sum + e.amount, 0))}
                     </Text>
                   </View>
-                  <View style={styles.expenseRight}>
-                    <Text style={styles.expenseAmount}>
-                      {formatCurrency(expense.amount)}
-                    </Text>
-                    {expense.category && (
-                      <View style={styles.categoryBadge}>
-                        <Text style={styles.categoryText}>
-                          {expense.category}
-                        </Text>
-                      </View>
-                    )}
-                  </View>
+                  
+                  {scopeExpenses.map((expense) => (
+                    <View key={expense.id} style={styles.expenseCard}>
+                      <TouchableOpacity
+                        style={styles.expenseMainArea}
+                        onPress={() => router.push({ pathname: "/ExpenseDetails", params: { id: expense.id } })}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.expenseHeader}>
+                          <View style={styles.expenseIcon}>
+                            <MaterialCommunityIcons
+                              name={
+                                expense.category === "materials"
+                                  ? "package-variant"
+                                  : expense.category === "labor"
+                                  ? "account-hard-hat"
+                                  : expense.category === "equipment"
+                                  ? "tools"
+                                  : "receipt"
+                              }
+                              size={20}
+                              color="#667eea"
+                            />
+                          </View>
+                          <View style={styles.expenseInfo}>
+                            <Text style={styles.expenseDescription}>
+                              {expense.description}
+                            </Text>
+                            <Text style={styles.expenseDate}>
+                              {new Date(expense.expense_date).toLocaleDateString(
+                                "en-US",
+                                { day: "numeric", month: "short", year: "numeric" }
+                              )}
+                            </Text>
+                          </View>
+                          <View style={styles.expenseRight}>
+                            <Text style={styles.expenseAmount}>
+                              {formatCurrency(expense.amount)}
+                            </Text>
+                            {expense.category && (
+                              <View style={styles.categoryBadge}>
+                                <Text style={styles.categoryText}>
+                                  {expense.category}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        </View>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.editExpenseButton}
+                        onPress={(e) => {
+                          e.stopPropagation();
+                          router.push({ pathname: "/AddExpense", params: { id: expense.id, projectId: id } });
+                        }}
+                        activeOpacity={0.7}
+                      >
+                        <MaterialCommunityIcons name="pencil" size={18} color="#f093fb" />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
                 </View>
-              </View>
-            ))}
+              ));
+            })()}
           </View>
         )}
     </ScrollView>
@@ -575,6 +891,19 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 3,
     elevation: 2,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  expenseMainArea: {
+    flex: 1,
+  },
+  editExpenseButton: {
+    padding: 8,
+    marginLeft: 8,
+    backgroundColor: "#f5f5f5",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
   },
   expenseHeader: {
     flexDirection: "row",
@@ -622,5 +951,215 @@ const styles = StyleSheet.create({
     color: "#667eea",
     fontWeight: "600",
     textTransform: "capitalize",
+  },
+  infoRowColumn: {
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f0f0f0",
+  },
+  infoRowHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+    gap: 8,
+  },
+  scopeBadgesContainer: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginLeft: 28,
+  },
+  scopeBadge: {
+    backgroundColor: "#F5F7FF",
+    borderWidth: 1,
+    borderColor: "#667eea",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  scopeBadgeText: {
+    fontSize: 12,
+    color: "#667eea",
+    fontWeight: "600",
+  },
+  scopeGroup: {
+    marginBottom: 20,
+  },
+  scopeGroupHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F5F7FF",
+    padding: 12,
+    borderRadius: 12,
+    marginBottom: 8,
+    gap: 8,
+  },
+  scopeGroupTitle: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#667eea",
+  },
+  scopeGroupBadge: {
+    backgroundColor: "#667eea",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    minWidth: 24,
+    alignItems: "center",
+  },
+  scopeGroupCount: {
+    fontSize: 11,
+    color: "#fff",
+    fontWeight: "600",
+  },
+  scopeGroupTotal: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#667eea",
+  },
+  cardTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 20,
+    paddingBottom: 12,
+    borderBottomWidth: 2,
+    borderBottomColor: "#e8f5e9",
+  },
+  summaryGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 16,
+  },
+  summaryItem: {
+    width: "47%",
+    backgroundColor: "#fff",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  summaryItemHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  summaryLabel: {
+    fontSize: 11,
+    color: "#888",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    fontWeight: "600",
+  },
+  summaryValue: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  receivedValue: {
+    color: "#4CAF50",
+    fontSize: 20,
+  },
+  remainingValue: {
+    color: "#FF9800",
+    fontSize: 20,
+  },
+  profitValue: {
+    color: "#4CAF50",
+    fontSize: 20,
+  },
+  lossValue: {
+    color: "#F44336",
+    fontSize: 20,
+  },
+  recordPaymentButton: {
+    backgroundColor: "#4CAF50",
+    shadowColor: "#4CAF50",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  emptyPayments: {
+    alignItems: "center",
+    paddingVertical: 50,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#e0e0e0",
+    borderStyle: "dashed",
+  },
+  paymentsList: {
+    paddingHorizontal: 20,
+    marginBottom: 20,
+  },
+  paymentCard: {
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+    borderLeftWidth: 5,
+    borderLeftColor: "#4CAF50",
+  },
+  paymentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  paymentInfo: {
+    flex: 1,
+    marginLeft: 16,
+  },
+  paymentAmount: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#4CAF50",
+    marginBottom: 4,
+  },
+  paymentDate: {
+    fontSize: 13,
+    color: "#999",
+    marginTop: 2,
+  },
+  paymentBadge: {
+    backgroundColor: "#e8f5e9",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: "#4CAF50",
+  },
+  paymentBadgeText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#4CAF50",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  paymentFrom: {
+    fontSize: 14,
+    color: "#555",
+    marginLeft: 46,
+    marginBottom: 6,
+    fontWeight: "500",
+  },
+  paymentMode: {
+    fontSize: 13,
+    color: "#888",
+    marginLeft: 46,
   },
 });

@@ -1,5 +1,9 @@
 import { database, TABLES } from '../services/databaseService';
 import { getCurrentUser } from './authApi';
+import { ScopeOfWork } from './projectsApi';
+
+export type PaymentMethod = 'Cash' | 'UPI' | 'Bank Transfer' | 'Check' | 'Card' | 'Other';
+export type PaymentStatus = 'Paid' | 'Unpaid' | 'Partial';
 
 export interface Expense {
     id?: string;
@@ -8,9 +12,22 @@ export interface Expense {
     amount: number;
     description: string;
     category?: string;
+    scope_of_work?: ScopeOfWork | 'Other'; // Link to specific scope within project
+    vendor_name?: string; // Vendor/Supplier name
+    vendor_contact?: string; // Vendor phone/email
+    payment_method?: PaymentMethod; // How payment was made
+    payment_status?: PaymentStatus; // Payment status
     expense_date: string;
     created_at?: string;
     updated_at?: string;
+}
+
+export interface VendorInfo {
+    vendor_name: string;
+    vendor_contact: string;
+    last_used: string;
+    total_expenses: number;
+    total_amount: number;
 }
 
 /**
@@ -192,6 +209,79 @@ export const getTotalExpensesByProject = async (projectId: string): Promise<numb
         throw error;
     }
 };
+
+/**
+ * Get unique vendors from user's expenses
+ */
+export const getUniqueVendors = async (): Promise<VendorInfo[]> => {
+    try {
+        const user = await getCurrentUser();
+        if (!user) {
+            throw new Error('User not authenticated');
+        }
+
+        const expenses = await database.loadData<Expense>(TABLES.EXPENSES, {
+            filter: `user_id.eq.${user.id}`,
+            order: 'created_at.desc'
+        });
+
+        if (!expenses) return [];
+
+        // Group by vendor_name and get unique vendors with their info
+        const vendorMap = new Map<string, VendorInfo>();
+        
+        expenses.forEach(expense => {
+            if (expense.vendor_name && expense.vendor_name.trim()) {
+                const existing = vendorMap.get(expense.vendor_name);
+                if (!existing) {
+                    vendorMap.set(expense.vendor_name, {
+                        vendor_name: expense.vendor_name,
+                        vendor_contact: expense.vendor_contact || '',
+                        last_used: expense.created_at || new Date().toISOString(),
+                        total_expenses: 1,
+                        total_amount: expense.amount
+                    });
+                } else {
+                    existing.total_expenses += 1;
+                    existing.total_amount += expense.amount;
+                    // Keep the most recent contact info
+                    if (expense.vendor_contact && !existing.vendor_contact) {
+                        existing.vendor_contact = expense.vendor_contact;
+                    }
+                }
+            }
+        });
+
+        // Convert to array and sort by last used
+        return Array.from(vendorMap.values()).sort((a, b) => 
+            new Date(b.last_used).getTime() - new Date(a.last_used).getTime()
+        );
+    } catch (error) {
+        console.error('Get unique vendors error:', error);
+        return [];
+    }
+};
+
+/**
+ * Payment method options with icons
+ */
+export const PAYMENT_METHODS: { value: PaymentMethod; label: string; icon: string; color: string }[] = [
+    { value: 'Cash', label: 'Cash', icon: 'cash', color: '#27ae60' },
+    { value: 'UPI', label: 'UPI', icon: 'cellphone', color: '#9b59b6' },
+    { value: 'Bank Transfer', label: 'Bank Transfer', icon: 'bank-transfer', color: '#3498db' },
+    { value: 'Check', label: 'Check', icon: 'checkbook', color: '#e67e22' },
+    { value: 'Card', label: 'Card', icon: 'credit-card', color: '#e74c3c' },
+    { value: 'Other', label: 'Other', icon: 'help-circle', color: '#95a5a6' },
+];
+
+/**
+ * Payment status options with colors
+ */
+export const PAYMENT_STATUS_OPTIONS: { value: PaymentStatus; label: string; color: string }[] = [
+    { value: 'Paid', label: 'Paid', color: '#27ae60' },
+    { value: 'Unpaid', label: 'Unpaid', color: '#e74c3c' },
+    { value: 'Partial', label: 'Partial', color: '#f39c12' },
+];
 
 /**
  * Get expenses within a date range

@@ -14,6 +14,28 @@ export default function ExpenseDetails() {
   const [project, setProject] = useState<Project | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const handleDelete = () => {
+    Alert.alert("Delete Expense", "Are you sure you want to delete this expense? This action cannot be undone.", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            if (id) {
+              await deleteExpense(id.toString());
+              Alert.alert("Success", "Expense deleted successfully!", [
+                { text: "OK", onPress: () => router.back() },
+              ]);
+            }
+          } catch {
+            Alert.alert("Error", "Failed to delete expense");
+          }
+        },
+      },
+    ]);
+  };
+
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
@@ -30,6 +52,7 @@ export default function ExpenseDetails() {
         </View>
       ),
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation, id, expense]);
 
   useEffect(() => {
@@ -54,34 +77,12 @@ export default function ExpenseDetails() {
           router.back();
         }
       }
-    } catch (error) {
+    } catch {
       Alert.alert("Error", "Failed to load expense");
       router.back();
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleDelete = () => {
-    Alert.alert("Delete Expense", "Are you sure you want to delete this expense? This action cannot be undone.", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            if (id) {
-              await deleteExpense(id.toString());
-              Alert.alert("Success", "Expense deleted successfully!", [
-                { text: "OK", onPress: () => router.back() },
-              ]);
-            }
-          } catch (error) {
-            Alert.alert("Error", "Failed to delete expense");
-          }
-        },
-      },
-    ]);
   };
 
   const getCategoryInfo = (category?: string) => {
@@ -166,6 +167,76 @@ export default function ExpenseDetails() {
             </View>
             <MaterialCommunityIcons name="chevron-right" size={24} color="#999" />
           </TouchableOpacity>
+        )}
+
+        {/* Scope of Work */}
+        {expense.scope_of_work && (
+          <View style={styles.infoCard}>
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons name="hammer-wrench" size={20} color="#667eea" />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Scope of Work</Text>
+              <Text style={styles.infoValue}>{expense.scope_of_work}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Vendor/Supplier */}
+        {expense.vendor_name && (
+          <View style={styles.infoCard}>
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons name="store" size={20} color="#9b59b6" />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Vendor/Supplier</Text>
+              <Text style={styles.infoValue}>{expense.vendor_name}</Text>
+              {expense.vendor_contact && (
+                <Text style={styles.infoSubValue}>{expense.vendor_contact}</Text>
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* Payment Method */}
+        {expense.payment_method && (
+          <View style={styles.infoCard}>
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons name="cash" size={20} color="#27ae60" />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Payment Method</Text>
+              <Text style={styles.infoValue}>{expense.payment_method}</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Payment Status */}
+        {expense.payment_status && (
+          <View style={styles.infoCard}>
+            <View style={styles.iconCircle}>
+              <MaterialCommunityIcons name="check-circle" size={20} color={
+                expense.payment_status === 'Paid' ? '#27ae60' :
+                expense.payment_status === 'Unpaid' ? '#e74c3c' :
+                '#f39c12'
+              } />
+            </View>
+            <View style={styles.infoContent}>
+              <Text style={styles.infoLabel}>Payment Status</Text>
+              <View style={styles.statusBadgeContainer}>
+                <View style={[
+                  styles.statusBadge,
+                  { backgroundColor:
+                    expense.payment_status === 'Paid' ? '#27ae60' :
+                    expense.payment_status === 'Unpaid' ? '#e74c3c' :
+                    '#f39c12'
+                  }
+                ]}>
+                  <Text style={styles.statusBadgeText}>{expense.payment_status}</Text>
+                </View>
+              </View>
+            </View>
+          </View>
         )}
 
         {/* Category */}
@@ -348,6 +419,29 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#333",
     fontWeight: "600",
+    letterSpacing: 0.3,
+  },
+  infoSubValue: {
+    fontSize: 13,
+    color: "#666",
+    marginTop: 4,
+    letterSpacing: 0.3,
+  },
+  statusBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    alignSelf: 'flex-start',
+  },
+  statusBadgeText: {
+    fontSize: 13,
+    color: '#fff',
+    fontWeight: '600',
     letterSpacing: 0.3,
   },
 });
