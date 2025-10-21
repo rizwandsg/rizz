@@ -1,27 +1,27 @@
-import React, { useState, useEffect } from "react";
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-  ScrollView,
-  KeyboardAvoidingView,
-  Platform,
-} from "react-native";
-import { LinearGradient } from "expo-linear-gradient";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { router, useLocalSearchParams } from "expo-router";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useLocalSearchParams } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  createCustomerPayment,
-  updateCustomerPayment,
-  getCustomerPaymentById,
-  CustomerPayment,
-  PaymentMethod,
-  PAYMENT_METHODS,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+    createCustomerPayment,
+    CustomerPayment,
+    getCustomerPaymentById,
+    PAYMENT_METHODS,
+    PaymentMethod,
+    updateCustomerPayment,
 } from "../api/customerPaymentsApi";
 import { getProjectById, Project } from "../api/projectsApi";
 

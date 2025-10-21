@@ -4,27 +4,27 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ActivityIndicator,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  createPayment,
-  getPaymentById,
-  Payment,
-  PaymentMode,
-  PaymentType,
-  PAYMENT_MODES,
-  PAYMENT_TYPES,
-  updatePayment,
+    createPayment,
+    getPaymentById,
+    Payment,
+    PAYMENT_MODES,
+    PAYMENT_TYPES,
+    PaymentMode,
+    PaymentType,
+    updatePayment,
 } from "../api/paymentsApi";
 import { getProjectById, Project } from "../api/projectsApi";
 

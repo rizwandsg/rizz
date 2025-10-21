@@ -5,9 +5,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { createExpense, Expense, getExpenseById, updateExpense, getUniqueVendors, VendorInfo, PAYMENT_METHODS, PAYMENT_STATUS_OPTIONS, PaymentMethod, PaymentStatus } from "../api/expensesApi";
+import { ExpenseCategory, getCategoriesForScope } from "../api/expenseCategoriesApi";
+import { createExpense, Expense, getExpenseById, getUniqueVendors, PAYMENT_METHODS, PAYMENT_STATUS_OPTIONS, PaymentMethod, PaymentStatus, updateExpense, VendorInfo } from "../api/expensesApi";
 import { getProjects, Project, ScopeOfWork } from "../api/projectsApi";
-import { getCategoriesForScope, ExpenseCategory } from "../api/expenseCategoriesApi";
 
 export default function AddExpense() {
   const insets = useSafeAreaInsets();

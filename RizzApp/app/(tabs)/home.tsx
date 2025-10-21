@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getProjects, Project, deleteProject } from '../../api/projectsApi';
+import { deleteProject, getProjects, Project } from '../../api/projectsApi';
 
 export default function Home() {
   const router = useRouter();

@@ -14,17 +14,17 @@ import {
 } from "react-native";
 import { Expense, getExpensesByProject } from "../api/expensesApi";
 import {
+    getPaymentsByProject,
+    getPaymentSummary,
+    Payment,
+    PAYMENT_TYPES,
+    PaymentSummary,
+} from "../api/paymentsApi";
+import {
     deleteProject,
     getProjectById,
     Project,
 } from "../api/projectsApi";
-import {
-    getPaymentsByProject,
-    getPaymentSummary,
-    Payment,
-    PaymentSummary,
-    PAYMENT_TYPES,
-} from "../api/paymentsApi";
 
 export default function ProjectDetails() {
   const router = useRouter();
