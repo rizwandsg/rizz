@@ -6,9 +6,11 @@ import React, { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    Modal,
     ScrollView,
     StyleSheet,
     Text,
+    TextInput,
     TouchableOpacity,
     View,
 } from "react-native";
@@ -24,6 +26,7 @@ import {
     deleteProject,
     getProjectById,
     Project,
+    updateProject,
 } from "../api/projectsApi";
 
 export default function ProjectDetails() {
@@ -36,6 +39,20 @@ export default function ProjectDetails() {
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
+  const [statusModalVisible, setStatusModalVisible] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [customStatus, setCustomStatus] = useState('');
+  const [showCustomInput, setShowCustomInput] = useState(false);
+
+  const PROJECT_STATUSES = [
+    { value: 'site visitted', label: 'Site Visited', icon: 'map-marker-check', color: '#2196F3' },
+    { value: 'design work processing', label: 'Design Work Processing', icon: 'palette', color: '#9C27B0' },
+    { value: 'quotation sent', label: 'Quotation Sent', icon: 'file-document-edit', color: '#00BCD4' },
+    { value: 'work started', label: 'Work Started', icon: 'hammer-wrench', color: '#FF9800' },
+    { value: 'work finished', label: 'Work Finished', icon: 'check-circle', color: '#4CAF50' },
+    { value: 'on hold', label: 'On Hold', icon: 'pause-circle', color: '#607D8B' },
+    { value: 'cancelled', label: 'Cancelled', icon: 'close-circle', color: '#F44336' },
+  ];
 
   const loadProjectData = async () => {
     if (!id) return;
@@ -109,6 +126,31 @@ export default function ProjectDetails() {
     );
   }, [id, router]);
 
+  const handleStatusUpdate = async (newStatus: string) => {
+    if (!project) return;
+    try {
+      setUpdatingStatus(true);
+      await updateProject(project.id!, { status: newStatus });
+      setProject({ ...project, status: newStatus });
+      setStatusModalVisible(false);
+      setShowCustomInput(false);
+      setCustomStatus('');
+      Alert.alert("Success", "Project status updated");
+    } catch {
+      Alert.alert("Error", "Failed to update project status");
+    } finally {
+      setUpdatingStatus(false);
+    }
+  };
+
+  const handleCustomStatusSubmit = () => {
+    if (customStatus.trim()) {
+      handleStatusUpdate(customStatus.trim());
+    } else {
+      Alert.alert("Error", "Please enter a status");
+    }
+  };
+
   const handleAddExpense = () => {
     router.push({ pathname: "/AddExpense", params: { projectId: id } });
   };
@@ -135,12 +177,21 @@ export default function ProjectDetails() {
 
   const getStatusColor = (status?: string) => {
     switch (status) {
-      case "completed":
+      case "site visitted":
+        return "#2196F3";
+      case "design work processing":
+        return "#9C27B0";
+      case "quotation sent":
+        return "#00BCD4";
+      case "work started":
+        return "#FF9800";
+      case "work finished":
         return "#4CAF50";
+      case "on hold":
+      case "on-hold":
+        return "#607D8B";
       case "cancelled":
         return "#F44336";
-      case "on-hold":
-        return "#FF9800";
       default:
         return "#667eea";
     }
@@ -148,14 +199,23 @@ export default function ProjectDetails() {
 
   const getStatusIcon = (status?: string) => {
     switch (status) {
-      case "completed":
-        return "check-decagram";
-      case "cancelled":
-        return "close-circle-outline";
+      case "site visitted":
+        return "map-marker-check";
+      case "design work processing":
+        return "palette";
+      case "quotation sent":
+        return "file-document-edit";
+      case "work started":
+        return "hammer-wrench";
+      case "work finished":
+        return "check-circle";
+      case "on hold":
       case "on-hold":
-        return "pause-circle-outline";
+        return "pause-circle";
+      case "cancelled":
+        return "close-circle";
       default:
-        return "progress-clock";
+        return "briefcase";
     }
   };
 
@@ -196,7 +256,8 @@ export default function ProjectDetails() {
   const statusIcon = getStatusIcon(project.status);
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <>
+      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Project Info Card */}
       <LinearGradient
         colors={[statusColor, statusColor + "DD"]}
@@ -211,16 +272,24 @@ export default function ProjectDetails() {
         {project.description && (
           <Text style={styles.projectDescription}>{project.description}</Text>
         )}
-        <View style={styles.statusBadge}>
-          <MaterialCommunityIcons
-            name={statusIcon as any}
-            size={16}
-            color="#fff"
-          />
-          <Text style={styles.statusText}>
-            {project.status?.charAt(0).toUpperCase() +
-              (project.status?.slice(1) || "")}
-          </Text>
+        <View style={styles.statusBadgeContainer}>
+          <View style={styles.statusBadge}>
+            <MaterialCommunityIcons
+              name={statusIcon as any}
+              size={16}
+              color="#fff"
+            />
+            <Text style={styles.statusText}>
+              {project.status?.charAt(0).toUpperCase() +
+                (project.status?.slice(1) || "")}
+            </Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.editStatusButton}
+            onPress={() => setStatusModalVisible(true)}
+          >
+            <MaterialCommunityIcons name="pencil" size={18} color="#fff" />
+          </TouchableOpacity>
         </View>
       </LinearGradient>
       <View style={styles.card}>
@@ -384,16 +453,16 @@ export default function ProjectDetails() {
                   {formatCurrency(paymentSummary.remaining_amount)}
                 </Text>
               </View>
-              <View style={styles.summaryItem}>
+              <View style={[styles.summaryItem, styles.expensesCard]}>
                 <View style={styles.summaryItemHeader}>
                   <MaterialCommunityIcons
                     name="cart-outline"
-                    size={16}
+                    size={18}
                     color="#F44336"
                   />
                   <Text style={styles.summaryLabel}>Total Expenses</Text>
                 </View>
-                <Text style={styles.summaryValue}>
+                <Text style={[styles.summaryValue, styles.expensesValue]}>
                   {formatCurrency(paymentSummary.total_expenses)}
                 </Text>
               </View>
@@ -656,7 +725,110 @@ export default function ProjectDetails() {
             })()}
           </View>
         )}
-    </ScrollView>
+      </ScrollView>
+
+      {/* Status Update Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={statusModalVisible}
+        onRequestClose={() => setStatusModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Update Project Status</Text>
+              <TouchableOpacity onPress={() => setStatusModalVisible(false)}>
+                <MaterialCommunityIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.statusOptions}>
+              {PROJECT_STATUSES.map((status) => (
+                <TouchableOpacity
+                  key={status.value}
+                  style={[
+                    styles.statusOption,
+                    project?.status === status.value && styles.statusOptionSelected
+                  ]}
+                  onPress={() => handleStatusUpdate(status.value)}
+                  disabled={updatingStatus}
+                >
+                  <MaterialCommunityIcons 
+                    name={status.icon as any} 
+                    size={24} 
+                    color={project?.status === status.value ? "#fff" : status.color}
+                  />
+                  <Text style={[
+                    styles.statusOptionText,
+                    project?.status === status.value && styles.statusOptionTextSelected
+                  ]}>
+                    {status.label}
+                  </Text>
+                  {project?.status === status.value && (
+                    <MaterialCommunityIcons name="check" size={20} color="#fff" />
+                  )}
+                </TouchableOpacity>
+              ))}
+
+              {/* Custom Status Option */}
+              <TouchableOpacity
+                style={[styles.statusOption, styles.customStatusOption]}
+                onPress={() => setShowCustomInput(!showCustomInput)}
+                disabled={updatingStatus}
+              >
+                <MaterialCommunityIcons 
+                  name="pencil-box-outline" 
+                  size={24} 
+                  color="#667eea"
+                />
+                <Text style={styles.statusOptionText}>
+                  Custom Status
+                </Text>
+                <MaterialCommunityIcons 
+                  name={showCustomInput ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="#667eea"
+                />
+              </TouchableOpacity>
+
+              {/* Custom Input Field */}
+              {showCustomInput && (
+                <View style={styles.customInputContainer}>
+                  <TextInput
+                    style={styles.customInput}
+                    placeholder="Enter custom status..."
+                    value={customStatus}
+                    onChangeText={setCustomStatus}
+                    autoFocus
+                    maxLength={50}
+                  />
+                  <TouchableOpacity
+                    style={styles.customSubmitButton}
+                    onPress={handleCustomStatusSubmit}
+                    disabled={updatingStatus || !customStatus.trim()}
+                  >
+                    <Text style={styles.customSubmitText}>Set Status</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+            
+            {updatingStatus && (
+              <ActivityIndicator size="large" color="#667eea" style={styles.modalLoader} />
+            )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Analytics FAB */}
+      <TouchableOpacity
+        style={styles.analyticsFAB}
+        onPress={() => router.push(`/ProjectAnalytics?id=${project.id}`)}
+      >
+        <MaterialCommunityIcons name="chart-box" size={28} color="#fff" />
+      </TouchableOpacity>
+    </>
   );
 }
 
@@ -741,11 +913,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   projectDescription: {
-    fontSize: 15,
-    color: "rgba(255,255,255,0.9)",
+    fontSize: 14,
+    color: "rgba(255,255,255,0.85)",
     textAlign: "center",
     marginBottom: 16,
-    paddingHorizontal: 20,
+    paddingHorizontal: 24,
+    lineHeight: 20,
+    fontStyle: "italic",
   },
   statusBadge: {
     flexDirection: "row",
@@ -755,6 +929,19 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     gap: 6,
+  },
+  statusBadgeContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  editStatusButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.25)",
+    justifyContent: "center",
+    alignItems: "center",
   },
   statusText: {
     color: "#fff",
@@ -924,8 +1111,9 @@ const styles = StyleSheet.create({
   expenseDescription: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#333",
+    color: "#1a1a1a",
     marginBottom: 4,
+    lineHeight: 20,
   },
   expenseDate: {
     fontSize: 13,
@@ -1045,6 +1233,13 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
+  expensesCard: {
+    backgroundColor: "#fff5f5",
+    borderColor: "#ffcdd2",
+    borderWidth: 2,
+    borderLeftWidth: 5,
+    borderLeftColor: "#F44336",
+  },
   summaryItemHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -1062,6 +1257,10 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
+  },
+  expensesValue: {
+    color: "#F44336",
+    fontSize: 20,
   },
   receivedValue: {
     color: "#4CAF50",
@@ -1161,5 +1360,110 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: "#888",
     marginLeft: 46,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  modalContent: {
+    backgroundColor: "#fff",
+    borderRadius: 20,
+    padding: 24,
+    width: "85%",
+    maxWidth: 400,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#333",
+  },
+  statusOptions: {
+    gap: 12,
+  },
+  statusOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderRadius: 12,
+    backgroundColor: "#f8f9fa",
+    gap: 12,
+    borderWidth: 2,
+    borderColor: "#e0e0e0",
+  },
+  statusOptionSelected: {
+    backgroundColor: "#667eea",
+    borderColor: "#667eea",
+  },
+  statusOptionText: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#333",
+  },
+  statusOptionTextSelected: {
+    color: "#fff",
+  },
+  customStatusOption: {
+    backgroundColor: "#f0f4ff",
+    borderColor: "#667eea",
+  },
+  customInputContainer: {
+    gap: 12,
+    padding: 12,
+    backgroundColor: "#f0f4ff",
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: "#667eea",
+  },
+  customInput: {
+    backgroundColor: "#fff",
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    borderWidth: 1,
+    borderColor: "#d0d0d0",
+  },
+  customSubmitButton: {
+    backgroundColor: "#667eea",
+    padding: 14,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  customSubmitText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  modalLoader: {
+    marginTop: 20,
+  },
+  analyticsFAB: {
+    position: 'absolute',
+    bottom: 30,
+    right: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#667eea',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
 });

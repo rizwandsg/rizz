@@ -52,6 +52,7 @@ const SCOPE_OPTIONS: ScopeOption[] = [
   { value: 'Insulation Work', icon: 'thermometer', color: '#0288D1' },
   { value: 'Demolition Work', icon: 'hammer-wrench', color: '#C62828' },
   { value: 'Site Preparation', icon: 'excavator', color: '#F57C00' },
+  { value: 'Traveling Expenses', icon: 'car-multiple', color: '#FF5722' },
   { value: 'Complete Interior Fit-out', icon: 'home-modern', color: '#667eea' },
   { value: 'Complete Renovation', icon: 'home-edit', color: '#764ba2' },
   { value: 'Turnkey Project', icon: 'key-variant', color: '#4CAF50' },
@@ -294,19 +295,19 @@ export default function AddProject() {
         </View>
 
         {/* Description */}
-        <View style={styles.inputGroup}>
+        <View style={[styles.inputGroup, { marginTop: 32 }]}>
           <Text style={styles.label}>Description</Text>
           <View style={[styles.inputContainer, styles.textAreaContainer]}>
             <View style={[styles.iconCircle, styles.textAreaIcon]}>
               <MaterialCommunityIcons name="text" size={20} color="#667eea" />
             </View>
             <TextInput 
-              placeholder="Enter project description" 
+              placeholder="Enter project description (optional)" 
               value={description} 
               onChangeText={setDescription} 
               style={[styles.input, styles.textArea]} 
               editable={!loading} 
-              placeholderTextColor="#999" 
+              placeholderTextColor="#aaa" 
               multiline 
               numberOfLines={4} 
               textAlignVertical="top" 
@@ -476,11 +477,12 @@ const styles = StyleSheet.create({
     marginBottom: 24 
   },
   label: { 
-    fontSize: 14, 
-    fontWeight: "600", 
-    color: "#333", 
-    marginBottom: 10,
-    letterSpacing: 0.3,
+    fontSize: 12, 
+    fontWeight: "700", 
+    color: "#1a1a1a", 
+    marginBottom: 12,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
   },
   inputContainer: { 
     flexDirection: "row", 
@@ -500,6 +502,7 @@ const styles = StyleSheet.create({
   textAreaContainer: { 
     alignItems: "flex-start",
     minHeight: 120,
+    paddingVertical: 4,
   },
   iconCircle: {
     width: 40,
@@ -512,7 +515,7 @@ const styles = StyleSheet.create({
   },
   textAreaIcon: { 
     alignSelf: 'flex-start',
-    marginTop: 0,
+    marginTop: 8,
   },
   input: { 
     flex: 1, 
@@ -522,7 +525,11 @@ const styles = StyleSheet.create({
   },
   textArea: { 
     minHeight: 100, 
-    textAlignVertical: "top" 
+    textAlignVertical: "top",
+    paddingTop: 8,
+    lineHeight: 22,
+    fontSize: 15,
+    fontWeight: '400',
   },
   dateRow: {
     flexDirection: 'row',

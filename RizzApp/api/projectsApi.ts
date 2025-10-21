@@ -40,6 +40,7 @@ export type ScopeOfWork =
     | 'Insulation Work'
     | 'Demolition Work'
     | 'Site Preparation'
+    | 'Traveling Expenses'
     | 'Complete Interior Fit-out'
     | 'Complete Renovation'
     | 'Turnkey Project';
@@ -168,6 +169,14 @@ export const SCOPE_CATEGORIES: ScopeCategory[] = [
         scopes: [
             { value: 'HVAC Work', icon: 'air-conditioner' },
             { value: 'Insulation Work', icon: 'thermometer' },
+        ]
+    },
+    {
+        name: 'Traveling & Miscellaneous',
+        icon: 'car',
+        color: '#FF5722',
+        scopes: [
+            { value: 'Traveling Expenses', icon: 'car-multiple' },
         ]
     },
     {

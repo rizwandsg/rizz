@@ -159,6 +159,16 @@ export const EXPENSE_CATEGORIES_BY_SCOPE: Record<ScopeOfWork | 'Other' | 'Genera
         { name: 'Labor Cost', icon: 'account-hard-hat', color: '#2196F3' },
         { name: 'Other', icon: 'dots-horizontal', color: '#999' },
     ],
+    'Traveling Expenses': [
+        { name: 'Fuel & Petrol', icon: 'gas-station', color: '#FF5722' },
+        { name: 'Vehicle Rental', icon: 'car-estate', color: '#F57C00' },
+        { name: 'Tolls & Parking', icon: 'ticket', color: '#FFC107' },
+        { name: 'Accommodation', icon: 'bed', color: '#9C27B0' },
+        { name: 'Food & Meals', icon: 'food', color: '#4CAF50' },
+        { name: 'Public Transport', icon: 'bus', color: '#2196F3' },
+        { name: 'Site Visit Expenses', icon: 'map-marker-distance', color: '#00BCD4' },
+        { name: 'Other', icon: 'dots-horizontal', color: '#999' },
+    ],
 
     // Flooring & Tiling
     'Flooring Work': [
