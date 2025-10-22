@@ -4,31 +4,31 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    KeyboardAvoidingView,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { Expense, getExpensesByProject } from "../api/expensesApi";
 import {
-    getPaymentsByProject,
-    getPaymentSummary,
-    Payment,
-    PAYMENT_TYPES,
-    PaymentSummary,
+  getPaymentsByProject,
+  getPaymentSummary,
+  Payment,
+  PAYMENT_TYPES,
+  PaymentSummary,
 } from "../api/paymentsApi";
 import {
-    deleteProject,
-    getProjectById,
-    Project,
-    updateProject,
+  deleteProject,
+  getProjectById,
+  Project,
+  updateProject,
 } from "../api/projectsApi";
 
 export default function ProjectDetails() {

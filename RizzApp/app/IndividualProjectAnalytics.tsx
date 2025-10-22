@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Dimensions,
-  ActivityIndicator,
-} from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LineChart, BarChart, ProgressChart } from 'react-native-chart-kit';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import {
+    ActivityIndicator,
+    Dimensions,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TouchableOpacity,
+    View,
+} from 'react-native';
+import { BarChart, LineChart, ProgressChart } from 'react-native-chart-kit';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Expense, getExpensesByProject } from '../api/expensesApi';
+import { getPaymentsByProject, getPaymentSummary, PaymentSummary } from '../api/paymentsApi';
 import { getProjectById, Project } from '../api/projectsApi';
-import { getExpensesByProject, Expense } from '../api/expensesApi';
-import { getPaymentSummary, getPaymentsByProject, PaymentSummary } from '../api/paymentsApi';
 
 const { width } = Dimensions.get('window');
 
