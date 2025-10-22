@@ -1,29 +1,29 @@
-import React, { useState, useCallback } from 'react';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
+import React, { useCallback, useState } from 'react';
 import {
-    View,
-    Text,
-    StyleSheet,
-    FlatList,
-    TouchableOpacity,
+    ActivityIndicator,
     Alert,
-    TextInput,
+    FlatList,
     Modal,
     ScrollView,
-    ActivityIndicator,
-    Switch
+    StyleSheet,
+    Switch,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View
 } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { 
-    getSubUsers, 
-    createSubUser, 
-    updateSubUser, 
-    deleteSubUser, 
+import {
+    createSubUser,
+    CreateSubUserData,
+    deleteSubUser,
+    getSubUsers,
     resetSubUserPassword,
     SubUser,
-    CreateSubUserData 
+    updateSubUser
 } from '../../api/authApi';
 
 export default function UsersScreen() {
