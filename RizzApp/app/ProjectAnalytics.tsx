@@ -165,7 +165,9 @@ export default function ProjectAnalytics() {
               size={20}
               color={category.color}
             />
-            <Text style={styles.categoryName}>{category.name}</Text>
+            <Text style={styles.categoryName} numberOfLines={2} ellipsizeMode="tail">
+              {category.name}
+            </Text>
           </View>
           <Text style={styles.categoryPercentage}>
             {category.percentage.toFixed(1)}%
@@ -362,10 +364,14 @@ export default function ProjectAnalytics() {
                   />
                 </View>
                 <View style={styles.expenseInfo}>
-                  <Text style={styles.expenseName}>{category.name}</Text>
-                  <Text style={styles.expensePercentage}>{category.percentage.toFixed(1)}% of budget</Text>
+                  <Text style={styles.expenseName} numberOfLines={1} ellipsizeMode="tail">
+                    {category.name}
+                  </Text>
+                  <Text style={styles.expensePercentage} numberOfLines={1}>
+                    {category.percentage.toFixed(1)}% of budget
+                  </Text>
                 </View>
-                <Text style={styles.expenseAmount}>
+                <Text style={styles.expenseAmount} numberOfLines={1}>
                   ₹{category.amount.toLocaleString('en-IN')}
                 </Text>
               </View>
@@ -502,16 +508,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    gap: 12,
   },
   categoryInfo: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
+    flex: 1,
+    minWidth: 0,
   },
   categoryName: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
+    flex: 1,
+    flexWrap: 'wrap',
   },
   categoryPercentage: {
     fontSize: 14,
@@ -587,6 +598,8 @@ const styles = StyleSheet.create({
   },
   expenseInfo: {
     flex: 1,
+    minWidth: 0,
+    marginRight: 12,
   },
   expenseName: {
     fontSize: 15,
@@ -602,5 +615,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
     color: '#667eea',
+    flexShrink: 0,
   },
 });

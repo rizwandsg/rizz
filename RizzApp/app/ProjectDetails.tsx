@@ -6,7 +6,9 @@ import React, { useCallback, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
+    KeyboardAvoidingView,
     Modal,
+    Platform,
     ScrollView,
     StyleSheet,
     Text,
@@ -734,7 +736,10 @@ export default function ProjectDetails() {
         visible={statusModalVisible}
         onRequestClose={() => setStatusModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.modalOverlay}
+        >
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Update Project Status</Text>
@@ -743,7 +748,11 @@ export default function ProjectDetails() {
               </TouchableOpacity>
             </View>
             
-            <View style={styles.statusOptions}>
+            <ScrollView 
+              style={styles.statusOptions}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
               {PROJECT_STATUSES.map((status) => (
                 <TouchableOpacity
                   key={status.value}
@@ -812,13 +821,13 @@ export default function ProjectDetails() {
                   </TouchableOpacity>
                 </View>
               )}
-            </View>
+            </ScrollView>
             
             {updatingStatus && (
               <ActivityIndicator size="large" color="#667eea" style={styles.modalLoader} />
             )}
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Analytics FAB */}
@@ -1364,17 +1373,18 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
+    justifyContent: "flex-end",
     alignItems: "center",
   },
   modalContent: {
     backgroundColor: "#fff",
-    borderRadius: 20,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     padding: 24,
-    width: "85%",
-    maxWidth: 400,
+    width: "100%",
+    maxHeight: "85%",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
@@ -1391,61 +1401,83 @@ const styles = StyleSheet.create({
     color: "#333",
   },
   statusOptions: {
-    gap: 12,
+    flexGrow: 0,
+    paddingBottom: 20,
   },
   statusOption: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 16,
-    borderRadius: 12,
-    backgroundColor: "#f8f9fa",
+    padding: 18,
+    borderRadius: 14,
+    backgroundColor: "#ffffff",
     gap: 12,
     borderWidth: 2,
-    borderColor: "#e0e0e0",
+    borderColor: "#e8e8e8",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+    marginBottom: 12,
   },
   statusOptionSelected: {
     backgroundColor: "#667eea",
     borderColor: "#667eea",
+    shadowColor: "#667eea",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    elevation: 4,
   },
   statusOptionText: {
     flex: 1,
     fontSize: 16,
     fontWeight: "600",
-    color: "#333",
+    color: "#1a1a1a",
   },
   statusOptionTextSelected: {
     color: "#fff",
   },
   customStatusOption: {
-    backgroundColor: "#f0f4ff",
+    backgroundColor: "#ffffff",
     borderColor: "#667eea",
+    borderWidth: 2,
   },
   customInputContainer: {
+    marginTop: 12,
     gap: 12,
-    padding: 12,
-    backgroundColor: "#f0f4ff",
+    padding: 16,
+    backgroundColor: "#ffffff",
     borderRadius: 12,
-    borderWidth: 2,
-    borderColor: "#667eea",
+    borderWidth: 1,
+    borderColor: "#e0e0e0",
   },
   customInput: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 10,
+    padding: 14,
+    fontSize: 15,
     borderWidth: 1,
     borderColor: "#d0d0d0",
+    color: "#333",
+    fontWeight: "500",
   },
   customSubmitButton: {
     backgroundColor: "#667eea",
-    padding: 14,
-    borderRadius: 8,
+    padding: 16,
+    borderRadius: 10,
     alignItems: "center",
+    shadowColor: "#667eea",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   customSubmitText: {
     color: "#fff",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "700",
+    letterSpacing: 0.5,
   },
   modalLoader: {
     marginTop: 20,

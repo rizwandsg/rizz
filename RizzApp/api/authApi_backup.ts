@@ -191,3 +191,33 @@ export const updateProfile = async (data: { full_name?: string; phone?: string }
     }
 };
 
+/**
+ * Update user profile
+ */
+export const updateProfile = async (data: { full_name?: string; phone?: string }): Promise<User> => {
+    try {
+        const currentUser = await getCurrentUser();
+        if (!currentUser) {
+            throw new Error('No user logged in');
+        }
+
+        // Update user in database
+        const updatedData = {
+            id: currentUser.id,
+            ...(data.full_name && { full_name: data.full_name }),
+            ...(data.phone !== undefined && { phone: data.phone }),
+        };
+
+        await database.upsertData('users', updatedData);
+
+        // Update local storage
+        const updatedUser = { ...currentUser, ...updatedData };
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUser));
+
+        return updatedUser;
+    } catch (error) {
+        console.error('Update profile error:', error);
+        throw error;
+    }
+};
+

@@ -198,6 +198,55 @@ export default function AddExpense() {
     }
   };
 
+  // Helper function to get icon for scope
+  const getScopeIcon = (scope: ScopeOfWork | 'Other'): string => {
+    const scopeIconMap: Record<string, string> = {
+      'Carpentry Work': 'hammer-screwdriver',
+      'Painting Work': 'format-paint',
+      'Aluminium Work': 'window-closed-variant',
+      'Electrical Work': 'flash',
+      'Plumbing Work': 'pipe',
+      'Flooring Work': 'floor-plan',
+      'False Ceiling Work': 'ceiling-light',
+      'Masonry Work': 'wall',
+      'Tiling Work': 'grid',
+      'Glazing Work': 'window-open-variant',
+      'Door & Window Work': 'door',
+      'Kitchen & Modular Work': 'countertop',
+      'Interior Decoration': 'sofa',
+      'Exterior Decoration': 'home-city',
+      'Landscaping Work': 'tree',
+      'HVAC Work': 'air-conditioner',
+      'Waterproofing Work': 'water-off',
+      'Structural Work': 'home-variant',
+      'Civil Work': 'hard-hat',
+      'Plastering Work': 'texture',
+      'Wallpaper Work': 'wallpaper',
+      'Furniture Work': 'table-furniture',
+      'Lighting Work': 'lightbulb-on',
+      'Partition Work': 'view-split-vertical',
+      'Plaster of Paris Work': 'spray',
+      'Wood Flooring': 'pine-tree',
+      'Marble & Granite Work': 'square',
+      'Steel Fabrication': 'wrench',
+      'Railing Work': 'fence',
+      'Staircase Work': 'stairs',
+      'Bathroom Fitting': 'shower',
+      'Wardrobe Work': 'wardrobe',
+      'Curtain & Blinds': 'blinds',
+      'Wall Cladding': 'wall-sconce-flat',
+      'Roofing Work': 'home-roof',
+      'Insulation Work': 'thermometer',
+      'Demolition Work': 'hammer-wrench',
+      'Site Preparation': 'excavator',
+      'Traveling Expenses': 'car-multiple',
+      'Complete Interior Fit-out': 'home-modern',
+      'Complete Renovation': 'home-edit',
+      'Turnkey Project': 'key-variant',
+    };
+    return scopeIconMap[scope] || 'hammer-wrench';
+  };
+
   const categories = [
     { value: "materials", label: "Materials", icon: "package-variant", color: "#FF6B6B" },
     { value: "labor", label: "Labor", icon: "account-hard-hat", color: "#4ECDC4" },
@@ -395,7 +444,13 @@ export default function AddExpense() {
                 onPress={() => setShowScopeDropdown(!showScopeDropdown)}
                 disabled={loading}
               >
-                <MaterialCommunityIcons name="hammer-wrench" size={20} color="#f093fb" />
+                <View style={styles.iconCircle}>
+                  <MaterialCommunityIcons 
+                    name={selectedScope ? getScopeIcon(selectedScope) as any : "hammer-wrench"} 
+                    size={20} 
+                    color="#f093fb" 
+                  />
+                </View>
                 <Text style={[styles.dropdownText, !selectedScope && { color: '#999' }]}>
                   {selectedScope || 'Select scope of work'}
                 </Text>
@@ -404,29 +459,44 @@ export default function AddExpense() {
               
               {showScopeDropdown && (
                 <View style={styles.dropdownList}>
-                  {availableScopes.map((scope) => (
-                    <TouchableOpacity
-                      key={scope}
-                      style={[
-                        styles.dropdownItem,
-                        selectedScope === scope && styles.dropdownItemSelected
-                      ]}
-                      onPress={() => {
-                        setSelectedScope(scope);
-                        setShowScopeDropdown(false);
-                      }}
-                    >
-                      <Text style={[
-                        styles.dropdownItemText,
-                        selectedScope === scope && styles.dropdownItemTextSelected
-                      ]}>
-                        {scope}
-                      </Text>
-                      {selectedScope === scope && (
-                        <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
-                      )}
-                    </TouchableOpacity>
-                  ))}
+                  <ScrollView 
+                    style={styles.dropdownScroll}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator={true}
+                  >
+                    {availableScopes.map((scope) => (
+                      <TouchableOpacity
+                        key={scope}
+                        style={[
+                          styles.dropdownItem,
+                          selectedScope === scope && styles.dropdownItemSelected
+                        ]}
+                        onPress={() => {
+                          setSelectedScope(scope);
+                          setShowScopeDropdown(false);
+                        }}
+                      >
+                        <View style={styles.scopeItemContainer}>
+                          <View style={styles.scopeIconCircle}>
+                            <MaterialCommunityIcons 
+                              name={getScopeIcon(scope) as any} 
+                              size={20} 
+                              color={selectedScope === scope ? "#f093fb" : "#667eea"} 
+                            />
+                          </View>
+                          <Text style={[
+                            styles.dropdownItemText,
+                            selectedScope === scope && styles.dropdownItemTextSelected
+                          ]}>
+                            {scope}
+                          </Text>
+                        </View>
+                        {selectedScope === scope && (
+                          <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
                 </View>
               )}
             </View>
@@ -1012,5 +1082,19 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     marginRight: 8,
+  },
+  scopeItemContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    gap: 12,
+  },
+  scopeIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#f0f0ff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });

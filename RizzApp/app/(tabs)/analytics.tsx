@@ -36,6 +36,15 @@ const chartConfig = {
   decimalPlaces: 0
 };
 
+// Helper function to get consistent colors for projects
+const getProjectColor = (index: number): string => {
+  const colors = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', '#FFEAA7',
+    '#DFE6E9', '#74B9FF', '#A29BFE', '#FD79A8', '#FDCB6E'
+  ];
+  return colors[index % colors.length];
+};
+
 function AnalyticsRoute() {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
@@ -50,16 +59,29 @@ function AnalyticsRoute() {
       try {
         // Load projects
         const projects = await getProjects();
-        // Since API projects don't have budget, we'll calculate from expenses per project
-        setTotalBudget(projects.length * 100000); // Mock budget for now
+        
+        // Calculate total budget from project costs
+        const calculatedBudget = projects.reduce((sum, p) => sum + (p.total_project_cost || 0), 0);
+        setTotalBudget(calculatedBudget || projects.length * 100000);
           
-        setProjectData(projects.map((p: Project) => ({
-          name: p.name,
-          population: 100000, // Mock budget per project
-          color: '#' + (Math.random() * 0xFFFFFF << 0).toString(16).padStart(6, '0'),
-          legendFontColor: "#333",
-          legendFontSize: 14
-        })));
+        const projectChartData = projects.map((p: Project, index: number) => {
+          const projectBudget = p.total_project_cost || 100000;
+          // Truncate name to fit better
+          let displayName = p.name;
+          if (displayName.length > 12) {
+            displayName = displayName.substring(0, 12) + '...';
+          }
+          
+          return {
+            name: displayName,
+            population: projectBudget,
+            color: getProjectColor(index),
+            legendFontColor: "#333",
+            legendFontSize: 10
+          };
+        });
+        
+        setProjectData(projectChartData);
 
         // Load expenses
         const expenses = await getExpenses();
@@ -151,17 +173,23 @@ function AnalyticsRoute() {
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Budget Distribution</Text>
         {projectData.length > 0 ? (
-          <PieChart
-            data={projectData}
-            width={screenWidth - 32}
-            height={220}
-            accessor="population"
-            backgroundColor="transparent"
-            paddingLeft="16"
-            center={[10, 0]}
-            chartConfig={chartConfig}
-            absolute
-          />
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chartScrollContent}
+          >
+            <PieChart
+              data={projectData}
+              width={screenWidth}
+              height={projectData.length > 4 ? 280 : 240}
+              accessor="population"
+              backgroundColor="transparent"
+              paddingLeft="15"
+              chartConfig={chartConfig}
+              absolute={false}
+              hasLegend={true}
+            />
+          </ScrollView>
         ) : (
           <View style={styles.emptyChart}>
             <MaterialCommunityIcons name="chart-pie" size={48} color="#ccc" />
@@ -246,47 +274,62 @@ const styles = StyleSheet.create({
   },
   summaryContainer: {
     flexDirection: 'row',
-    padding: 16,
-    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 12,
   },
   summaryCard: {
     flex: 1,
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    marginHorizontal: 8,
+    borderRadius: 16,
+    padding: 20,
     alignItems: 'center',
-    elevation: 2,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
   },
   summaryLabel: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
-    marginTop: 8,
+    marginTop: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   summaryValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginTop: 4,
+    marginTop: 6,
+    color: '#1a1a1a',
   },
   chartContainer: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    margin: 16,
-    elevation: 2,
+    borderRadius: 16,
+    padding: 20,
+    paddingHorizontal: 8,
+    marginHorizontal: 16,
+    marginVertical: 12,
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowRadius: 8,
+  },
+  chartWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'visible',
+  },
+  chartScrollContent: {
+    paddingHorizontal: 8,
   },
   chartTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     marginBottom: 16,
+    color: '#1a1a1a',
   },
   chart: {
     borderRadius: 12,

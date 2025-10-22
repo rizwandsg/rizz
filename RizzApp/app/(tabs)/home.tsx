@@ -268,6 +268,14 @@ export default function Home() {
                   <View style={styles.cardActions}>
                     <TouchableOpacity
                       style={styles.actionButton}
+                      onPress={() => project.id && router.push(`/IndividualProjectAnalytics?id=${project.id}`)}
+                    >
+                      <MaterialCommunityIcons name="chart-line" size={18} color="#4CAF50" />
+                      <Text style={[styles.actionButtonText, { color: '#4CAF50' }]}>Analytics</Text>
+                    </TouchableOpacity>
+                    <View style={styles.actionDivider} />
+                    <TouchableOpacity
+                      style={styles.actionButton}
                       onPress={() => project.id && handleEditProject(project.id)}
                     >
                       <MaterialCommunityIcons name="pencil" size={18} color="#667eea" />

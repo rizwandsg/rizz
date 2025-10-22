@@ -92,40 +92,44 @@ export default function ProfileScreen() {
         colors={['#667eea', '#764ba2']}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 20 }]}
+        style={[styles.header, { paddingTop: insets.top + 12 }]}
       >
         <View style={styles.avatarContainer}>
           <LinearGradient
             colors={['#fff', '#f0f0f0']}
             style={styles.avatarGradient}
           >
-            <MaterialCommunityIcons name="account" size={48} color="#667eea" />
+            <MaterialCommunityIcons name="account" size={40} color="#667eea" />
           </LinearGradient>
         </View>
         <Text style={styles.userName}>{user?.full_name || 'User'}</Text>
         <Text style={styles.userEmail}>{user?.email || ''}</Text>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 20 }}
+      >
         {/* Stats Cards */}
         <View style={styles.statsContainer}>
           <View style={styles.statCard}>
             <View style={[styles.iconCircle, { backgroundColor: '#E3F2FD' }]}>
-              <MaterialCommunityIcons name="briefcase" size={28} color="#2196F3" />
+              <MaterialCommunityIcons name="briefcase" size={24} color="#2196F3" />
             </View>
             <Text style={styles.statValue}>{stats.projectCount}</Text>
             <Text style={styles.statLabel}>Projects</Text>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.iconCircle, { backgroundColor: '#E8F5E9' }]}>
-              <MaterialCommunityIcons name="receipt" size={28} color="#4CAF50" />
+              <MaterialCommunityIcons name="receipt" size={24} color="#4CAF50" />
             </View>
             <Text style={styles.statValue}>{stats.expenseCount}</Text>
             <Text style={styles.statLabel}>Expenses</Text>
           </View>
           <View style={styles.statCard}>
             <View style={[styles.iconCircle, { backgroundColor: '#FFF3E0' }]}>
-              <MaterialCommunityIcons name="currency-inr" size={28} color="#FF9800" />
+              <MaterialCommunityIcons name="currency-inr" size={24} color="#FF9800" />
             </View>
             <Text style={styles.statValue}>₹{(stats.totalExpenses / 1000).toFixed(0)}K</Text>
             <Text style={styles.statLabel}>Total Spent</Text>
@@ -136,7 +140,10 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Settings</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/EditProfile')}
+          >
             <View style={styles.menuIconContainer}>
               <MaterialCommunityIcons name="account-edit" size={22} color="#667eea" />
             </View>
@@ -144,7 +151,10 @@ export default function ProfileScreen() {
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/ChangePassword')}
+          >
             <View style={styles.menuIconContainer}>
               <MaterialCommunityIcons name="lock" size={22} color="#667eea" />
             </View>
@@ -152,7 +162,10 @@ export default function ProfileScreen() {
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/Notifications')}
+          >
             <View style={styles.menuIconContainer}>
               <MaterialCommunityIcons name="bell" size={22} color="#667eea" />
             </View>
@@ -165,7 +178,10 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>App Settings</Text>
           
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/Theme')}
+          >
             <View style={styles.menuIconContainer}>
               <MaterialCommunityIcons name="palette" size={22} color="#667eea" />
             </View>
@@ -173,7 +189,10 @@ export default function ProfileScreen() {
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={styles.menuItem}
+            onPress={() => router.push('/HelpSupport')}
+          >
             <View style={styles.menuIconContainer}>
               <MaterialCommunityIcons name="help-circle" size={22} color="#667eea" />
             </View>
@@ -181,7 +200,10 @@ export default function ProfileScreen() {
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.menuItem}>
+          <TouchableOpacity 
+            style={[styles.menuItem, { borderBottomWidth: 0 }]}
+            onPress={() => router.push('/About')}
+          >
             <View style={styles.menuIconContainer}>
               <MaterialCommunityIcons name="information" size={22} color="#667eea" />
             </View>
@@ -205,6 +227,9 @@ export default function ProfileScreen() {
 
         {/* Footer */}
         <Text style={styles.version}>Version 1.0.0</Text>
+        
+        {/* Bottom Padding for Tab Bar */}
+        <View style={{ height: 60 }} />
       </ScrollView>
     </View>
   );
@@ -226,7 +251,7 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   header: {
-    paddingBottom: 30,
+    paddingBottom: 20,
     alignItems: 'center',
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -237,12 +262,12 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   avatarContainer: {
-    marginBottom: 16,
+    marginBottom: 12,
   },
   avatarGradient: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -256,25 +281,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 4,
+    letterSpacing: 0.5,
   },
   userEmail: {
     fontSize: 14,
-    color: 'rgba(255,255,255,0.9)',
+    color: 'rgba(255,255,255,0.95)',
+    letterSpacing: 0.3,
   },
   content: {
     flex: 1,
   },
   statsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    marginTop: -40,
+    paddingHorizontal: 16,
+    marginTop: 15,
     marginBottom: 20,
-    gap: 12,
+    gap: 10,
   },
   statCard: {
     flex: 1,
     backgroundColor: '#fff',
-    padding: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 8,
     borderRadius: 16,
     alignItems: 'center',
     shadowColor: '#000',
@@ -284,23 +312,24 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   iconCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 10,
   },
   statValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
-    marginTop: 4,
+    marginTop: 2,
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#999',
     marginTop: 4,
+    textAlign: 'center',
   },
   section: {
     backgroundColor: '#fff',
