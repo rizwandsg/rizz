@@ -2,7 +2,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpenses } from "../../api/expensesApi";
 import { getProjects } from "../../api/projectsApi";
@@ -20,7 +20,10 @@ export default function ExpenseScreen() {
   const insets = useSafeAreaInsets();
   const [projectSummaries, setProjectSummaries] = useState<ProjectExpenseSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
+
+  console.log('💰 Expense screen rendering with purple gradient theme');
 
   const loadData = async () => {
     try {
@@ -74,6 +77,12 @@ export default function ExpenseScreen() {
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -89,7 +98,7 @@ export default function ExpenseScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#667eea" />
         <Text style={styles.loadingText}>Loading expenses...</Text>
       </View>
     );
@@ -102,11 +111,9 @@ export default function ExpenseScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Gradient Header */}
+      {/* Purple Gradient Header - Updated Theme */}
       <LinearGradient
-        colors={['#f093fb', '#f5576c']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={['#667eea', '#764ba2']}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
         <View style={styles.headerContent}>
@@ -147,6 +154,14 @@ export default function ExpenseScreen() {
         keyExtractor={item => item.projectId}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#667eea']}
+            tintColor="#667eea"
+          />
+        }
         renderItem={({ item, index }) => {
           // Use gradient colors based on total amount
           const gradientColors: [string, string] = item.totalAmount > 50000 
@@ -244,7 +259,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     elevation: 8,
-    shadowColor: '#f093fb',
+    shadowColor: '#667eea',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,

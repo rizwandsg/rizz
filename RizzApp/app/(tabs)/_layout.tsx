@@ -1,9 +1,24 @@
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useState, useEffect } from "react";
+import { getCurrentUser, User } from "../../api/authApi";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    // Load current user to check role
+    const loadUser = async () => {
+      const user = await getCurrentUser();
+      setCurrentUser(user);
+    };
+    loadUser();
+  }, []);
+
+  // Check if user is an owner (not a sub-user)
+  const isOwner = currentUser && (!currentUser.parent_user_id || currentUser.role === 'owner');
   
   return (
     <Tabs
@@ -43,6 +58,17 @@ export default function TabsLayout() {
           title: "Analytics",
           tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
           headerShown: false,
+        }}
+      />
+      {/* Users tab - Only visible to owner accounts */}
+      <Tabs.Screen
+        name="users"
+        options={{
+          title: "Users",
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" size={size} color={color} />,
+          headerShown: false,
+          // Hide tab for sub-users
+          href: isOwner ? '/(tabs)/users' : null,
         }}
       />
       <Tabs.Screen

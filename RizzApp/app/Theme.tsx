@@ -1,8 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import {
     Alert,
     ScrollView,
@@ -12,45 +11,28 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-const THEME_STORAGE_KEY = '@rizzapp_theme';
+import { THEMES, ThemeId, useTheme } from '../context/ThemeContext';
 
 export default function ThemeScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const [selectedTheme, setSelectedTheme] = useState('purple');
+    const { theme, setTheme } = useTheme();
 
     const themes = [
-        { id: 'purple', name: 'Purple Gradient', colors: ['#667eea', '#764ba2'] as const, icon: 'palette' },
-        { id: 'blue', name: 'Blue Ocean', colors: ['#2196F3', '#1976D2'] as const, icon: 'water' },
-        { id: 'green', name: 'Fresh Green', colors: ['#4CAF50', '#388E3C'] as const, icon: 'leaf' },
-        { id: 'orange', name: 'Sunset Orange', colors: ['#FF9800', '#F57C00'] as const, icon: 'white-balance-sunny' },
-        { id: 'pink', name: 'Rose Pink', colors: ['#E91E63', '#C2185B'] as const, icon: 'flower' },
-        { id: 'teal', name: 'Ocean Teal', colors: ['#009688', '#00796B'] as const, icon: 'waves' },
+        { ...THEMES.purple, icon: 'palette' },
+        { ...THEMES.blue, icon: 'water' },
+        { ...THEMES.green, icon: 'leaf' },
+        { ...THEMES.orange, icon: 'white-balance-sunny' },
+        { ...THEMES.pink, icon: 'flower' },
+        { ...THEMES.teal, icon: 'waves' },
     ];
 
-    useEffect(() => {
-        loadTheme();
-    }, []);
-
-    const loadTheme = async () => {
+    const handleThemeSelect = async (themeId: ThemeId) => {
         try {
-            const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-            if (savedTheme) {
-                setSelectedTheme(savedTheme);
-            }
-        } catch (error) {
-            console.error('Failed to load theme:', error);
-        }
-    };
-
-    const handleThemeSelect = async (themeId: string) => {
-        setSelectedTheme(themeId);
-        try {
-            await AsyncStorage.setItem(THEME_STORAGE_KEY, themeId);
+            await setTheme(themeId);
             Alert.alert(
-                'Theme Selected',
-                'Your theme preference has been saved. Theme changes will be applied in a future update.',
+                'Theme Applied',
+                'Your theme has been successfully updated!',
                 [{ text: 'OK' }]
             );
         } catch (error) {
@@ -63,7 +45,7 @@ export default function ThemeScreen() {
         <View style={styles.container}>
             {/* Header */}
             <LinearGradient
-                colors={['#667eea', '#764ba2']}
+                colors={theme.colors}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.header, { paddingTop: insets.top + 10 }]}
@@ -83,25 +65,25 @@ export default function ThemeScreen() {
                 </Text>
 
                 <View style={styles.themesContainer}>
-                    {themes.map((theme) => (
+                    {themes.map((themeOption) => (
                         <TouchableOpacity
-                            key={theme.id}
+                            key={themeOption.id}
                             style={[
                                 styles.themeCard,
-                                selectedTheme === theme.id && styles.selectedTheme
+                                theme.id === themeOption.id && styles.selectedTheme
                             ]}
-                            onPress={() => handleThemeSelect(theme.id)}
+                            onPress={() => handleThemeSelect(themeOption.id)}
                         >
                             <LinearGradient
-                                colors={theme.colors}
+                                colors={themeOption.colors}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={styles.themePreview}
                             >
-                                <MaterialCommunityIcons name={theme.icon as any} size={32} color="#fff" />
+                                <MaterialCommunityIcons name={themeOption.icon as any} size={32} color="#fff" />
                             </LinearGradient>
-                            <Text style={styles.themeName}>{theme.name}</Text>
-                            {selectedTheme === theme.id && (
+                            <Text style={styles.themeName}>{themeOption.name}</Text>
+                            {theme.id === themeOption.id && (
                                 <MaterialCommunityIcons
                                     name="check-circle"
                                     size={24}
@@ -115,9 +97,9 @@ export default function ThemeScreen() {
 
                 {/* Info */}
                 <View style={styles.infoBox}>
-                    <MaterialCommunityIcons name="information" size={20} color="#667eea" />
-                    <Text style={styles.infoText}>
-                        Theme changes will be available in a future update
+                    <MaterialCommunityIcons name="information" size={20} color={theme.primaryColor} />
+                    <Text style={[styles.infoText, { color: theme.primaryColor }]}>
+                        Theme is now applied! You&apos;ll see the new colors in headers and buttons throughout the app.
                     </Text>
                 </View>
             </ScrollView>

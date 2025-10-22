@@ -15,7 +15,7 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getCurrentUser, User } from '../api/authApi';
+import { getCurrentUser, updateProfile, User } from '../api/authApi';
 
 export default function EditProfileScreen() {
     const router = useRouter();
@@ -24,6 +24,7 @@ export default function EditProfileScreen() {
     const [fullName, setFullName] = useState('');
     const [phone, setPhone] = useState('');
     const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
 
     useEffect(() => {
         loadUserData();
@@ -51,13 +52,34 @@ export default function EditProfileScreen() {
             return;
         }
 
-        // Temporary: Show coming soon message
-        // TODO: Re-enable after fixing device cache issue
-        Alert.alert(
-            'Feature Temporarily Disabled',
-            'Profile editing is temporarily disabled due to a technical issue. Please check back in the next update.',
-            [{ text: 'OK', onPress: () => router.back() }]
-        );
+        try {
+            setSaving(true);
+            
+            // Update profile
+            await updateProfile({
+                full_name: fullName.trim(),
+                phone: phone.trim() || undefined,
+            });
+
+            Alert.alert(
+                'Success',
+                'Profile updated successfully!',
+                [
+                    {
+                        text: 'OK',
+                        onPress: () => router.back(),
+                    },
+                ]
+            );
+        } catch (error) {
+            console.error('Failed to update profile:', error);
+            Alert.alert(
+                'Error',
+                'Failed to update profile. Please try again.'
+            );
+        } finally {
+            setSaving(false);
+        }
     };
 
     if (loading) {
@@ -152,15 +174,25 @@ export default function EditProfileScreen() {
                     <TouchableOpacity
                         style={styles.saveButton}
                         onPress={handleSave}
+                        disabled={saving}
                     >
                         <LinearGradient
-                            colors={['#667eea', '#764ba2']}
+                            colors={saving ? ['#999', '#666'] : ['#667eea', '#764ba2']}
                             start={{ x: 0, y: 0 }}
                             end={{ x: 1, y: 0 }}
                             style={styles.saveGradient}
                         >
-                            <MaterialCommunityIcons name="content-save" size={20} color="#fff" />
-                            <Text style={styles.saveText}>Save Changes</Text>
+                            {saving ? (
+                                <>
+                                    <ActivityIndicator size="small" color="#fff" />
+                                    <Text style={styles.saveText}>Saving...</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <MaterialCommunityIcons name="content-save" size={20} color="#fff" />
+                                    <Text style={styles.saveText}>Save Changes</Text>
+                                </>
+                            )}
                         </LinearGradient>
                     </TouchableOpacity>
                 </ScrollView>

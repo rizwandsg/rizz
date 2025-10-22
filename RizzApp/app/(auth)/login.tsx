@@ -88,7 +88,15 @@ export default function LoginScreen() {
 
             {/* Password Input */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Password</Text>
+              <View style={styles.labelRow}>
+                <Text style={styles.label}>Password</Text>
+                <TouchableOpacity
+                  onPress={() => router.push('/(auth)/reset-password')}
+                  disabled={loading}
+                >
+                  <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                </TouchableOpacity>
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder="Enter your password"
@@ -174,11 +182,21 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 20,
   },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   label: {
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
+  },
+  forgotPasswordText: {
+    fontSize: 13,
+    color: '#667eea',
+    fontWeight: '500',
   },
   input: {
     height: 50,
@@ -191,7 +209,7 @@ const styles = StyleSheet.create({
   },
   button: {
     height: 50,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#667eea',
     borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
@@ -217,7 +235,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 14,
-    color: '#007AFF',
+    color: '#667eea',
     fontWeight: '600',
   },
 });

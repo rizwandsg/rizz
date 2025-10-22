@@ -1,6 +1,7 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Dimensions, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Dimensions, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { LineChart, PieChart } from "react-native-chart-kit";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpenses } from "../../api/expensesApi";
@@ -48,11 +49,14 @@ const getProjectColor = (index: number): string => {
 function AnalyticsRoute() {
   const insets = useSafeAreaInsets();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [projectData, setProjectData] = useState<ChartDataPoint[]>([]);
   const [expenseData, setExpenseData] = useState<ExpenseData[]>([]);
   const [totalBudget, setTotalBudget] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [error, setError] = useState<string | null>(null);
+
+  console.log('📊 Analytics rendering with purple gradient theme');
 
   useEffect(() => {
     const loadData = async () => {
@@ -114,6 +118,55 @@ function AnalyticsRoute() {
     loadData();
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const projects = await getProjects();
+      const expenses = await getExpenses();
+
+      const calculatedBudget = projects.reduce((sum, p) => sum + (p.total_project_cost || 0), 0);
+      setTotalBudget(calculatedBudget || projects.length * 100000);
+
+      const projectChartData = projects.map((p: Project, index: number) => {
+        const projectBudget = p.total_project_cost || 100000;
+        const displayName = p.name.length > 10 ? p.name.substring(0, 10) + '...' : p.name;
+        
+        return {
+          name: displayName,
+          population: projectBudget,
+          color: getProjectColor(index),
+          legendFontColor: "#7F7F7F",
+          legendFontSize: 12
+        };
+      });
+
+      setProjectData(projectChartData);
+
+      const calculatedTotalExpenses = expenses.reduce((sum, e) => sum + e.amount, 0);
+      setTotalExpenses(calculatedTotalExpenses);
+
+      const expenseDataList: ExpenseData[] = expenses.map(expense => ({
+        id: expense.id || '',
+        projectId: expense.project_id || '',
+        description: expense.description || '',
+        cost: expense.amount,
+        date: expense.expense_date
+      }));
+      
+      setExpenseData(expenseDataList);
+      
+      if (projects.length === 0 && expenses.length === 0) {
+        setError('No data available yet. Add some projects and expenses to see analytics.');
+      } else {
+        setError(null);
+      }
+    } catch (error) {
+      console.error("Error refreshing data:", error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -151,25 +204,48 @@ function AnalyticsRoute() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f5f7fa' }}>
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <Text style={styles.headerTitle}>Analytics</Text>
-        <Text style={styles.headerSubtitle}>Financial Overview</Text>
-      </View>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      
-      <View style={styles.summaryContainer}>
-        <View style={styles.summaryCard}>
-          <MaterialCommunityIcons name="currency-inr" size={24} color="#007AFF" />
-          <Text style={styles.summaryLabel}>Total Budget</Text>
-          <Text style={styles.summaryValue}>₹{totalBudget.toLocaleString()}</Text>
+      {/* Purple Gradient Header - Updated Theme */}
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
+      >
+        <View style={styles.headerContent}>
+          <View>
+            <Text style={styles.headerTitle}>Analytics</Text>
+            <Text style={styles.headerSubtitle}>Financial Overview</Text>
+          </View>
         </View>
-        <View style={styles.summaryCard}>
-          <MaterialCommunityIcons name="cash-multiple" size={24} color="#34C759" />
-          <Text style={styles.summaryLabel}>Total Expenses</Text>
-          <Text style={styles.summaryValue}>₹{totalExpenses.toLocaleString()}</Text>
-        </View>
-      </View>
 
+        {/* Stats Cards */}
+        <View style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <MaterialCommunityIcons name="currency-inr" size={24} color="#FFD93D" />
+            <Text style={styles.statNumber}>₹{(totalBudget / 1000).toFixed(0)}K</Text>
+            <Text style={styles.statLabel}>Budget</Text>
+          </View>
+          <View style={styles.statCard}>
+            <MaterialCommunityIcons name="cash-multiple" size={24} color="#6BCF7F" />
+            <Text style={styles.statNumber}>₹{(totalExpenses / 1000).toFixed(0)}K</Text>
+            <Text style={styles.statLabel}>Expenses</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      <ScrollView 
+        style={styles.container} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#667eea']}
+            tintColor="#667eea"
+          />
+        }
+      >
+      
+      {/* Removed old summary cards as they're now in header */}
+      
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Budget Distribution</Text>
         {projectData.length > 0 ? (
@@ -201,14 +277,16 @@ function AnalyticsRoute() {
       <View style={styles.chartContainer}>
         <Text style={styles.chartTitle}>Monthly Expenses</Text>
         {expenseData.length > 0 ? (
-          <LineChart
-            data={expenseChartData}
-            width={screenWidth - 32}
-            height={220}
-            chartConfig={chartConfig}
-            bezier
-            style={styles.chart}
-          />
+          <View style={styles.chartWrapper}>
+            <LineChart
+              data={expenseChartData}
+              width={screenWidth - 72}
+              height={220}
+              chartConfig={chartConfig}
+              bezier
+              style={styles.chart}
+            />
+          </View>
         ) : (
           <View style={styles.emptyChart}>
             <MaterialCommunityIcons name="chart-line" size={48} color="#ccc" />
@@ -216,6 +294,9 @@ function AnalyticsRoute() {
           </View>
         )}
       </View>
+      
+      {/* Add bottom padding for last element */}
+      <View style={{ height: 24 }} />
     </ScrollView>
     </View>
   );
@@ -224,15 +305,50 @@ function AnalyticsRoute() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
-    paddingHorizontal: 16,
+    backgroundColor: '#f5f7fa',
   },
-  header: {
-    backgroundColor: '#667eea',
-    paddingHorizontal: 20,
+  headerGradient: {
     paddingBottom: 20,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    elevation: 8,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 16,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    paddingHorizontal: 20,
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    borderRadius: 16,
+    padding: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginTop: 8,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 4,
   },
   headerTitle: {
     fontSize: 28,
@@ -248,6 +364,7 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: '#f5f7fa',
   },
   loadingText: {
     marginTop: 10,
@@ -272,45 +389,13 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e1e4e8',
   },
-  summaryContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    gap: 12,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
-    alignItems: 'center',
-    elevation: 3,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-  },
-  summaryLabel: {
-    fontSize: 13,
-    color: '#666',
-    marginTop: 10,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  summaryValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginTop: 6,
-    color: '#1a1a1a',
-  },
   chartContainer: {
     backgroundColor: '#fff',
     borderRadius: 16,
     padding: 20,
-    paddingHorizontal: 8,
     marginHorizontal: 16,
-    marginVertical: 12,
+    marginTop: 16,
+    marginBottom: 12,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -320,7 +405,8 @@ const styles = StyleSheet.create({
   chartWrapper: {
     alignItems: 'center',
     justifyContent: 'center',
-    overflow: 'visible',
+    overflow: 'hidden',
+    width: '100%',
   },
   chartScrollContent: {
     paddingHorizontal: 8,

@@ -15,10 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentUser, logout, User } from '../../api/authApi';
 import { getExpenses } from '../../api/expensesApi';
 import { getProjects } from '../../api/projectsApi';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState({
     projectCount: 0,
@@ -89,7 +91,7 @@ export default function ProfileScreen() {
     <View style={styles.container}>
       {/* Gradient Header */}
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={theme.colors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.header, { paddingTop: insets.top + 12 }]}
@@ -99,7 +101,7 @@ export default function ProfileScreen() {
             colors={['#fff', '#f0f0f0']}
             style={styles.avatarGradient}
           >
-            <MaterialCommunityIcons name="account" size={40} color="#667eea" />
+            <MaterialCommunityIcons name="account" size={40} color={theme.primaryColor} />
           </LinearGradient>
         </View>
         <Text style={styles.userName}>{user?.full_name || 'User'}</Text>
@@ -145,7 +147,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/EditProfile')}
           >
             <View style={styles.menuIconContainer}>
-              <MaterialCommunityIcons name="account-edit" size={22} color="#667eea" />
+              <MaterialCommunityIcons name="account-edit" size={22} color={theme.primaryColor} />
             </View>
             <Text style={styles.menuText}>Edit Profile</Text>
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
@@ -156,7 +158,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/ChangePassword')}
           >
             <View style={styles.menuIconContainer}>
-              <MaterialCommunityIcons name="lock" size={22} color="#667eea" />
+              <MaterialCommunityIcons name="lock" size={22} color={theme.primaryColor} />
             </View>
             <Text style={styles.menuText}>Change Password</Text>
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
@@ -167,7 +169,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/Notifications')}
           >
             <View style={styles.menuIconContainer}>
-              <MaterialCommunityIcons name="bell" size={22} color="#667eea" />
+              <MaterialCommunityIcons name="bell" size={22} color={theme.primaryColor} />
             </View>
             <Text style={styles.menuText}>Notifications</Text>
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
@@ -183,7 +185,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/Theme')}
           >
             <View style={styles.menuIconContainer}>
-              <MaterialCommunityIcons name="palette" size={22} color="#667eea" />
+              <MaterialCommunityIcons name="palette" size={22} color={theme.primaryColor} />
             </View>
             <Text style={styles.menuText}>Theme</Text>
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
@@ -194,7 +196,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/HelpSupport')}
           >
             <View style={styles.menuIconContainer}>
-              <MaterialCommunityIcons name="help-circle" size={22} color="#667eea" />
+              <MaterialCommunityIcons name="help-circle" size={22} color={theme.primaryColor} />
             </View>
             <Text style={styles.menuText}>Help & Support</Text>
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />
@@ -205,7 +207,7 @@ export default function ProfileScreen() {
             onPress={() => router.push('/About')}
           >
             <View style={styles.menuIconContainer}>
-              <MaterialCommunityIcons name="information" size={22} color="#667eea" />
+              <MaterialCommunityIcons name="information" size={22} color={theme.primaryColor} />
             </View>
             <Text style={styles.menuText}>About</Text>
             <MaterialCommunityIcons name="chevron-right" size={22} color="#ccc" />

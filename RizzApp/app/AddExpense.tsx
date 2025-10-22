@@ -1,4 +1,4 @@
-﻿import { MaterialCommunityIcons } from "@expo/vector-icons";
+import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -259,7 +259,7 @@ export default function AddExpense() {
   if (loadingProjects || (id && loadingExpense)) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#f093fb" />
+        <ActivityIndicator size="large" color="#667eea" />
         <Text style={styles.loadingText}>{id ? "Loading expense..." : "Loading projects..."}</Text>
       </View>
     );
@@ -286,9 +286,7 @@ export default function AddExpense() {
     >
       {/* Gradient Header */}
       <LinearGradient
-        colors={['#f093fb', '#f5576c']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
+        colors={['#667eea', '#764ba2']}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
         <View style={styles.headerContentCentered}>
@@ -386,7 +384,7 @@ export default function AddExpense() {
           <Text style={styles.label}>Description *</Text>
           <View style={styles.inputContainer}>
             <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="text" size={20} color="#f093fb" />
+              <MaterialCommunityIcons name="text" size={20} color="#667eea" />
             </View>
             <TextInput 
               placeholder="Enter expense description" 
@@ -404,7 +402,7 @@ export default function AddExpense() {
           <Text style={styles.label}>Amount *</Text>
           <View style={styles.inputContainer}>
             <View style={styles.iconCircle}>
-              <MaterialCommunityIcons name="currency-inr" size={20} color="#f093fb" />
+              <MaterialCommunityIcons name="currency-inr" size={20} color="#667eea" />
             </View>
             <TextInput 
               placeholder="0.00" 
@@ -426,7 +424,7 @@ export default function AddExpense() {
             onPress={() => setShowDatePicker(true)} 
             disabled={loading}
           >
-            <MaterialCommunityIcons name="calendar" size={20} color="#f093fb" />
+            <MaterialCommunityIcons name="calendar" size={20} color="#667eea" />
             <Text style={styles.dateText}>
               {expenseDate.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" })}
             </Text>
@@ -448,7 +446,7 @@ export default function AddExpense() {
                   <MaterialCommunityIcons 
                     name={selectedScope ? getScopeIcon(selectedScope) as any : "hammer-wrench"} 
                     size={20} 
-                    color="#f093fb" 
+                    color="#667eea" 
                   />
                 </View>
                 <Text style={[styles.dropdownText, !selectedScope && { color: '#999' }]}>
@@ -481,7 +479,7 @@ export default function AddExpense() {
                             <MaterialCommunityIcons 
                               name={getScopeIcon(scope) as any} 
                               size={20} 
-                              color={selectedScope === scope ? "#f093fb" : "#667eea"} 
+                              color={selectedScope === scope ? "#667eea" : "#667eea"} 
                             />
                           </View>
                           <Text style={[
@@ -492,7 +490,7 @@ export default function AddExpense() {
                           </Text>
                         </View>
                         {selectedScope === scope && (
-                          <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                          <MaterialCommunityIcons name="check" size={20} color="#667eea" />
                         )}
                       </TouchableOpacity>
                     ))}
@@ -511,7 +509,7 @@ export default function AddExpense() {
                 onPress={() => setShowVendorDropdown(!showVendorDropdown)}
                 disabled={loading}
               >
-                <MaterialCommunityIcons name="store" size={20} color="#f093fb" />
+                <MaterialCommunityIcons name="store" size={20} color="#667eea" />
                 <Text style={[styles.dropdownText, !vendorName && { color: '#999' }]}>
                   {vendorName || 'Select or enter vendor'}
               </Text>
@@ -570,7 +568,7 @@ export default function AddExpense() {
                           </View>
                         </View>
                         {vendorName === vendor.vendor_name && (
-                          <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                          <MaterialCommunityIcons name="check" size={20} color="#667eea" />
                         )}
                       </TouchableOpacity>
                     ))}
@@ -586,7 +584,7 @@ export default function AddExpense() {
             <View style={styles.inputGroup}>
               <Text style={styles.label}>Vendor Contact (Optional)</Text>
               <View style={styles.inputContainer}>
-                <MaterialCommunityIcons name="phone" size={20} color="#f093fb" />
+                <MaterialCommunityIcons name="phone" size={20} color="#667eea" />
                 <TextInput
                   style={styles.textInput}
                   placeholder="Phone or email"
@@ -610,7 +608,7 @@ export default function AddExpense() {
                 <MaterialCommunityIcons 
                   name={(PAYMENT_METHODS.find(m => m.value === paymentMethod)?.icon || 'cash') as any}
                   size={20} 
-                  color={PAYMENT_METHODS.find(m => m.value === paymentMethod)?.color || '#f093fb'} 
+                  color={PAYMENT_METHODS.find(m => m.value === paymentMethod)?.color || '#667eea'} 
                 />
                 <Text style={styles.dropdownText}>{paymentMethod}</Text>
                 <MaterialCommunityIcons name={showPaymentMethodDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
@@ -642,7 +640,7 @@ export default function AddExpense() {
                         {method.label}
                       </Text>
                       {paymentMethod === method.value && (
-                        <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                        <MaterialCommunityIcons name="check" size={20} color="#667eea" />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -690,7 +688,7 @@ export default function AddExpense() {
                         {status.label}
                       </Text>
                       {paymentStatus === status.value && (
-                        <MaterialCommunityIcons name="check" size={20} color="#f093fb" />
+                        <MaterialCommunityIcons name="check" size={20} color="#667eea" />
                       )}
                     </TouchableOpacity>
                   ))}
@@ -732,7 +730,7 @@ export default function AddExpense() {
             </View>
           </View>
           <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSave} disabled={loading}>
-            <LinearGradient colors={loading ? ["#999", "#666"] : ["#f093fb", "#f5576c"]} style={styles.saveButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
+            <LinearGradient colors={loading ? ["#999", "#666"] : ["#667eea", "#764ba2"]} style={styles.saveButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               {loading ? <ActivityIndicator color="#fff" /> : <><MaterialCommunityIcons name="check" size={20} color="#fff" /><Text style={styles.saveButtonText}>{id ? "Update Expense" : "Save Expense"}</Text></>}
             </LinearGradient>
           </TouchableOpacity>
@@ -752,7 +750,7 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
     elevation: 8,
-    shadowColor: '#f093fb',
+    shadowColor: '#667eea',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -838,7 +836,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14, 
     borderWidth: 1, 
     borderColor: "#e8e8e8", 
-    shadowColor: "#f093fb", 
+    shadowColor: "#667eea", 
     shadowOffset: { width: 0, height: 4 }, 
     shadowOpacity: 0.1, 
     shadowRadius: 8, 
@@ -868,7 +866,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1,
     borderColor: '#e8e8e8',
-    shadowColor: '#f093fb',
+    shadowColor: '#667eea',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -890,7 +888,7 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1,
     borderColor: '#e8e8e8',
-    shadowColor: '#f093fb',
+    shadowColor: '#667eea',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -995,7 +993,7 @@ const styles = StyleSheet.create({
     marginBottom: 40, 
     borderRadius: 16, 
     overflow: "hidden", 
-    shadowColor: "#f093fb", 
+    shadowColor: "#667eea", 
     shadowOffset: { width: 0, height: 6 }, 
     shadowOpacity: 0.35, 
     shadowRadius: 12, 
@@ -1098,3 +1096,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
 });
+
+

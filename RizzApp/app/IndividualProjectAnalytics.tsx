@@ -195,6 +195,7 @@ export default function IndividualProjectAnalytics() {
       paymentSummary.project_cost > 0 ? paymentSummary.total_expenses / paymentSummary.project_cost : 0,
       paymentSummary.project_cost > 0 ? Math.max(0, paymentSummary.profit_loss) / paymentSummary.project_cost : 0,
     ],
+    colors: ['#4CAF50', '#F44336', '#667eea'], // Green, Red, Purple
   };
 
   // Bar chart data for expense categories
@@ -288,30 +289,39 @@ export default function IndividualProjectAnalytics() {
         {/* Progress Chart */}
         <View style={styles.chartSection}>
           <Text style={styles.sectionTitle}>Project Progress</Text>
-          <View style={styles.chartContainer}>
+          <View style={styles.progressChartWrapper}>
             <ProgressChart
               data={progressData}
-              width={width - 88}
-              height={200}
-              strokeWidth={14}
-              radius={28}
-              chartConfig={chartConfig}
-              hideLegend={false}
+              width={width - 80}
+              height={220}
+              strokeWidth={16}
+              radius={32}
+              chartConfig={{
+                ...chartConfig,
+                color: (opacity = 1, index) => {
+                  const colors = ['rgba(76, 175, 80, ', 'rgba(244, 67, 54, ', 'rgba(102, 126, 234, '];
+                  return colors[index || 0] + opacity + ')';
+                },
+              }}
+              hideLegend={true}
               style={styles.chart}
             />
           </View>
           <View style={styles.legendContainer}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#4CAF50' }]} />
-              <Text style={styles.legendText}>Received: {(progressData.data[0] * 100).toFixed(0)}%</Text>
+              <Text style={styles.legendText}>Received</Text>
+              <Text style={styles.legendValue}>{(progressData.data[0] * 100).toFixed(0)}%</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#F44336' }]} />
-              <Text style={styles.legendText}>Spent: {(progressData.data[1] * 100).toFixed(0)}%</Text>
+              <Text style={styles.legendText}>Spent</Text>
+              <Text style={styles.legendValue}>{(progressData.data[1] * 100).toFixed(0)}%</Text>
             </View>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: '#667eea' }]} />
-              <Text style={styles.legendText}>Profit: {(progressData.data[2] * 100).toFixed(0)}%</Text>
+              <Text style={styles.legendText}>Profit</Text>
+              <Text style={styles.legendValue}>{(progressData.data[2] * 100).toFixed(0)}%</Text>
             </View>
           </View>
         </View>
@@ -537,29 +547,42 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  progressChartWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 20,
+  },
   chartScrollView: {
     marginVertical: 8,
   },
   legendContainer: {
-    marginTop: 12,
-    gap: 8,
+    marginTop: 20,
+    paddingHorizontal: 16,
+    gap: 12,
   },
   legendItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    flex: 1,
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 12,
+    gap: 12,
   },
   legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    flexShrink: 0,
+    width: 14,
+    height: 14,
+    borderRadius: 7,
   },
   legendText: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#666',
+    fontWeight: '500',
     flex: 1,
+  },
+  legendValue: {
+    fontSize: 16,
+    color: '#1a1a1a',
+    fontWeight: '700',
   },
   categoryItem: {
     marginBottom: 20,

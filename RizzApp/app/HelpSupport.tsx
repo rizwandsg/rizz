@@ -138,7 +138,7 @@ export default function HelpSupportScreen() {
                     <MaterialCommunityIcons name="phone" size={20} color="#667eea" />
                     <View style={{ flex: 1 }}>
                         <Text style={styles.infoLabel}>Phone</Text>
-                        <Text style={styles.infoValue}>+91 98765 43210</Text>
+                        <Text style={styles.infoValue}>+91 10000001</Text>
                     </View>
                 </View>
 

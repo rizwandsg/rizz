@@ -44,7 +44,7 @@ export default function ExpenseDetails() {
             style={styles.headerButton}
             onPress={() => router.push(`/AddExpense?id=${id}&projectId=${expense?.project_id}`)}
           >
-            <MaterialCommunityIcons name="pencil" size={22} color="#f093fb" />
+            <MaterialCommunityIcons name="pencil" size={22} color="#667eea" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={handleDelete}>
             <MaterialCommunityIcons name="delete" size={22} color="#F44336" />
@@ -100,7 +100,7 @@ export default function ExpenseDetails() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#f093fb" />
+        <ActivityIndicator size="large" color="#667eea" />
         <Text style={styles.loadingText}>Loading expense...</Text>
       </View>
     );
@@ -120,7 +120,7 @@ export default function ExpenseDetails() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Amount Card */}
-      <LinearGradient colors={["#f093fb", "#f5576c"]} style={styles.amountCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+      <LinearGradient colors={["#667eea", "#764ba2"]} style={styles.amountCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
         <View style={styles.categoryBadge}>
           <MaterialCommunityIcons name={categoryInfo.icon as any} size={16} color="#fff" />
           <Text style={styles.categoryBadgeText}>{categoryInfo.label}</Text>
@@ -144,7 +144,7 @@ export default function ExpenseDetails() {
         {/* Description */}
         <View style={styles.infoCard}>
           <View style={styles.iconCircle}>
-            <MaterialCommunityIcons name="text" size={20} color="#f093fb" />
+            <MaterialCommunityIcons name="text" size={20} color="#667eea" />
           </View>
           <View style={styles.infoContent}>
             <Text style={styles.infoLabel}>Description</Text>
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     margin: 20,
     padding: 24,
     borderRadius: 20,
-    shadowColor: "#f093fb",
+    shadowColor: "#667eea",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.3,
     shadowRadius: 16,

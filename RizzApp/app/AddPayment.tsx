@@ -141,7 +141,7 @@ export default function AddPayment() {
   if (loadingPayment) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#f093fb" />
+        <ActivityIndicator size="large" color="#667eea" />
         <Text style={styles.loadingText}>Loading payment...</Text>
       </View>
     );
@@ -159,7 +159,7 @@ export default function AddPayment() {
       >
         <View style={styles.content}>
           <LinearGradient
-            colors={["#f093fb", "#f5576c"]}
+            colors={["#667eea", "#764ba2"]}
             style={styles.header}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 0 }}
@@ -181,7 +181,7 @@ export default function AddPayment() {
               <MaterialCommunityIcons
                 name="currency-inr"
                 size={20}
-                color="#f093fb"
+                color="#667eea"
               />
               <TextInput
                 style={styles.input}
@@ -204,7 +204,7 @@ export default function AddPayment() {
               <MaterialCommunityIcons
                 name="calendar"
                 size={20}
-                color="#f093fb"
+                color="#667eea"
               />
               <Text style={styles.dateText}>
                 {paymentDate.toLocaleDateString("en-US", {
@@ -234,7 +234,7 @@ export default function AddPayment() {
               <MaterialCommunityIcons
                 name="account"
                 size={20}
-                color="#f093fb"
+                color="#667eea"
               />
               <TextInput
                 style={styles.input}
@@ -262,7 +262,7 @@ export default function AddPayment() {
                 size={20}
                 color={
                   PAYMENT_TYPES.find((t) => t.value === paymentType)?.color ||
-                  "#f093fb"
+                  "#667eea"
                 }
               />
               <Text style={styles.dropdownText}>
@@ -308,7 +308,7 @@ export default function AddPayment() {
                       <MaterialCommunityIcons
                         name="check"
                         size={20}
-                        color="#f093fb"
+                        color="#667eea"
                       />
                     )}
                   </TouchableOpacity>
@@ -333,7 +333,7 @@ export default function AddPayment() {
                 size={20}
                 color={
                   PAYMENT_MODES.find((m) => m.value === paymentMode)?.color ||
-                  "#f093fb"
+                  "#667eea"
                 }
               />
               <Text style={styles.dropdownText}>
@@ -379,7 +379,7 @@ export default function AddPayment() {
                       <MaterialCommunityIcons
                         name="check"
                         size={20}
-                        color="#f093fb"
+                        color="#667eea"
                       />
                     )}
                   </TouchableOpacity>
@@ -397,7 +397,7 @@ export default function AddPayment() {
               <MaterialCommunityIcons
                 name="barcode"
                 size={20}
-                color="#f093fb"
+                color="#667eea"
               />
               <TextInput
                 style={styles.input}
@@ -432,7 +432,7 @@ export default function AddPayment() {
             disabled={loading}
           >
             <LinearGradient
-              colors={loading ? ["#999", "#666"] : ["#f093fb", "#f5576c"]}
+              colors={loading ? ["#999", "#666"] : ["#667eea", "#764ba2"]}
               style={styles.saveButtonGradient}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
@@ -590,7 +590,7 @@ const styles = StyleSheet.create({
   },
   dropdownItemTextSelected: {
     fontWeight: "600",
-    color: "#f093fb",
+    color: "#667eea",
   },
   textAreaContainer: {
     backgroundColor: "#fff",
@@ -634,3 +634,5 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
 });
+
+

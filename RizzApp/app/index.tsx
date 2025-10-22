@@ -68,7 +68,7 @@ export default function Index() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#007AFF" />
+        <ActivityIndicator size="large" color="#667eea" />
       </View>
     );
   }
@@ -213,10 +213,10 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#667eea',
   },
   logoutText: {
-    color: '#007AFF',
+    color: '#667eea',
     fontSize: 14,
     fontWeight: '600',
   },
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#667eea',
   },
   statLabel: {
     fontSize: 12,
@@ -257,7 +257,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   actionButton: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#667eea',
     padding: 16,
     borderRadius: 12,
     alignItems: 'center',
@@ -266,7 +266,7 @@ const styles = StyleSheet.create({
   actionButtonSecondary: {
     backgroundColor: '#fff',
     borderWidth: 1,
-    borderColor: '#007AFF',
+    borderColor: '#667eea',
   },
   actionButtonText: {
     color: '#fff',
@@ -274,7 +274,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   actionButtonTextSecondary: {
-    color: '#007AFF',
+    color: '#667eea',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -354,7 +354,7 @@ const styles = StyleSheet.create({
   expenseAmount: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#007AFF',
+    color: '#667eea',
   },
   emptyState: {
     padding: 40,

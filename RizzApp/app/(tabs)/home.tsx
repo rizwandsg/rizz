@@ -3,7 +3,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deleteProject, getProjects, Project } from '../../api/projectsApi';
 
@@ -12,6 +12,7 @@ export default function Home() {
   const insets = useSafeAreaInsets();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const fetchProjects = async () => {
     try {
@@ -30,6 +31,12 @@ export default function Home() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchProjects();
+    setRefreshing(false);
   };
 
   useFocusEffect(
@@ -88,7 +95,11 @@ export default function Home() {
     );
   }
 
-  const activeProjects = projects.filter(p => p.status === 'active').length;
+  const activeProjects = projects.filter(p => 
+    p.status === 'active' || 
+    p.status === 'work started' || 
+    p.status === 'on-hold'
+  ).length;
   const completedProjects = projects.filter(p => p.status === 'completed').length;
 
   return (
@@ -133,7 +144,18 @@ export default function Home() {
         </View>
       </LinearGradient>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#667eea']}
+            tintColor="#667eea"
+          />
+        }
+      >
         {projects.length === 0 ? (
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="folder-open-outline" size={80} color="#ccc" />

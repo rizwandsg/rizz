@@ -63,7 +63,7 @@ CREATE TABLE public.projects (
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   client_name character varying,
   total_project_cost numeric,
-  scope_of_work ARRAY CHECK (scope_of_work IS NULL OR scope_of_work <@ ARRAY['Carpentry Work'::text, 'Painting Work'::text, 'Aluminium Work'::text, 'Electrical Work'::text, 'Plumbing Work'::text, 'Flooring Work'::text, 'False Ceiling Work'::text, 'Masonry Work'::text, 'Tiling Work'::text, 'Glazing Work'::text, 'Door & Window Work'::text, 'Kitchen & Modular Work'::text, 'Interior Decoration'::text, 'Exterior Decoration'::text, 'Landscaping Work'::text, 'HVAC Work'::text, 'Waterproofing Work'::text, 'Structural Work'::text, 'Civil Work'::text, 'Plastering Work'::text, 'Wallpaper Work'::text, 'Furniture Work'::text, 'Lighting Work'::text, 'Partition Work'::text, 'Plaster of Paris Work'::text, 'Wood Flooring'::text, 'Marble & Granite Work'::text, 'Steel Fabrication'::text, 'Railing Work'::text, 'Staircase Work'::text, 'Bathroom Fitting'::text, 'Wardrobe Work'::text, 'Curtain & Blinds'::text, 'Wall Cladding'::text, 'Roofing Work'::text, 'Insulation Work'::text, 'Demolition Work'::text, 'Site Preparation'::text, 'Complete Interior Fit-out'::text, 'Complete Renovation'::text, 'Turnkey Project'::text]),
+  scope_of_work ARRAY CHECK (scope_of_work <@ ARRAY['Carpentry Work'::text, 'Painting Work'::text, 'Aluminium Work'::text, 'Electrical Work'::text, 'Plumbing Work'::text, 'Flooring Work'::text, 'False Ceiling Work'::text, 'Masonry Work'::text, 'Tiling Work'::text, 'Glazing Work'::text, 'Door & Window Work'::text, 'Kitchen & Modular Work'::text, 'Interior Decoration'::text, 'Exterior Decoration'::text, 'Landscaping Work'::text, 'HVAC Work'::text, 'Waterproofing Work'::text, 'Structural Work'::text, 'Civil Work'::text, 'Plastering Work'::text, 'Wallpaper Work'::text, 'Furniture Work'::text, 'Lighting Work'::text, 'Partition Work'::text, 'Plaster of Paris Work'::text, 'Wood Flooring'::text, 'Marble & Granite Work'::text, 'Steel Fabrication'::text, 'Railing Work'::text, 'Staircase Work'::text, 'Bathroom Fitting'::text, 'Wardrobe Work'::text, 'Curtain & Blinds'::text, 'Wall Cladding'::text, 'Roofing Work'::text, 'Insulation Work'::text, 'Demolition Work'::text, 'Site Preparation'::text, 'Traveling Expenses'::text, 'Complete Interior Fit-out'::text, 'Complete Renovation'::text, 'Turnkey Project'::text]),
   CONSTRAINT projects_pkey PRIMARY KEY (id),
   CONSTRAINT projects_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id)
 );
@@ -75,7 +75,12 @@ CREATE TABLE public.users (
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   last_login timestamp with time zone,
-  CONSTRAINT users_pkey PRIMARY KEY (id)
+  phone character varying,
+  parent_user_id uuid,
+  role character varying NOT NULL DEFAULT 'owner'::character varying CHECK (role::text = ANY (ARRAY['owner'::character varying, 'member'::character varying]::text[])),
+  is_active boolean NOT NULL DEFAULT true,
+  CONSTRAINT users_pkey PRIMARY KEY (id),
+  CONSTRAINT users_parent_user_id_fkey FOREIGN KEY (parent_user_id) REFERENCES public.users(id)
 );
 CREATE TABLE public.vendor_payments (
   id uuid NOT NULL DEFAULT gen_random_uuid(),

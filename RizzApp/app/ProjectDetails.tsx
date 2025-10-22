@@ -718,7 +718,7 @@ export default function ProjectDetails() {
                         }}
                         activeOpacity={0.7}
                       >
-                        <MaterialCommunityIcons name="pencil" size={18} color="#f093fb" />
+                        <MaterialCommunityIcons name="pencil" size={18} color="#667eea" />
                       </TouchableOpacity>
                     </View>
                   ))}
@@ -1499,3 +1499,4 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
 });
+

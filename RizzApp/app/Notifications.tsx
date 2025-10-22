@@ -1,8 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+    Alert,
     ScrollView,
     StyleSheet,
     Switch,
@@ -11,6 +13,8 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+const NOTIFICATIONS_STORAGE_KEY = '@rizzapp_notification_settings';
 
 export default function NotificationsScreen() {
     const router = useRouter();
@@ -24,8 +28,52 @@ export default function NotificationsScreen() {
         weeklyReports: false,
     });
 
-    const toggleSetting = (key: keyof typeof settings) => {
-        setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    useEffect(() => {
+        loadSettings();
+    }, []);
+
+    const loadSettings = async () => {
+        try {
+            const savedSettings = await AsyncStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+            if (savedSettings) {
+                setSettings(JSON.parse(savedSettings));
+            }
+        } catch (error) {
+            console.error('Failed to load notification settings:', error);
+        }
+    };
+
+    const toggleSetting = async (key: keyof typeof settings) => {
+        const newSettings = { ...settings, [key]: !settings[key] };
+        setSettings(newSettings);
+        
+        try {
+            await AsyncStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(newSettings));
+            
+            // Show confirmation based on the setting
+            const settingNames: Record<string, string> = {
+                pushNotifications: 'Push Notifications',
+                emailNotifications: 'Email Notifications',
+                projectUpdates: 'Project Updates',
+                expenseAlerts: 'Expense Alerts',
+                paymentReminders: 'Payment Reminders',
+                weeklyReports: 'Weekly Reports',
+            };
+            
+            const settingName = settingNames[key];
+            const status = newSettings[key] ? 'enabled' : 'disabled';
+            
+            Alert.alert(
+                'Settings Updated',
+                `${settingName} ${status} successfully!`,
+                [{ text: 'OK' }]
+            );
+        } catch (error) {
+            console.error('Failed to save notification settings:', error);
+            Alert.alert('Error', 'Failed to save notification settings');
+            // Revert the change
+            setSettings(settings);
+        }
     };
 
     return (
