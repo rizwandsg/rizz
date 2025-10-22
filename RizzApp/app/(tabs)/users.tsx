@@ -16,7 +16,6 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useTheme } from '../../context/ThemeContext';
 import {
     createSubUser,
     CreateSubUserData,
@@ -26,6 +25,7 @@ import {
     SubUser,
     updateSubUser
 } from '../../api/authApi';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function UsersScreen() {
     const insets = useSafeAreaInsets();
