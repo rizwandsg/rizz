@@ -6,10 +6,12 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { deleteProject, getProjects, Project } from '../../api/projectsApi';
+import { useTheme } from '../../context/ThemeContext';
 
 export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -49,7 +51,7 @@ export default function Home() {
     if (status === 'completed') return ['#6BCF7F', '#34C759'];
     if (status === 'cancelled') return ['#FF6B6B', '#FF3B30'];
     if (status === 'on-hold') return ['#FFD93D', '#FFA500'];
-    return ['#667eea', '#764ba2'];  // active
+    return [theme.primaryColor, theme.secondaryColor];  // active - uses theme
   };
 
   const getStatusIcon = (status?: string) => {
@@ -89,7 +91,7 @@ export default function Home() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#667eea" />
+        <ActivityIndicator size="large" color={theme.primaryColor} />
         <Text style={styles.loadingText}>Loading projects...</Text>
       </View>
     );
@@ -106,7 +108,7 @@ export default function Home() {
     <View style={styles.container}>
       {/* Gradient Header */}
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={theme.colors as any}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
@@ -151,8 +153,8 @@ export default function Home() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#667eea']}
-            tintColor="#667eea"
+            colors={[theme.primaryColor]}
+            tintColor={theme.primaryColor}
           />
         }
       >
@@ -193,7 +195,12 @@ export default function Home() {
                         <MaterialCommunityIcons name="briefcase" size={24} color="#fff" />
                       </View>
                       <View style={styles.cardHeaderRight}>
-                        <MaterialCommunityIcons name={statusIcon} size={20} color="#fff" />
+                        <View style={styles.headerStatusBadge}>
+                          <MaterialCommunityIcons name={statusIcon} size={16} color="#fff" style={{ marginRight: 6 }} />
+                          <Text style={styles.headerStatusText}>
+                            {project.status?.charAt(0).toUpperCase() + (project.status?.slice(1) || '')}
+                          </Text>
+                        </View>
                       </View>
                     </View>
                   </LinearGradient>
@@ -273,15 +280,6 @@ export default function Home() {
                           </Text>
                         </>
                       )}
-                    </View>
-
-                    {/* Status Badge */}
-                    <View style={styles.statusBadgeContainer}>
-                      <View style={[styles.statusBadge, { backgroundColor: gradientStart }]}>
-                        <Text style={styles.statusBadgeText}>
-                          {project.status?.charAt(0).toUpperCase() + (project.status?.slice(1) || '')}
-                        </Text>
-                      </View>
                     </View>
                   </View>
                   </TouchableOpacity>
@@ -458,6 +456,21 @@ const styles = StyleSheet.create({
   cardHeaderRight: {
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  headerStatusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  headerStatusText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#fff',
   },
   cardBody: {
     padding: 20,

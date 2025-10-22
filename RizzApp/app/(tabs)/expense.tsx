@@ -6,8 +6,9 @@ import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, Touchabl
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpenses } from "../../api/expensesApi";
 import { getProjects } from "../../api/projectsApi";
+import { useTheme } from '../../context/ThemeContext';
 
-interface ProjectExpenseSummary {
+interface ProjectExpenseSummary{
   projectId: string;
   projectName: string;
   totalAmount: number;
@@ -18,12 +19,13 @@ interface ProjectExpenseSummary {
 
 export default function ExpenseScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [projectSummaries, setProjectSummaries] = useState<ProjectExpenseSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
 
-  console.log('💰 Expense screen rendering with purple gradient theme');
+  console.log('💰 Expense screen rendering with theme:', theme.name);
 
   const loadData = async () => {
     try {
@@ -98,7 +100,7 @@ export default function ExpenseScreen() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#667eea" />
+        <ActivityIndicator size="large" color={theme.primaryColor} />
         <Text style={styles.loadingText}>Loading expenses...</Text>
       </View>
     );
@@ -111,9 +113,9 @@ export default function ExpenseScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Purple Gradient Header - Updated Theme */}
+      {/* Dynamic Gradient Header - Uses Theme */}
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={theme.colors as any}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
         <View style={styles.headerContent}>
@@ -158,8 +160,8 @@ export default function ExpenseScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#667eea']}
-            tintColor="#667eea"
+            colors={[theme.primaryColor]}
+            tintColor={theme.primaryColor}
           />
         }
         renderItem={({ item, index }) => {
@@ -168,7 +170,7 @@ export default function ExpenseScreen() {
             ? ['#FF6B6B', '#FF3B30']
             : item.totalAmount > 20000
             ? ['#FFD93D', '#FFA500']
-            : ['#667eea', '#764ba2'];
+            : [theme.primaryColor, theme.secondaryColor];
           
           return (
             <TouchableOpacity 

@@ -185,6 +185,60 @@ export const login = async (credentials: LoginCredentials): Promise<User> => {
 };
 
 /**
+ * Change password for the current user
+ */
+export const changePassword = async (
+    email: string,
+    currentPassword: string,
+    newPassword: string
+): Promise<void> => {
+    try {
+        console.log('🔐 Starting password change for:', email);
+
+        // Hash the current password to verify it
+        const currentPasswordHash = await hashPassword(currentPassword);
+        console.log('🔑 Current password hashed:', currentPasswordHash.substring(0, 10) + '...');
+
+        // Get ALL users and filter in JavaScript
+        const allUsers = await database.loadData<User>('users');
+        const users = allUsers?.filter(u => u.email.toLowerCase() === email.toLowerCase()) || [];
+
+        console.log('📊 Total users loaded:', allUsers?.length || 0);
+        console.log('👥 Users matching email:', users.length);
+
+        if (users.length === 0) {
+            console.log('❌ User not found');
+            throw new Error('User not found');
+        }
+
+        const user = users[0] as any;
+
+        // Verify current password
+        if (user.password_hash !== currentPasswordHash) {
+            console.log('❌ Current password is incorrect');
+            throw new Error('Current password is incorrect');
+        }
+
+        console.log('✅ Current password verified');
+
+        // Hash the new password
+        const newPasswordHash = await hashPassword(newPassword);
+        console.log('🔑 New password hashed:', newPasswordHash.substring(0, 10) + '...');
+
+        // Update user's password in database
+        await database.updateData('users', user.id, {
+            password_hash: newPasswordHash,
+            updated_at: new Date().toISOString()
+        });
+
+        console.log('✅ Password changed successfully');
+    } catch (error: any) {
+        console.error('❌ Change password error:', error);
+        throw error;
+    }
+};
+
+/**
  * Logout user
  */
 export const logout = async (): Promise<void> => {

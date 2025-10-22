@@ -6,6 +6,7 @@ import { LineChart, PieChart } from "react-native-chart-kit";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpenses } from "../../api/expensesApi";
 import { getProjects, Project } from "../../api/projectsApi";
+import { useTheme } from '../../context/ThemeContext';
 
 interface ChartDataPoint {
   name: string;
@@ -48,6 +49,7 @@ const getProjectColor = (index: number): string => {
 
 function AnalyticsRoute() {
   const insets = useSafeAreaInsets();
+  const { theme } = useTheme();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [projectData, setProjectData] = useState<ChartDataPoint[]>([]);
@@ -56,7 +58,7 @@ function AnalyticsRoute() {
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
-  console.log('📊 Analytics rendering with purple gradient theme');
+  console.log('📊 Analytics rendering with theme:', theme.name);
 
   useEffect(() => {
     const loadData = async () => {
@@ -204,9 +206,9 @@ function AnalyticsRoute() {
 
   return (
     <View style={{ flex: 1, backgroundColor: '#f5f7fa' }}>
-      {/* Purple Gradient Header - Updated Theme */}
+      {/* Dynamic Gradient Header - Uses Theme */}
       <LinearGradient
-        colors={['#667eea', '#764ba2']}
+        colors={theme.colors as any}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
         <View style={styles.headerContent}>
@@ -238,8 +240,8 @@ function AnalyticsRoute() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={['#667eea']}
-            tintColor="#667eea"
+            colors={[theme.primaryColor]}
+            tintColor={theme.primaryColor}
           />
         }
       >

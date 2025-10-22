@@ -16,6 +16,7 @@ import {
     View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useTheme } from '../../context/ThemeContext';
 import {
     createSubUser,
     CreateSubUserData,
@@ -28,6 +29,7 @@ import {
 
 export default function UsersScreen() {
     const insets = useSafeAreaInsets();
+    const { theme } = useTheme();
     const [users, setUsers] = useState<SubUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [modalVisible, setModalVisible] = useState(false);
@@ -283,9 +285,9 @@ export default function UsersScreen() {
 
     return (
         <View style={styles.container}>
-            {/* Purple Gradient Header - Updated Theme */}
+            {/* Dynamic Gradient Header - Uses Theme */}
             <LinearGradient
-                colors={['#667eea', '#764ba2']}
+                colors={theme.colors as any}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 1 }}
                 style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}

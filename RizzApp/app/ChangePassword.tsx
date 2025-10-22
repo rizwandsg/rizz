@@ -15,6 +15,7 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { changePassword, getCurrentUser } from '../api/authApi';
 
 export default function ChangePasswordScreen() {
     const router = useRouter();
@@ -45,15 +46,22 @@ export default function ChangePasswordScreen() {
 
         setSaving(true);
         try {
-            // TODO: Implement password change API
-            await new Promise(resolve => setTimeout(resolve, 1000));
+            // Get current user
+            const user = await getCurrentUser();
+            if (!user) {
+                Alert.alert('Error', 'Please login again');
+                return;
+            }
+
+            // Change password using the API
+            await changePassword(user.email, currentPassword, newPassword);
             
             Alert.alert('Success', 'Password changed successfully', [
                 { text: 'OK', onPress: () => router.back() }
             ]);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Change password error:', error);
-            Alert.alert('Error', 'Failed to change password');
+            Alert.alert('Error', error.message || 'Failed to change password');
         } finally {
             setSaving(false);
         }

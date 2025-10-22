@@ -67,6 +67,7 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [theme, setThemeState] = useState<Theme>(THEMES.purple);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     loadTheme();
@@ -75,23 +76,36 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const loadTheme = async () => {
     try {
       const savedThemeId = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+      console.log('📱 Loading saved theme:', savedThemeId);
       if (savedThemeId && savedThemeId in THEMES) {
         setThemeState(THEMES[savedThemeId as ThemeId]);
+        console.log('✅ Theme loaded:', savedThemeId);
+      } else {
+        console.log('ℹ️ No saved theme, using default: purple');
       }
     } catch (error) {
       console.error('Failed to load theme:', error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   const setTheme = async (themeId: ThemeId) => {
     try {
+      console.log('💾 Saving theme:', themeId);
       await AsyncStorage.setItem(THEME_STORAGE_KEY, themeId);
       setThemeState(THEMES[themeId]);
+      console.log('✅ Theme saved:', themeId);
     } catch (error) {
       console.error('Failed to save theme:', error);
       throw error;
     }
   };
+
+  // Don't render children until theme is loaded
+  if (isLoading) {
+    return null;
+  }
 
   return (
     <ThemeContext.Provider value={{ theme, setTheme }}>
