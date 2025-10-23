@@ -94,16 +94,8 @@ export default function ProfileScreen() {
         colors={theme.colors}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
-        style={[styles.header, { paddingTop: insets.top + 12 }]}
+        style={[styles.header, { paddingTop: insets.top + 8 }]}
       >
-        <View style={styles.avatarContainer}>
-          <LinearGradient
-            colors={['#fff', '#f0f0f0']}
-            style={styles.avatarGradient}
-          >
-            <MaterialCommunityIcons name="account" size={40} color={theme.primaryColor} />
-          </LinearGradient>
-        </View>
         <Text style={styles.userName}>{user?.full_name || 'User'}</Text>
         <Text style={styles.userEmail}>{user?.email || ''}</Text>
       </LinearGradient>
@@ -253,33 +245,18 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   header: {
-    paddingBottom: 20,
+    paddingBottom: 16,
     alignItems: 'center',
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     shadowColor: '#667eea',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 5,
   },
-  avatarContainer: {
-    marginBottom: 12,
-  },
-  avatarGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-  },
   userName: {
-    fontSize: 24,
+    fontSize: 26,
     fontWeight: 'bold',
     color: '#fff',
     marginBottom: 4,
