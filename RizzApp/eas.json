@@ -7,7 +7,11 @@
       "developmentClient": true,
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleDebug"
+      },
+      "env": {
+        "EXPO_USE_FAST_RESOLVER": "1"
       }
     },
     "preview": {
@@ -19,6 +23,9 @@
     "production": {
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_USE_FAST_RESOLVER": "1"
       }
     }
   },
