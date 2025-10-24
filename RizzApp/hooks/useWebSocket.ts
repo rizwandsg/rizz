@@ -3,7 +3,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { subscribeToAll, unsubscribeFromAll, WebSocketCallbacks, getConnectionStatus } from '../services/websocketService';
+import { getConnectionStatus, subscribeToAll, unsubscribeFromAll, WebSocketCallbacks } from '../services/websocketService';
 
 /**
  * Hook to manage WebSocket connection with automatic cleanup

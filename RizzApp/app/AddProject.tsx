@@ -90,10 +90,12 @@ export default function AddProject() {
             setTotalProjectCost(project.total_project_cost?.toString() || "");
             setScopeOfWork(project.scope_of_work || []); // Handle undefined
           } else {
+            console.log('❌ Project not found');
             Alert.alert("Error", "Project not found");
             router.back();
           }
         } catch (error) {
+          console.error('❌ Failed to load project:', error);
           Alert.alert("Error", "Failed to load project");
           router.back();
         } finally {
@@ -133,14 +135,33 @@ export default function AddProject() {
       
       if (id) {
         await updateProject(id.toString(), projectData);
+        console.log('✅ Project updated successfully');
       } else {
         await createProject(projectData as Project);
+        console.log('✅ Project created successfully');
       }
-      Alert.alert("Success", `Project ${id ? "updated" : "created"} successfully!`, [{ text: "OK", onPress: () => router.back() }]);
+      
+      // Set loading to false BEFORE showing alert
+      setLoading(false);
+      
+      // Show success alert with a tiny delay to ensure it renders
+      console.log('🔔 Showing success alert...');
+      setTimeout(() => {
+        Alert.alert(
+          "Success", 
+          `Project ${id ? "updated" : "created"} successfully!`, 
+          [{ 
+            text: "OK", 
+            onPress: () => {
+              console.log('Alert OK pressed, navigating back...');
+              router.back();
+            }
+          }]
+        );
+      }, 100);
     } catch (error) {
-      console.error('Error saving project:', error);
+      console.error('❌ Error saving project:', error);
       Alert.alert("Error", error instanceof Error ? error.message : "Failed to save project");
-    } finally {
       setLoading(false);
     }
   };

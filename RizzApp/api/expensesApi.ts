@@ -50,8 +50,11 @@ export const createExpense = async (expense: Expense, projectName?: string): Pro
         
         // Send notification for expense creation
         try {
+            console.log('🔔 Attempting to send expense creation notification...');
             const notificationsEnabled = await areNotificationsEnabled();
+            console.log('🔔 Notifications enabled:', notificationsEnabled);
             if (notificationsEnabled) {
+                console.log('🔔 Calling sendAppNotification...');
                 await sendAppNotification(NotificationType.EXPENSE_ADDED, {
                     expenseAmount: result.amount,
                     projectName: projectName || 'Project',
@@ -59,6 +62,8 @@ export const createExpense = async (expense: Expense, projectName?: string): Pro
                     description: result.description,
                 });
                 console.log('✅ Expense creation notification sent');
+            } else {
+                console.log('⚠️ Notifications are disabled in settings');
             }
         } catch (notifError) {
             console.error('⚠️ Failed to send expense notification:', notifError);

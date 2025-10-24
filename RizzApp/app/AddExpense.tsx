@@ -184,16 +184,47 @@ export default function AddExpense() {
       expenseData.payment_method = paymentMethod;
       expenseData.payment_status = paymentStatus;
 
+      // Set loading to false BEFORE showing alert
+      setLoading(false);
+      
       if (id) {
         await updateExpense(id.toString(), expenseData);
-        Alert.alert("Success", "Expense updated successfully!", [{ text: "OK", onPress: () => router.back() }]);
+        console.log('✅ Expense updated successfully');
+        // Show alert with tiny delay to ensure it renders
+        setTimeout(() => {
+          Alert.alert(
+            "Success", 
+            "Expense updated successfully!", 
+            [{ 
+              text: "OK", 
+              onPress: () => {
+                console.log('Alert OK pressed, navigating back...');
+                router.back();
+              }
+            }]
+          );
+        }, 100);
       } else {
         await createExpense(expenseData as Expense);
-        Alert.alert("Success", "Expense created successfully!", [{ text: "OK", onPress: () => router.back() }]);
+        console.log('✅ Expense created successfully');
+        // Show alert with tiny delay to ensure it renders
+        setTimeout(() => {
+          Alert.alert(
+            "Success", 
+            "Expense created successfully!", 
+            [{ 
+              text: "OK", 
+              onPress: () => {
+                console.log('Alert OK pressed, navigating back...');
+                router.back();
+              }
+            }]
+          );
+        }, 100);
       }
     } catch (error) {
+      console.error('❌ Error saving expense:', error);
       Alert.alert("Error", error instanceof Error ? error.message : "Failed to save expense");
-    } finally {
       setLoading(false);
     }
   };

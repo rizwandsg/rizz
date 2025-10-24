@@ -16,7 +16,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
     NotificationType,
     registerForPushNotificationsAsync,
-    sendAppNotification
+    sendAppNotification,
+    forceEnableNotifications,
+    checkNotificationPermissions,
+    testNotificationSystem
 } from '../services/notificationService';
 
 const NOTIFICATIONS_STORAGE_KEY = '@rizzapp_notification_settings';
@@ -33,7 +36,6 @@ export default function NotificationsScreen() {
         weeklyReports: false,
     });
     const [pushToken, setPushToken] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         loadSettings();
@@ -228,23 +230,144 @@ export default function NotificationsScreen() {
 
                 {/* Test Notification */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Test</Text>
+                    <Text style={styles.sectionTitle}>Test Notifications</Text>
                     
+                    {/* Expo Go Warning */}
+                    <View style={styles.warningBox}>
+                        <MaterialCommunityIcons name="information" size={20} color="#f59e0b" />
+                        <Text style={styles.warningText}>
+                            In Expo Go, notifications are logged to console only. For actual popups, build a development build.
+                        </Text>
+                    </View>
+
+                    {/* Test Buttons */}
                     <TouchableOpacity
                         style={styles.testButton}
                         onPress={async () => {
                             try {
+                                console.log('🧪 Testing PROJECT_CREATED notification...');
                                 await sendAppNotification(NotificationType.PROJECT_CREATED, {
-                                    projectName: 'Test Project',
+                                    projectName: 'Test Office Renovation',
                                 });
-                                Alert.alert('Success', 'Test notification sent!');
+                                Alert.alert(
+                                    '✅ Notification Sent!', 
+                                    'Check the console logs for the notification output.\n\nIn Expo Go, notifications only appear in logs, not as popups.',
+                                    [{ text: 'OK' }]
+                                );
                             } catch (error) {
                                 Alert.alert('Error', 'Failed to send notification');
+                                console.error('Test notification error:', error);
                             }
                         }}
                     >
-                        <MaterialCommunityIcons name="bell-ring" size={20} color="#667eea" />
-                        <Text style={styles.testButtonText}>Send Test Notification</Text>
+                        <MaterialCommunityIcons name="briefcase-plus" size={20} color="#667eea" />
+                        <Text style={styles.testButtonText}>Test Project Created</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={styles.testButton}
+                        onPress={async () => {
+                            try {
+                                console.log('🧪 Testing EXPENSE_ADDED notification...');
+                                await sendAppNotification(NotificationType.EXPENSE_ADDED, {
+                                    projectName: 'Office Renovation',
+                                    expenseAmount: 5000,
+                                    description: 'Test Expense',
+                                });
+                                Alert.alert(
+                                    '✅ Notification Sent!', 
+                                    'Check the console logs for the notification output.\n\nIn Expo Go, notifications only appear in logs, not as popups.',
+                                    [{ text: 'OK' }]
+                                );
+                            } catch (error) {
+                                Alert.alert('Error', 'Failed to send notification');
+                                console.error('Test notification error:', error);
+                            }
+                        }}
+                    >
+                        <MaterialCommunityIcons name="receipt-text" size={20} color="#667eea" />
+                        <Text style={styles.testButtonText}>Test Expense Added</Text>
+                    </TouchableOpacity>
+
+                    {/* Fix Button */}
+                    <TouchableOpacity
+                        style={[styles.testButton, { backgroundColor: '#fef3c7' }]}
+                        onPress={async () => {
+                            try {
+                                console.log('🔧 Forcing notifications to be enabled...');
+                                await forceEnableNotifications();
+                                await loadSettings(); // Reload settings
+                                Alert.alert(
+                                    '✅ Settings Fixed!', 
+                                    'Push notifications have been force-enabled. Try creating a project or expense now.',
+                                    [{ text: 'OK' }]
+                                );
+                            } catch (error) {
+                                Alert.alert('Error', 'Failed to fix settings');
+                                console.error('Fix settings error:', error);
+                            }
+                        }}
+                    >
+                        <MaterialCommunityIcons name="wrench" size={20} color="#f59e0b" />
+                        <Text style={[styles.testButtonText, { color: '#f59e0b' }]}>
+                            Fix Notification Settings
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Check Permissions Button */}
+                    <TouchableOpacity
+                        style={[styles.testButton, { backgroundColor: '#dbeafe' }]}
+                        onPress={async () => {
+                            try {
+                                console.log('🔍 Checking notification permissions...');
+                                await checkNotificationPermissions();
+                                Alert.alert(
+                                    '✅ Permissions Checked!', 
+                                    'Check the console for detailed permission information.',
+                                    [{ text: 'OK' }]
+                                );
+                            } catch (error) {
+                                Alert.alert('Error', 'Failed to check permissions');
+                                console.error('Check permissions error:', error);
+                            }
+                        }}
+                    >
+                        <MaterialCommunityIcons name="shield-check" size={20} color="#3b82f6" />
+                        <Text style={[styles.testButtonText, { color: '#3b82f6' }]}>
+                            Check Permissions
+                        </Text>
+                    </TouchableOpacity>
+
+                    {/* Full System Test Button */}
+                    <TouchableOpacity
+                        style={[styles.testButton, { backgroundColor: '#dcfce7' }]}
+                        onPress={async () => {
+                            try {
+                                console.log('🧪 Running full notification system test...');
+                                const success = await testNotificationSystem();
+                                if (success) {
+                                    Alert.alert(
+                                        '✅ Test Passed!', 
+                                        'Notification system is working! Check your notification bar.',
+                                        [{ text: 'OK' }]
+                                    );
+                                } else {
+                                    Alert.alert(
+                                        '❌ Test Failed', 
+                                        'Notification system is not working. Check console for details.',
+                                        [{ text: 'OK' }]
+                                    );
+                                }
+                            } catch (error) {
+                                Alert.alert('Error', 'Test failed with error. Check console.');
+                                console.error('Full system test error:', error);
+                            }
+                        }}
+                    >
+                        <MaterialCommunityIcons name="beaker" size={20} color="#16a34a" />
+                        <Text style={[styles.testButtonText, { color: '#16a34a' }]}>
+                            Full System Test
+                        </Text>
                     </TouchableOpacity>
 
                     {pushToken && (
@@ -329,6 +452,23 @@ const styles = StyleSheet.create({
     settingDesc: {
         fontSize: 13,
         color: '#999',
+    },
+    warningBox: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        backgroundColor: '#fffbeb',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 12,
+        gap: 10,
+        borderLeftWidth: 3,
+        borderLeftColor: '#f59e0b',
+    },
+    warningText: {
+        flex: 1,
+        fontSize: 13,
+        color: '#92400e',
+        lineHeight: 18,
     },
     testButton: {
         flexDirection: 'row',

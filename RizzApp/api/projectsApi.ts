@@ -227,13 +227,18 @@ export const createProject = async (project: Project): Promise<Project> => {
         
         // Send notification for project creation
         try {
+            console.log('🔔 Attempting to send project creation notification...');
             const notificationsEnabled = await areNotificationsEnabled();
+            console.log('🔔 Notifications enabled:', notificationsEnabled);
             if (notificationsEnabled) {
+                console.log('🔔 Calling sendAppNotification...');
                 await sendAppNotification(NotificationType.PROJECT_CREATED, {
                     projectName: result.name,
                     projectId: result.id,
                 });
                 console.log('✅ Project creation notification sent');
+            } else {
+                console.log('⚠️ Notifications are disabled in settings');
             }
         } catch (notifError) {
             console.error('⚠️ Failed to send project notification:', notifError);
