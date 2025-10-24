@@ -1,9 +1,10 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
     ActivityIndicator,
     Dimensions,
+    RefreshControl,
     ScrollView,
     StyleSheet,
     Text,
@@ -37,13 +38,13 @@ const chartConfig = {
 
 export default function IndividualProjectAnalytics() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
   const { id } = useLocalSearchParams();
   
   const [project, setProject] = useState<Project | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -98,6 +99,12 @@ export default function IndividualProjectAnalytics() {
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadProjectAnalytics();
+    setRefreshing(false);
+  };
+
   // Prepare expense data by category
   const getExpensesByCategory = () => {
     const categoryMap = new Map<string, number>();
@@ -135,9 +142,6 @@ export default function IndividualProjectAnalytics() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Project Analytics</Text>
         </View>
         <View style={styles.loadingContainer}>
@@ -152,9 +156,6 @@ export default function IndividualProjectAnalytics() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Project Analytics</Text>
         </View>
         <View style={styles.loadingContainer}>
@@ -172,9 +173,6 @@ export default function IndividualProjectAnalytics() {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Project Analytics</Text>
         </View>
         <View style={styles.loadingContainer}>
@@ -226,16 +224,21 @@ export default function IndividualProjectAnalytics() {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Project Analytics</Text>
-        <TouchableOpacity onPress={loadProjectAnalytics} style={styles.refreshButton}>
-          <MaterialCommunityIcons name="refresh" size={24} color="#fff" />
-        </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.scrollView} 
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#667eea']}
+            tintColor="#667eea"
+          />
+        }
+      >
         {/* Project Info */}
         <View style={styles.projectInfo}>
           <Text style={styles.projectName}>{project.name}</Text>
@@ -431,9 +434,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     backgroundColor: '#667eea',
-    paddingHorizontal: 16,
+    paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
@@ -443,18 +446,10 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  backButton: {
-    padding: 8,
-  },
-  refreshButton: {
-    padding: 8,
-  },
   headerTitle: {
     fontSize: 20,
     fontWeight: '700',
     color: '#fff',
-    flex: 1,
-    textAlign: 'center',
   },
   scrollView: {
     flex: 1,

@@ -301,8 +301,32 @@ export const getProjectById = async (id: string): Promise<Project | null> => {
 
         const project = await database.loadDataById<Project>(TABLES.PROJECTS, id);
         
-        // Verify the project belongs to the current user
-        if (project && project.user_id !== user.id) {
+        if (!project) {
+            return null;
+        }
+
+        // Get list of user IDs that this user can access projects from
+        const accessibleUserIds: string[] = [user.id];
+
+        // If user is a member (sub-user), also include parent's projects
+        if (user.parent_user_id) {
+            accessibleUserIds.push(user.parent_user_id);
+        }
+
+        // If user is owner, include all sub-users' projects
+        if (user.role === 'owner' && !user.parent_user_id) {
+            const allUsers = await database.loadData<any>('users');
+            const subUserIds = allUsers
+                ?.filter(u => u.parent_user_id === user.id)
+                .map(u => u.id) || [];
+            
+            if (subUserIds.length > 0) {
+                accessibleUserIds.push(...subUserIds);
+            }
+        }
+
+        // Verify the project belongs to an accessible user
+        if (!project.user_id || !accessibleUserIds.includes(project.user_id)) {
             throw new Error('Unauthorized access to project');
         }
 
@@ -323,9 +347,34 @@ export const updateProject = async (id: string, updates: Partial<Project>): Prom
             throw new Error('User not authenticated');
         }
 
-        // Verify the project belongs to the current user
+        // Get the existing project
         const existingProject = await database.loadDataById<Project>(TABLES.PROJECTS, id);
-        if (!existingProject || existingProject.user_id !== user.id) {
+        if (!existingProject) {
+            throw new Error('Project not found');
+        }
+
+        // Get list of user IDs that this user can access projects from
+        const accessibleUserIds: string[] = [user.id];
+
+        // If user is a member (sub-user), also include parent's projects
+        if (user.parent_user_id) {
+            accessibleUserIds.push(user.parent_user_id);
+        }
+
+        // If user is owner, include all sub-users' projects
+        if (user.role === 'owner' && !user.parent_user_id) {
+            const allUsers = await database.loadData<any>('users');
+            const subUserIds = allUsers
+                ?.filter(u => u.parent_user_id === user.id)
+                .map(u => u.id) || [];
+            
+            if (subUserIds.length > 0) {
+                accessibleUserIds.push(...subUserIds);
+            }
+        }
+
+        // Verify the project belongs to an accessible user
+        if (!existingProject.user_id || !accessibleUserIds.includes(existingProject.user_id)) {
             throw new Error('Unauthorized access to project');
         }
 
@@ -354,9 +403,34 @@ export const deleteProject = async (id: string): Promise<void> => {
             throw new Error('User not authenticated');
         }
 
-        // Verify the project belongs to the current user
+        // Get the existing project
         const existingProject = await database.loadDataById<Project>(TABLES.PROJECTS, id);
-        if (!existingProject || existingProject.user_id !== user.id) {
+        if (!existingProject) {
+            throw new Error('Project not found');
+        }
+
+        // Get list of user IDs that this user can access projects from
+        const accessibleUserIds: string[] = [user.id];
+
+        // If user is a member (sub-user), also include parent's projects
+        if (user.parent_user_id) {
+            accessibleUserIds.push(user.parent_user_id);
+        }
+
+        // If user is owner, include all sub-users' projects
+        if (user.role === 'owner' && !user.parent_user_id) {
+            const allUsers = await database.loadData<any>('users');
+            const subUserIds = allUsers
+                ?.filter(u => u.parent_user_id === user.id)
+                .map(u => u.id) || [];
+            
+            if (subUserIds.length > 0) {
+                accessibleUserIds.push(...subUserIds);
+            }
+        }
+
+        // Verify the project belongs to an accessible user
+        if (!existingProject.user_id || !accessibleUserIds.includes(existingProject.user_id)) {
             throw new Error('Unauthorized access to project');
         }
 

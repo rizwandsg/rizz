@@ -65,17 +65,15 @@ export default function TabsLayout() {
           headerShown: false,
         }}
       />
-      {/* Users tab - Only visible to owner accounts */}
-      {isOwner && (
-        <Tabs.Screen
-          name="users"
-          options={{
-            title: "Users",
-            tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" size={size} color={color} />,
-            headerShown: false,
-          }}
-        />
-      )}
+      <Tabs.Screen
+        name="users"
+        options={{
+          title: "Users",
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" size={size} color={color} />,
+          headerShown: false,
+          href: isOwner ? '/users' : null,
+        }}
+      />
       <Tabs.Screen
         name="profile"
         options={{
