@@ -1,10 +1,13 @@
+import { useAuth, useUser } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getCurrentUser, getSupabaseUserFromClerk, syncClerkUserToSupabase } from '../../api/authApi';
 import { deleteProject, getProjects, Project } from '../../api/projectsApi';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -12,24 +15,88 @@ export default function Home() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { isSignedIn, userId } = useAuth(); // Get both isSignedIn and userId from Clerk
+  const { user: clerkUser } = useUser(); // Get Clerk user object for email
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isSyncingRef = useRef(false); // Use ref to persist across renders and prevent race conditions
+  const hasLoadedRef = useRef(false); // Track if we've loaded data to prevent multiple initial calls
 
   const fetchProjects = async () => {
     try {
       setLoading(true);
       console.log('Fetching projects...');
       
+      // Check if user is authenticated (either Clerk or regular)
+      let regularUser = await getCurrentUser();
+      
+      // If user is signed in with Clerk but not in AsyncStorage, sync them
+      // Use ref to prevent multiple simultaneous sync attempts
+      if (!regularUser && isSignedIn && userId && !isSyncingRef.current) {
+        isSyncingRef.current = true; // Set flag immediately
+        console.log('🔄 Clerk user signed in but not in AsyncStorage, syncing...');
+        try {
+          // Try to get user from Supabase
+          let supabaseUser = await getSupabaseUserFromClerk(userId);
+          
+          // If user doesn't exist in Supabase, create them
+          if (!supabaseUser) {
+            console.log('📝 Creating Clerk user in Supabase...');
+            // Get email from Clerk user object
+            const email = clerkUser?.primaryEmailAddress?.emailAddress || `user_${userId}@clerk.temp`;
+            const fullName = clerkUser?.fullName || clerkUser?.firstName || 'Clerk User';
+            supabaseUser = await syncClerkUserToSupabase(userId, email, fullName);
+            console.log('✅ Created Supabase user:', { email, fullName });
+          }
+          
+          // Store in AsyncStorage
+          await AsyncStorage.setItem('@rizzapp_user', JSON.stringify(supabaseUser));
+          await AsyncStorage.setItem('@rizzapp_token', supabaseUser.id);
+          console.log('✅ Clerk user synced to AsyncStorage');
+          
+          // Update regularUser variable so we don't redirect
+          regularUser = supabaseUser;
+        } catch (syncError) {
+          console.error('❌ Failed to sync Clerk user:', syncError);
+          isSyncingRef.current = false; // Reset on error
+          // If sync fails, sign out and redirect to login
+          Alert.alert(
+            'Sync Error',
+            'Failed to sync your account. Please sign in again.',
+            [{ text: 'OK', onPress: () => router.replace('/(auth)/login') }]
+          );
+          return;
+        }
+        // Don't reset isSyncingRef here - keep it true so we never sync again for this session
+      }
+      
+      const isAuthenticated = regularUser !== null || isSignedIn;
+      
+      if (!isAuthenticated) {
+        console.log('⚠️ User not authenticated, redirecting to login...');
+        router.replace('/(auth)/login');
+        return;
+      }
+      
+      console.log(`✅ User authenticated - Regular: ${!!regularUser}, Clerk: ${isSignedIn}`);
+      
       const loadedProjects = await getProjects();
       console.log(`Found ${loadedProjects.length} projects`);
       setProjects(loadedProjects);
     } catch (error) {
       console.error('Error in fetchProjects:', error);
-      Alert.alert(
-        'Error',
-        'Failed to load projects. Please try again.'
-      );
+      
+      // Check if it's an authentication error
+      if (error instanceof Error && error.message.includes('not authenticated')) {
+        console.log('⚠️ Authentication error, redirecting to login...');
+        router.replace('/(auth)/login');
+      } else {
+        Alert.alert(
+          'Error',
+          'Failed to load projects. Please try again.'
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -43,7 +110,20 @@ export default function Home() {
 
   useFocusEffect(
     React.useCallback(() => {
-      fetchProjects();
+      // Only fetch if we haven't loaded yet, or if this is a subsequent focus (refresh)
+      if (!hasLoadedRef.current) {
+        hasLoadedRef.current = true;
+        fetchProjects();
+      } else {
+        // On subsequent focus events, only fetch if user is already in AsyncStorage
+        // This prevents re-syncing on every tab switch
+        getCurrentUser().then(user => {
+          if (user) {
+            fetchProjects();
+          }
+        });
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
   );
 

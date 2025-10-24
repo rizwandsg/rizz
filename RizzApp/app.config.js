@@ -44,6 +44,8 @@ module.exports = {
     },
     plugins: [
       "@react-native-google-signin/google-signin",
+      "expo-secure-store",
+      "expo-web-browser",
       ["expo-build-properties", {
         android: {
           compileSdkVersion: 33,

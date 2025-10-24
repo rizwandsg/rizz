@@ -1,3 +1,4 @@
+﻿import { useAuth } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
@@ -15,6 +16,7 @@ import { getProjects, Project } from '../api/projectsApi';
 
 export default function Index() {
   const router = useRouter();
+  const { signOut } = useAuth(); // Get Clerk signOut function
   const [user, setUser] = useState<User | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -52,7 +54,18 @@ export default function Index() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await logout();
+            // Logout from both regular auth and Clerk
+            await logout(); // Clear AsyncStorage
+            
+            // Sign out from Clerk if user is signed in with Clerk
+            try {
+              await signOut();
+              console.log('✅ Signed out from Clerk');
+            } catch {
+              console.log('⚠️ No Clerk session to sign out from');
+            }
+            
+            // Navigate to login
             router.replace('/(auth)/login');
           } catch (err) {
             console.error('Logout error:', err);

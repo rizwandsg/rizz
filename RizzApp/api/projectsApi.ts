@@ -278,7 +278,7 @@ export const getProjects = async (): Promise<Project[]> => {
         console.log('🔑 Accessible user IDs:', accessibleUserIds);
 
         // Filter projects by accessible user IDs
-        const projects = allProjects.filter(p => accessibleUserIds.includes(p.user_id));
+        const projects = allProjects.filter(p => p.user_id && accessibleUserIds.includes(p.user_id));
         
         console.log('✅ Found', projects.length, 'accessible projects out of', allProjects.length, 'total');
 

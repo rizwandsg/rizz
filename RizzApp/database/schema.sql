@@ -70,7 +70,7 @@ CREATE TABLE public.projects (
 CREATE TABLE public.users (
   id uuid NOT NULL DEFAULT uuid_generate_v4(),
   email character varying NOT NULL UNIQUE,
-  password_hash character varying NOT NULL,
+  password_hash character varying,
   full_name character varying NOT NULL,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()),
@@ -79,6 +79,7 @@ CREATE TABLE public.users (
   parent_user_id uuid,
   role character varying NOT NULL DEFAULT 'owner'::character varying CHECK (role::text = ANY (ARRAY['owner'::character varying, 'member'::character varying]::text[])),
   is_active boolean NOT NULL DEFAULT true,
+  clerk_user_id text UNIQUE,
   CONSTRAINT users_pkey PRIMARY KEY (id),
   CONSTRAINT users_parent_user_id_fkey FOREIGN KEY (parent_user_id) REFERENCES public.users(id)
 );

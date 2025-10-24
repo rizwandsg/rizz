@@ -1,3 +1,4 @@
+import { useAuth } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -21,6 +22,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
+  const { signOut } = useAuth(); // Get Clerk signOut function
   const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState({
     projectCount: 0,
@@ -67,7 +69,18 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            await logout();
+            // Logout from both regular auth and Clerk
+            await logout(); // Clear AsyncStorage
+            
+            // Sign out from Clerk if user is signed in with Clerk
+            try {
+              await signOut();
+              console.log('✅ Signed out from Clerk');
+            } catch {
+              console.log('⚠️ No Clerk session to sign out from');
+            }
+            
+            // Navigate to login
             router.replace('/(auth)/login');
           } catch (err) {
             console.error('Logout error:', err);

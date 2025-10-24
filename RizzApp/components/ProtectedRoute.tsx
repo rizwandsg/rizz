@@ -1,5 +1,5 @@
 import { useRouter, useSegments } from 'expo-router';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { isAuthenticated } from '../api/authApi';
 
@@ -11,31 +11,49 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
   const router = useRouter();
   const segments = useSegments();
   const [loading, setLoading] = useState(true);
+  const hasRedirectedRef = useRef(false); // Prevent multiple redirects
+  const majorSection = segments[0]; // Extract for dependency
 
   const checkAuth = useCallback(async () => {
+    // Skip if we've already redirected
+    if (hasRedirectedRef.current) {
+      setLoading(false);
+      return;
+    }
+
     try {
       const isAuth = await isAuthenticated();
-
-      const inAuthGroup = segments[0] === '(auth)';
+      const inAuthGroup = majorSection === '(auth)';
+      
+      // Get the current route path as a string to check which page we're on
+      const currentRoute = segments.join('/');
 
       if (!isAuth && !inAuthGroup) {
         // User is not authenticated and not in auth pages, redirect to login
+        hasRedirectedRef.current = true;
         router.replace('/(auth)/login');
-      } else if (isAuth && inAuthGroup) {
-        // User is authenticated but in auth pages, redirect to tabs
+      } else if (isAuth && inAuthGroup && !currentRoute.includes('clerk-signin') && !currentRoute.includes('clerk-signup')) {
+        // User is authenticated but in auth pages (and not actively signing in), redirect to tabs
+        hasRedirectedRef.current = true;
         router.replace('/(tabs)/home');
       }
     } catch (error) {
       console.error('Auth check error:', error);
+      hasRedirectedRef.current = true;
       router.replace('/(auth)/login');
     } finally {
       setLoading(false);
     }
-  }, [router, segments]);
+  }, [router, majorSection, segments]);
 
   useEffect(() => {
-    checkAuth();
-  }, [checkAuth]);
+    // Only run checkAuth on mount or when major section changes
+    if (majorSection && !hasRedirectedRef.current) {
+      checkAuth();
+    } else {
+      setLoading(false);
+    }
+  }, [majorSection, checkAuth]); // Depend on major section only
 
   if (loading) {
     return (

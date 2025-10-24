@@ -1,24 +1,29 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useFocusEffect } from "@react-navigation/native";
 import { getCurrentUser, User } from "../../api/authApi";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  useEffect(() => {
-    // Load current user to check role
-    const loadUser = async () => {
-      const user = await getCurrentUser();
-      setCurrentUser(user);
-    };
-    loadUser();
-  }, []);
+  // Load user on mount and whenever tabs gain focus
+  useFocusEffect(
+    React.useCallback(() => {
+      const loadUser = async () => {
+        const user = await getCurrentUser();
+        setCurrentUser(user);
+        console.log('👤 Tabs Layout - Current User:', user?.email, 'Role:', user?.role);
+      };
+      loadUser();
+    }, [])
+  );
 
   // Check if user is an owner (not a sub-user)
   const isOwner = currentUser && (!currentUser.parent_user_id || currentUser.role === 'owner');
+  console.log('🔑 Tabs Layout - Is Owner:', isOwner, 'User Role:', currentUser?.role);
   
   return (
     <Tabs
@@ -61,16 +66,16 @@ export default function TabsLayout() {
         }}
       />
       {/* Users tab - Only visible to owner accounts */}
-      <Tabs.Screen
-        name="users"
-        options={{
-          title: "Users",
-          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" size={size} color={color} />,
-          headerShown: false,
-          // Hide tab for sub-users
-          href: isOwner ? '/(tabs)/users' : null,
-        }}
-      />
+      {isOwner && (
+        <Tabs.Screen
+          name="users"
+          options={{
+            title: "Users",
+            tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" size={size} color={color} />,
+            headerShown: false,
+          }}
+        />
+      )}
       <Tabs.Screen
         name="profile"
         options={{

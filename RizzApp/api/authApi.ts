@@ -4,6 +4,7 @@ import { database } from '../services/databaseService';
 
 export interface User {
     id: string;
+    clerk_user_id?: string; // Clerk user ID for users authenticated via Clerk
     email: string;
     full_name: string;
     phone?: string;
@@ -265,7 +266,31 @@ export const getCurrentUser = async (): Promise<User | null> => {
 };
 
 /**
- * Check if user is authenticated
+ * Get current user with Clerk support
+ * Checks both regular auth (AsyncStorage) and Clerk auth
+ */
+export const getCurrentUserWithClerk = async (): Promise<User | null> => {
+    try {
+        // First check regular auth (AsyncStorage)
+        const userData = await AsyncStorage.getItem(USER_STORAGE_KEY);
+        if (userData) {
+            console.log('✅ Found regular auth user in AsyncStorage');
+            return JSON.parse(userData);
+        }
+
+        // If no regular user, try to get Clerk user
+        // Note: This function is called from React components where useAuth() is available
+        // For now, return null and let components handle Clerk auth separately
+        console.log('⚠️ No regular auth user found');
+        return null;
+    } catch (error) {
+        console.error('Get current user error:', error);
+        return null;
+    }
+};
+
+/**
+ * Check if user is authenticated (regular or Clerk)
  */
 export const isAuthenticated = async (): Promise<boolean> => {
     try {
@@ -563,3 +588,95 @@ export const resetSubUserPassword = async (subUserId: string): Promise<string> =
         throw error;
     }
 };
+
+/**
+ * Get Supabase user data for current Clerk user
+ */
+export const getSupabaseUserFromClerk = async (clerkUserId: string): Promise<User | null> => {
+    try {
+        const users = await database.loadData<User>('users', {
+            filter: `clerk_user_id.eq.${clerkUserId}`
+        });
+
+        if (users && users.length > 0) {
+            return users[0];
+        }
+
+        console.log('⚠️ No Supabase user found for Clerk ID:', clerkUserId);
+        return null;
+    } catch (error) {
+        console.error('❌ Failed to get Supabase user from Clerk ID:', error);
+        return null;
+    }
+};
+
+/**
+ * Create or sync Clerk user to Supabase
+ */
+export const syncClerkUserToSupabase = async (
+    clerkUserId: string,
+    email: string,
+    fullName: string
+): Promise<User> => {
+    try {
+        console.log('🔄 Syncing Clerk user to Supabase...', { clerkUserId, email, fullName });
+
+        // Check if user already exists
+        const existingUser = await getSupabaseUserFromClerk(clerkUserId);
+        
+        if (existingUser) {
+            console.log('✅ Clerk user already exists in Supabase:', existingUser.id);
+            
+            // Update last_login
+            await database.updateData('users', existingUser.id, {
+                last_login: new Date().toISOString(),
+            });
+            
+            return existingUser;
+        }
+
+        // Create new user in Supabase
+        const newUser = {
+            clerk_user_id: clerkUserId,
+            email: email.toLowerCase(),
+            password_hash: null, // Clerk users don't have password_hash
+            full_name: fullName,
+            role: 'owner', // New Clerk signups are always owners
+            is_active: true,
+            parent_user_id: null,
+        };
+
+        const createdUser = await database.saveData('users', newUser);
+        console.log('✅ Clerk user synced to Supabase:', createdUser);
+
+        return createdUser as unknown as User;
+    } catch (error) {
+        console.error('❌ Failed to sync Clerk user to Supabase:', error);
+        throw error;
+    }
+};
+
+/**
+ * Update last login for Clerk user and store in AsyncStorage
+ */
+export const updateClerkUserLastLogin = async (clerkUserId: string): Promise<void> => {
+    try {
+        const user = await getSupabaseUserFromClerk(clerkUserId);
+        
+        if (user) {
+            await database.updateData('users', user.id, {
+                last_login: new Date().toISOString(),
+            });
+            console.log('✅ Updated last_login for Clerk user');
+            
+            // Store Clerk user in AsyncStorage for getCurrentUser()
+            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+            await AsyncStorage.setItem(TOKEN_STORAGE_KEY, user.id);
+            console.log('✅ Stored Clerk user in AsyncStorage');
+        }
+    } catch (error) {
+        console.error('⚠️ Failed to update last_login:', error);
+        // Don't throw - this shouldn't block login
+    }
+};
+
