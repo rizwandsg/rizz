@@ -1,7 +1,7 @@
 import { database, TABLES } from '../services/databaseService';
+import { areNotificationsEnabled, NotificationType, sendAppNotification } from '../services/notificationService';
 import { getCurrentUser } from './authApi';
 import { ScopeOfWork } from './projectsApi';
-import { sendAppNotification, NotificationType, areNotificationsEnabled } from '../services/notificationService';
 
 export type PaymentMethod = 'Cash' | 'UPI' | 'Bank Transfer' | 'Check' | 'Card' | 'Other';
 export type PaymentStatus = 'Paid' | 'Unpaid' | 'Partial';

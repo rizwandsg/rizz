@@ -4,8 +4,8 @@ import { Tabs } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentUser, User } from "../../api/authApi";
-import { subscribeToAll, unsubscribeFromAll, WebSocketCallbacks } from "../../services/websocketService";
 import { registerForPushNotificationsAsync } from "../../services/notificationService";
+import { subscribeToAll, unsubscribeFromAll, WebSocketCallbacks } from "../../services/websocketService";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();

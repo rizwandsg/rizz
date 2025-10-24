@@ -1,6 +1,6 @@
 import { database, TABLES } from '../services/databaseService';
+import { areNotificationsEnabled, NotificationType, sendAppNotification } from '../services/notificationService';
 import { getCurrentUser } from './authApi';
-import { sendAppNotification, NotificationType, areNotificationsEnabled } from '../services/notificationService';
 
 export type ScopeOfWork = 
     | 'Carpentry Work'

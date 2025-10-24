@@ -4,21 +4,19 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
-    ActivityIndicator,
     Alert,
     ScrollView,
     StyleSheet,
     Switch,
     Text,
     TouchableOpacity,
-    View,
+    View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
-    registerForPushNotificationsAsync,
-    scheduleLocalNotification,
     NotificationType,
-    sendAppNotification,
+    registerForPushNotificationsAsync,
+    sendAppNotification
 } from '../services/notificationService';
 
 const NOTIFICATIONS_STORAGE_KEY = '@rizzapp_notification_settings';

@@ -4,8 +4,8 @@
  */
 
 import { createClient, RealtimeChannel } from '@supabase/supabase-js';
-import { sendAppNotification, NotificationType } from './notificationService';
 import { getCurrentUser } from '../api/authApi';
+import { NotificationType, sendAppNotification } from './notificationService';
 
 const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY!;
