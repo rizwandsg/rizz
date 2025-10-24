@@ -1,7 +1,7 @@
 import { SignedIn, SignedOut } from '@clerk/clerk-expo';
-import { View, Text, StyleSheet } from 'react-native';
-import { SignOutButton } from '../components/SignOutButton';
 import { Link } from 'expo-router';
+import { StyleSheet, Text, View } from 'react-native';
+import { SignOutButton } from '../components/SignOutButton';
 
 /**
  * Example component showing how to use Clerk's conditional rendering

@@ -1,5 +1,5 @@
 import { useRouter, useSegments } from 'expo-router';
-import React, { useCallback, useEffect, useState, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { isAuthenticated } from '../api/authApi';
 

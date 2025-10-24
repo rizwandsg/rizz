@@ -1,12 +1,12 @@
 import { useAuth, useUser } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState, useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { ActivityIndicator, Alert, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getCurrentUser, getSupabaseUserFromClerk, syncClerkUserToSupabase } from '../../api/authApi';
 import { deleteProject, getProjects, Project } from '../../api/projectsApi';
 import { useTheme } from '../../context/ThemeContext';
