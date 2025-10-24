@@ -43,6 +43,22 @@ export default function UsersScreen() {
     const [isActive, setIsActive] = useState(true);
     const [saving, setSaving] = useState(false);
 
+    // Handle email input with automatic @rizz.com domain
+    const handleEmailChange = (text: string) => {
+        // Remove any existing @rizz.com to prevent duplicates
+        const cleanText = text.replace('@rizz.com', '');
+        setEmail(cleanText);
+    };
+
+    // Get full email with @rizz.com domain
+    const getFullEmail = () => {
+        const cleanEmail = email.trim();
+        if (cleanEmail && !cleanEmail.includes('@')) {
+            return `${cleanEmail}@rizz.com`;
+        }
+        return cleanEmail;
+    };
+
     // Load sub-users
     const loadUsers = async () => {
         try {
@@ -117,8 +133,9 @@ export default function UsersScreen() {
                 Alert.alert('Success', 'User updated successfully');
             } else {
                 // Create new user
+                const fullEmail = getFullEmail();
                 const newUserData: CreateSubUserData = {
-                    email: email.trim().toLowerCase(),
+                    email: fullEmail.toLowerCase(),
                     password: password,
                     full_name: fullName.trim(),
                     phone: phone.trim() || undefined
@@ -372,14 +389,17 @@ export default function UsersScreen() {
                             {!editingUser && (
                                 <View style={styles.inputGroup}>
                                     <Text style={styles.inputLabel}>Email *</Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={email}
-                                        onChangeText={setEmail}
-                                        placeholder="user@example.com"
-                                        keyboardType="email-address"
-                                        autoCapitalize="none"
-                                    />
+                                    <View style={styles.emailInputWrapper}>
+                                        <TextInput
+                                            style={styles.emailUsernameInput}
+                                            value={email}
+                                            onChangeText={handleEmailChange}
+                                            placeholder="username"
+                                            keyboardType="email-address"
+                                            autoCapitalize="none"
+                                        />
+                                        <Text style={styles.emailDomain}>@rizz.com</Text>
+                                    </View>
                                 </View>
                             )}
 
@@ -699,6 +719,26 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#333',
         backgroundColor: '#fafafa',
+    },
+    emailInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderColor: '#e0e0e0',
+        borderRadius: 12,
+        backgroundColor: '#fafafa',
+        paddingRight: 14,
+    },
+    emailUsernameInput: {
+        flex: 1,
+        padding: 14,
+        fontSize: 16,
+        color: '#333',
+    },
+    emailDomain: {
+        fontSize: 16,
+        color: '#667eea',
+        fontWeight: '600',
     },
     switchRow: {
         flexDirection: 'row',

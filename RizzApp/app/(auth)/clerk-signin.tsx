@@ -1,9 +1,9 @@
-import { useAuth, useSignIn } from '@clerk/clerk-expo';
+import { useAuth, useSignIn, useClerk } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -20,13 +20,22 @@ import { getSupabaseUserFromClerk, syncClerkUserToSupabase } from '../../api/aut
 
 export default function ClerkSignInScreen() {
     const { signIn, setActive, isLoaded } = useSignIn();
-    const { getToken } = useAuth(); // Get getToken to retrieve session info
+    const { getToken, isSignedIn } = useAuth();
+    const { signOut } = useClerk();
     const router = useRouter();
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+
+    // Check if user is already signed in
+    useEffect(() => {
+        if (isLoaded && isSignedIn) {
+            console.log('⚠️ User already signed in, redirecting to home...');
+            router.replace('/(tabs)/home');
+        }
+    }, [isLoaded, isSignedIn, router]);
 
     const handleSignIn = async () => {
         if (!isLoaded) return;
@@ -112,6 +121,33 @@ export default function ClerkSignInScreen() {
             router.replace('/(tabs)/home');
         } catch (err: any) {
             console.error('❌ Clerk Sign-In Error:', JSON.stringify(err, null, 2));
+
+            // Handle session already exists error
+            if (err?.errors?.[0]?.code === 'session_exists') {
+                console.log('⚠️ Session already exists - clearing stale session and redirecting...');
+                try {
+                    // Sign out from Clerk to clear the stale session
+                    await signOut();
+                    console.log('✅ Cleared Clerk session');
+                    
+                    // Clear AsyncStorage
+                    await AsyncStorage.removeItem('@rizzapp_user');
+                    await AsyncStorage.removeItem('@rizzapp_token');
+                    console.log('✅ Cleared AsyncStorage');
+                    
+                    // Show message and redirect to login to try again
+                    Alert.alert(
+                        'Session Conflict',
+                        'Please try signing in again.',
+                        [{ text: 'OK' }]
+                    );
+                } catch (clearError) {
+                    console.error('❌ Failed to clear session:', clearError);
+                }
+                setLoading(false);
+                return;
+            }
+
             Alert.alert(
                 'Sign In Failed',
                 err.errors?.[0]?.message || 'Invalid email or password. Please try again.'
@@ -185,6 +221,14 @@ export default function ClerkSignInScreen() {
                             </TouchableOpacity>
                         </View>
                     </View>
+
+                    {/* Forgot Password Link */}
+                    <TouchableOpacity 
+                        style={styles.forgotPasswordButton}
+                        onPress={() => router.push('/(auth)/forgot-password')}
+                    >
+                        <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
+                    </TouchableOpacity>
 
                     {/* Sign In Button */}
                     <TouchableOpacity
@@ -297,6 +341,16 @@ const styles = StyleSheet.create({
         paddingVertical: 14,
         fontSize: 15,
         color: '#333',
+    },
+    forgotPasswordButton: {
+        alignSelf: 'flex-end',
+        marginTop: 8,
+        marginBottom: 4,
+    },
+    forgotPasswordText: {
+        fontSize: 14,
+        color: '#667eea',
+        fontWeight: '600',
     },
     signInButton: {
         marginTop: 10,

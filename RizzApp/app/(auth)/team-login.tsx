@@ -24,6 +24,22 @@ export default function TeamLoginScreen() {
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
 
+    // Handle email input with automatic @rizz.com domain
+    const handleEmailChange = (text: string) => {
+        // Remove any existing @rizz.com to prevent duplicates
+        const cleanText = text.replace('@rizz.com', '');
+        setEmail(cleanText);
+    };
+
+    // Get full email with @rizz.com domain
+    const getFullEmail = () => {
+        const cleanEmail = email.trim();
+        if (cleanEmail && !cleanEmail.includes('@')) {
+            return `${cleanEmail}@rizz.com`;
+        }
+        return cleanEmail;
+    };
+
     const handleLogin = async () => {
         // Validation
         if (!email.trim()) {
@@ -37,7 +53,8 @@ export default function TeamLoginScreen() {
 
         setLoading(true);
         try {
-            await login({ email: email.trim(), password });
+            const fullEmail = getFullEmail();
+            await login({ email: fullEmail, password });
             console.log('✅ Team Member Login Successful!');
             router.replace('/(tabs)/home');
         } catch (err: any) {
@@ -85,18 +102,19 @@ export default function TeamLoginScreen() {
                     {/* Email Input */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Email Address</Text>
-                        <View style={styles.inputContainer}>
-                            <MaterialCommunityIcons name="email" size={20} color="#999" />
+                        <View style={styles.emailInputWrapper}>
+                            <MaterialCommunityIcons name="email" size={20} color="#999" style={styles.emailIcon} />
                             <TextInput
-                                style={styles.input}
+                                style={styles.emailUsernameInput}
                                 value={email}
-                                onChangeText={setEmail}
-                                placeholder="Enter your work email"
+                                onChangeText={handleEmailChange}
+                                placeholder="username"
                                 placeholderTextColor="#999"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 autoComplete="email"
                             />
+                            <Text style={styles.emailDomain}>@rizz.com</Text>
                         </View>
                     </View>
 
@@ -239,6 +257,31 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         fontSize: 16,
         color: '#333',
+    },
+    emailInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#fff',
+        borderRadius: 12,
+        paddingLeft: 15,
+        paddingRight: 15,
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
+    },
+    emailIcon: {
+        marginRight: 10,
+    },
+    emailUsernameInput: {
+        flex: 1,
+        paddingVertical: 15,
+        fontSize: 16,
+        color: '#333',
+    },
+    emailDomain: {
+        fontSize: 16,
+        color: '#4c669f',
+        fontWeight: '600',
+        marginLeft: 5,
     },
     loginButton: {
         marginTop: 10,

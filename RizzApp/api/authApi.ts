@@ -186,7 +186,8 @@ export const login = async (credentials: LoginCredentials): Promise<User> => {
 };
 
 /**
- * Change password for the current user
+ * Change password for team members (Supabase users only)
+ * For Clerk owner users, use Clerk's password update API instead
  */
 export const changePassword = async (
     email: string,
@@ -194,11 +195,7 @@ export const changePassword = async (
     newPassword: string
 ): Promise<void> => {
     try {
-        console.log('🔐 Starting password change for:', email);
-
-        // Hash the current password to verify it
-        const currentPasswordHash = await hashPassword(currentPassword);
-        console.log('🔑 Current password hashed:', currentPasswordHash.substring(0, 10) + '...');
+        console.log('🔐 Starting password change for team member:', email);
 
         // Get ALL users and filter in JavaScript
         const allUsers = await database.loadData<User>('users');
@@ -213,6 +210,23 @@ export const changePassword = async (
         }
 
         const user = users[0] as any;
+
+        // This function should only be called for team members (non-Clerk users)
+        // Clerk users should use Clerk's password update API
+        if (user.clerk_user_id) {
+            console.log('❌ This function is for team members only. Clerk users should use Clerk API.');
+            throw new Error('Please use the Clerk password update method for owner accounts.');
+        }
+
+        // Check if user has a password set
+        if (!user.password_hash) {
+            console.log('❌ User has no password set');
+            throw new Error('No password is set for this account. Please contact support.');
+        }
+
+        // Hash the current password to verify it
+        const currentPasswordHash = await hashPassword(currentPassword);
+        console.log('🔑 Current password hashed:', currentPasswordHash.substring(0, 10) + '...');
 
         // Verify current password
         if (user.password_hash !== currentPasswordHash) {
@@ -232,7 +246,7 @@ export const changePassword = async (
             updated_at: new Date().toISOString()
         });
 
-        console.log('✅ Password changed successfully');
+        console.log('✅ Password changed successfully for team member');
     } catch (error: any) {
         console.error('❌ Change password error:', error);
         throw error;

@@ -32,8 +32,8 @@ export default function ProtectedRoute({ children }: ProtectedRouteProps) {
         // User is not authenticated and not in auth pages, redirect to login
         hasRedirectedRef.current = true;
         router.replace('/(auth)/login');
-      } else if (isAuth && inAuthGroup && !currentRoute.includes('clerk-signin') && !currentRoute.includes('clerk-signup')) {
-        // User is authenticated but in auth pages (and not actively signing in), redirect to tabs
+      } else if (isAuth && inAuthGroup && !currentRoute.includes('clerk-signin') && !currentRoute.includes('clerk-signup') && !currentRoute.includes('forgot-password')) {
+        // User is authenticated but in auth pages (and not actively signing in/resetting password), redirect to tabs
         hasRedirectedRef.current = true;
         router.replace('/(tabs)/home');
       }

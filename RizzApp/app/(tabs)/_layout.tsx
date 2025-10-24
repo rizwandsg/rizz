@@ -12,12 +12,35 @@ export default function TabsLayout() {
   // Load user on mount and whenever tabs gain focus
   useFocusEffect(
     React.useCallback(() => {
+      let interval: NodeJS.Timeout | null = null;
+      
       const loadUser = async () => {
         const user = await getCurrentUser();
         setCurrentUser(user);
         console.log('👤 Tabs Layout - Current User:', user?.email, 'Role:', user?.role);
+        
+        // If user not found, start polling
+        if (!user) {
+          interval = setInterval(async () => {
+            const polledUser = await getCurrentUser();
+            if (polledUser) {
+              setCurrentUser(polledUser);
+              console.log('👤 Tabs Layout - User loaded after poll:', polledUser?.email, 'Role:', polledUser?.role);
+              if (interval) clearInterval(interval);
+            }
+          }, 1000);
+          
+          // Clean up interval after 10 seconds
+          setTimeout(() => {
+            if (interval) clearInterval(interval);
+          }, 10000);
+        }
       };
       loadUser();
+      
+      return () => {
+        if (interval) clearInterval(interval);
+      };
     }, [])
   );
 
