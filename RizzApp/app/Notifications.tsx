@@ -4,6 +4,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
 import {
+    ActivityIndicator,
     Alert,
     ScrollView,
     StyleSheet,
@@ -13,6 +14,12 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import {
+    registerForPushNotificationsAsync,
+    scheduleLocalNotification,
+    NotificationType,
+    sendAppNotification,
+} from '../services/notificationService';
 
 const NOTIFICATIONS_STORAGE_KEY = '@rizzapp_notification_settings';
 
@@ -27,10 +34,25 @@ export default function NotificationsScreen() {
         paymentReminders: true,
         weeklyReports: false,
     });
+    const [pushToken, setPushToken] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         loadSettings();
+        initializeNotifications();
     }, []);
+
+    const initializeNotifications = async () => {
+        try {
+            const token = await registerForPushNotificationsAsync();
+            if (token) {
+                setPushToken(token);
+                console.log('✅ Push notifications initialized:', token);
+            }
+        } catch (error) {
+            console.error('❌ Failed to initialize notifications:', error);
+        }
+    };
 
     const loadSettings = async () => {
         try {
@@ -206,6 +228,35 @@ export default function NotificationsScreen() {
                     </View>
                 </View>
 
+                {/* Test Notification */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Test</Text>
+                    
+                    <TouchableOpacity
+                        style={styles.testButton}
+                        onPress={async () => {
+                            try {
+                                await sendAppNotification(NotificationType.PROJECT_CREATED, {
+                                    projectName: 'Test Project',
+                                });
+                                Alert.alert('Success', 'Test notification sent!');
+                            } catch (error) {
+                                Alert.alert('Error', 'Failed to send notification');
+                            }
+                        }}
+                    >
+                        <MaterialCommunityIcons name="bell-ring" size={20} color="#667eea" />
+                        <Text style={styles.testButtonText}>Send Test Notification</Text>
+                    </TouchableOpacity>
+
+                    {pushToken && (
+                        <View style={styles.tokenContainer}>
+                            <Text style={styles.tokenLabel}>Push Token:</Text>
+                            <Text style={styles.tokenText} numberOfLines={2}>{pushToken}</Text>
+                        </View>
+                    )}
+                </View>
+
                 <View style={{ height: 40 }} />
             </ScrollView>
         </View>
@@ -280,5 +331,38 @@ const styles = StyleSheet.create({
     settingDesc: {
         fontSize: 13,
         color: '#999',
+    },
+    testButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#f0f4ff',
+        paddingVertical: 14,
+        paddingHorizontal: 20,
+        borderRadius: 8,
+        gap: 10,
+        marginVertical: 8,
+    },
+    testButtonText: {
+        fontSize: 15,
+        fontWeight: '600',
+        color: '#667eea',
+    },
+    tokenContainer: {
+        backgroundColor: '#f8f9fa',
+        padding: 12,
+        borderRadius: 8,
+        marginTop: 12,
+    },
+    tokenLabel: {
+        fontSize: 12,
+        fontWeight: '600',
+        color: '#666',
+        marginBottom: 4,
+    },
+    tokenText: {
+        fontSize: 10,
+        color: '#999',
+        fontFamily: 'monospace',
     },
 });

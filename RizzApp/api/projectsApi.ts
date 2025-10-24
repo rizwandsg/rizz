@@ -1,5 +1,6 @@
 import { database, TABLES } from '../services/databaseService';
 import { getCurrentUser } from './authApi';
+import { sendAppNotification, NotificationType, areNotificationsEnabled } from '../services/notificationService';
 
 export type ScopeOfWork = 
     | 'Carpentry Work'
@@ -223,6 +224,22 @@ export const createProject = async (project: Project): Promise<Project> => {
         };
 
         const result = await database.saveData<Project>(TABLES.PROJECTS, newProject);
+        
+        // Send notification for project creation
+        try {
+            const notificationsEnabled = await areNotificationsEnabled();
+            if (notificationsEnabled) {
+                await sendAppNotification(NotificationType.PROJECT_CREATED, {
+                    projectName: result.name,
+                    projectId: result.id,
+                });
+                console.log('✅ Project creation notification sent');
+            }
+        } catch (notifError) {
+            console.error('⚠️ Failed to send project notification:', notifError);
+            // Don't throw - notification failure shouldn't break project creation
+        }
+        
         return result;
     } catch (error) {
         console.error('Create project error:', error);

@@ -1,13 +1,61 @@
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { Tabs } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getCurrentUser, User } from "../../api/authApi";
+import { subscribeToAll, unsubscribeFromAll, WebSocketCallbacks } from "../../services/websocketService";
+import { registerForPushNotificationsAsync } from "../../services/notificationService";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  // Initialize push notifications on mount
+  useEffect(() => {
+    registerForPushNotificationsAsync().then((token) => {
+      if (token) {
+        console.log('📱 Push notifications registered in tabs layout');
+      }
+    }).catch((error) => {
+      console.error('❌ Failed to register push notifications:', error);
+    });
+  }, []);
+
+  // Setup WebSocket subscriptions when user is loaded
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const callbacks: WebSocketCallbacks = {
+      onProjectCreated: (project) => {
+        console.log('🔔 WebSocket: Project created -', project.name);
+      },
+      onProjectUpdated: (project) => {
+        console.log('🔔 WebSocket: Project updated -', project.name);
+      },
+      onExpenseCreated: (expense) => {
+        console.log('🔔 WebSocket: Expense created - ₹', expense.amount);
+      },
+      onExpenseUpdated: (expense) => {
+        console.log('🔔 WebSocket: Expense updated - ₹', expense.amount);
+      },
+      onError: (error) => {
+        console.error('❌ WebSocket error:', error);
+      },
+    };
+
+    // Subscribe to real-time updates
+    subscribeToAll(callbacks).catch((error) => {
+      console.error('❌ Failed to subscribe to WebSocket:', error);
+    });
+
+    // Cleanup on unmount
+    return () => {
+      unsubscribeFromAll().catch((error) => {
+        console.error('❌ Failed to unsubscribe from WebSocket:', error);
+      });
+    };
+  }, [currentUser]);
 
   // Load user on mount and whenever tabs gain focus
   useFocusEffect(

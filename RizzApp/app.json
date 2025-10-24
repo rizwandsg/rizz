@@ -11,6 +11,14 @@
       "@react-native-google-signin/google-signin",
       "expo-router",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#667eea",
+          "sounds": ["./assets/notification.wav"]
+        }
+      ],
+      [
         "expo-build-properties",
         {
           "ios": {
@@ -36,21 +44,23 @@
       },
       "googleServicesFile": "./android/app/google-services.json",
       "permissions": [
-        "INTERNET"
+        "INTERNET",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "USE_FULL_SCREEN_INTENT",
+        "POST_NOTIFICATIONS"
       ],
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
     },
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "web": {
-      "bundler": "metro"
     },
     "extra": {
       "router": {

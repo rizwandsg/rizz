@@ -1,6 +1,7 @@
 import { database, TABLES } from '../services/databaseService';
 import { getCurrentUser } from './authApi';
 import { ScopeOfWork } from './projectsApi';
+import { sendAppNotification, NotificationType, areNotificationsEnabled } from '../services/notificationService';
 
 export type PaymentMethod = 'Cash' | 'UPI' | 'Bank Transfer' | 'Check' | 'Card' | 'Other';
 export type PaymentStatus = 'Paid' | 'Unpaid' | 'Partial';
@@ -33,7 +34,7 @@ export interface VendorInfo {
 /**
  * Create a new expense
  */
-export const createExpense = async (expense: Expense): Promise<Expense> => {
+export const createExpense = async (expense: Expense, projectName?: string): Promise<Expense> => {
     try {
         const user = await getCurrentUser();
         if (!user) {
@@ -46,6 +47,24 @@ export const createExpense = async (expense: Expense): Promise<Expense> => {
         };
 
         const result = await database.saveData<Expense>(TABLES.EXPENSES, newExpense);
+        
+        // Send notification for expense creation
+        try {
+            const notificationsEnabled = await areNotificationsEnabled();
+            if (notificationsEnabled) {
+                await sendAppNotification(NotificationType.EXPENSE_ADDED, {
+                    expenseAmount: result.amount,
+                    projectName: projectName || 'Project',
+                    expenseId: result.id,
+                    description: result.description,
+                });
+                console.log('✅ Expense creation notification sent');
+            }
+        } catch (notifError) {
+            console.error('⚠️ Failed to send expense notification:', notifError);
+            // Don't throw - notification failure shouldn't break expense creation
+        }
+        
         return result;
     } catch (error) {
         console.error('Create expense error:', error);
