@@ -48,10 +48,10 @@ module.exports = {
       "expo-web-browser",
       ["expo-build-properties", {
         android: {
-          compileSdkVersion: 33,
-          targetSdkVersion: 33,
-          buildToolsVersion: "33.0.0",
-          kotlinVersion: "1.8.0"
+          compileSdkVersion: 35,
+          targetSdkVersion: 35,
+          buildToolsVersion: "35.0.0",
+          kotlinVersion: "2.0.21"
         },
         ios: {
           useFrameworks: 'static'
