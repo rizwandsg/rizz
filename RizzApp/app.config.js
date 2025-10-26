@@ -24,7 +24,14 @@ module.exports = {
         backgroundColor: '#ffffff'
       },
       package: 'com.rizz.app',
-      googleServicesFile: './google-services.json'
+      googleServicesFile: './google-services.json',
+      permissions: [
+        "INTERNET",
+        "RECEIVE_BOOT_COMPLETED",
+        "VIBRATE",
+        "USE_FULL_SCREEN_INTENT",
+        "POST_NOTIFICATIONS"
+      ]
     },
     web: {
       favicon: './assets/favicon.png'
@@ -34,6 +41,7 @@ module.exports = {
         projectId: 'c50bdb29-edbf-4aa1-9ff2-505cb7567378'
       },
       router: {
+        origin: false,
         scheme: 'com.rizz.app'
       },
       supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
@@ -42,21 +50,36 @@ module.exports = {
       appEnv: process.env.EXPO_PUBLIC_APP_ENV,
       appName: process.env.EXPO_PUBLIC_APP_NAME
     },
+    experiments: {
+      typedRoutes: true,
+      reactCompiler: true
+    },
     plugins: [
       "@react-native-google-signin/google-signin",
-      "expo-secure-store",
-      "expo-web-browser",
-      ["expo-build-properties", {
-        android: {
-          compileSdkVersion: 35,
-          targetSdkVersion: 35,
-          buildToolsVersion: "35.0.0",
-          kotlinVersion: "2.0.21"
-        },
-        ios: {
-          useFrameworks: 'static'
+      "expo-router",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#667eea",
+          "sounds": ["./assets/notification.wav"]
         }
-      }]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "13.0"
+          },
+          "android": {
+            "kotlinVersion": "2.0.21",
+            "compileSdkVersion": 34,
+            "targetSdkVersion": 34,
+            "buildToolsVersion": "34.0.0",
+            "minSdkVersion": 23
+          }
+        }
+      ]
     ]
   }
 };

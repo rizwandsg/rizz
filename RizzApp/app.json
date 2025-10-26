@@ -25,9 +25,6 @@
             "deploymentTarget": "13.0"
           },
           "android": {
-            "extraMavenRepos": [
-              "../../node_modules/@notifee/react-native/android/libs"
-            ],
             "kotlinVersion": "2.0.21",
             "compileSdkVersion": 34,
             "targetSdkVersion": 34,
