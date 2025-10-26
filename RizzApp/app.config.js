@@ -71,7 +71,6 @@ module.exports = {
             "deploymentTarget": "15.1"
           },
           "android": {
-            "kotlinVersion": "2.0.21",
             "compileSdkVersion": 35,
             "targetSdkVersion": 35,
             "buildToolsVersion": "35.0.0",
