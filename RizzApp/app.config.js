@@ -1,6 +1,6 @@
 module.exports = {
   expo: {
-    name: 'RizzApp',
+    name: 'Rizz',
     slug: 'RizzApp',
     version: '1.0.0',
     orientation: 'portrait',
