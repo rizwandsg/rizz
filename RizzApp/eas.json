@@ -22,11 +22,13 @@
     },
     "production": {
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "gradleCommand": ":app:assembleRelease"
       },
       "env": {
         "EXPO_USE_FAST_RESOLVER": "1"
-      }
+      },
+      "resourceClass": "medium"
     }
   },
   "submit": {
