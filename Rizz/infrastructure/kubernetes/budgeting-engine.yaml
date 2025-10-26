@@ -1,0 +1,289 @@
+# Kubernetes Deployment Configuration - Budgeting Engine
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: budgeting-engine
+  namespace: riz-travel
+  labels:
+    app: budgeting-engine
+    tier: backend
+    version: v1
+spec:
+  replicas: 5
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: budgeting-engine
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 2
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: budgeting-engine
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8004"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: budgeting-engine-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      containers:
+      - name: budgeting-engine
+        image: gcr.io/riz-travel/budgeting-engine:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8004
+          protocol: TCP
+        env:
+        - name: ENVIRONMENT
+          value: "production"
+        - name: PORT
+          value: "8004"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: postgres-credentials
+              key: budget-db-url
+        - name: DATABASE_POOL_SIZE
+          value: "30"
+        - name: DATABASE_POOL_RECYCLE
+          value: "3600"
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: redis-config
+              key: url
+        - name: REDIS_CACHE_TTL
+          value: "900"  # 15 minutes
+        - name: TRIP_SERVICE_URL
+          value: "http://trip-service.riz-travel.svc.cluster.local"
+        - name: AUTH_SERVICE_URL
+          value: "http://auth-service.riz-travel.svc.cluster.local"
+        - name: LOG_LEVEL
+          value: "info"
+        - name: JAEGER_AGENT_HOST
+          value: "jaeger-agent.monitoring.svc.cluster.local"
+        - name: JAEGER_AGENT_PORT
+          value: "6831"
+        - name: WORKERS
+          value: "4"
+        - name: WORKER_CLASS
+          value: "uvicorn.workers.UvicornWorker"
+        - name: MAX_REQUESTS
+          value: "10000"
+        - name: MAX_REQUESTS_JITTER
+          value: "1000"
+        - name: GRACEFUL_TIMEOUT
+          value: "30"
+        - name: DEFAULT_CONTINGENCY_FRACTION
+          value: "0.10"  # 10%
+        - name: MAX_COMPUTE_TIMEOUT_SECONDS
+          value: "10"
+        - name: ENABLE_SCENARIO_GENERATION
+          value: "true"
+        resources:
+          requests:
+            cpu: 500m
+            memory: 512Mi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: http
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        lifecycle:
+          preStop:
+            exec:
+              command: ["/bin/sh", "-c", "sleep 20"]
+        volumeMounts:
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: config
+        configMap:
+          name: budgeting-engine-config
+      - name: tmp
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - budgeting-engine
+              topologyKey: kubernetes.io/hostname
+      topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: topology.kubernetes.io/zone
+        whenUnsatisfiable: DoNotSchedule
+        labelSelector:
+          matchLabels:
+            app: budgeting-engine
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: budgeting-engine
+  namespace: riz-travel
+  labels:
+    app: budgeting-engine
+spec:
+  type: ClusterIP
+  sessionAffinity: None
+  ports:
+  - name: http
+    port: 80
+    targetPort: http
+    protocol: TCP
+  selector:
+    app: budgeting-engine
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: budgeting-engine-hpa
+  namespace: riz-travel
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: budgeting-engine
+  minReplicas: 5
+  maxReplicas: 50
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 75
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 85
+  - type: Pods
+    pods:
+      metric:
+        name: budget_compute_duration_seconds
+      target:
+        type: AverageValue
+        averageValue: "2"
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+      - type: Pods
+        value: 3
+        periodSeconds: 60
+      selectPolicy: Min
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 30
+      - type: Pods
+        value: 10
+        periodSeconds: 30
+      selectPolicy: Max
+
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: budgeting-engine-sa
+  namespace: riz-travel
+  annotations:
+    iam.gke.io/gcp-service-account: budgeting-engine@riz-travel.iam.gserviceaccount.com
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: budgeting-engine-pdb
+  namespace: riz-travel
+spec:
+  minAvailable: 4
+  selector:
+    matchLabels:
+      app: budgeting-engine
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: budgeting-engine-config
+  namespace: riz-travel
+data:
+  config.yaml: |
+    categories:
+      - name: accommodation
+        recurring: per_night
+        multiplier_type: lodging
+      - name: food
+        recurring: per_day
+        multiplier_type: dining
+      - name: local_transport
+        recurring: per_day
+        multiplier_type: transport
+      - name: activities
+        recurring: per_day
+        multiplier_type: entertainment
+      - name: intercity_transport
+        recurring: once
+        multiplier_type: transport
+      - name: miscellaneous
+        recurring: per_day
+        multiplier_type: general
+    
+    budget_levels:
+      economy:
+        multiplier: 1.0
+      standard:
+        multiplier: 1.5
+      premium:
+        multiplier: 2.5
+      luxury:
+        multiplier: 4.0
+    
+    tax_rates:
+      default: 0.08
+      EU: 0.20
+      US: 0.085
+      ASIA: 0.07
