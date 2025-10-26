@@ -61,14 +61,15 @@ module.exports = {
         "expo-notifications",
         {
           "icon": "./assets/icon.png",
-          "color": "#667eea"
+          "color": "#667eea",
+          "sounds": ["./assets/notification.wav"]
         }
       ],
       [
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "13.0"
           },
           "android": {
             "kotlinVersion": "2.0.21",

@@ -14,11 +14,11 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
+    checkNotificationPermissions,
+    forceEnableNotifications,
     NotificationType,
     registerForPushNotificationsAsync,
     sendAppNotification,
-    forceEnableNotifications,
-    checkNotificationPermissions,
     testNotificationSystem
 } from '../services/notificationService';
 
