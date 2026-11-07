@@ -19,6 +19,8 @@ export function AuthProvider({ children }: { children?: React.ReactNode }) {
     let cancelled = false;
     const request = ++sequence.current;
     refreshing.current = false;
+    // Revoke the previous external session's visible state before async synchronization.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus({ loading: true, error: null, sessionKey: null });
     setAccessTokenProvider(isLoaded && isSignedIn ? () => getToken() : null);
     async function sync() {

@@ -33,11 +33,6 @@ export default function NotificationsScreen() {
     const [saving, setSaving] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        loadSettings();
-        initializeNotifications();
-    }, []);
-
     const initializeNotifications = async () => {
         try {
             await registerForPushNotificationsAsync();
@@ -57,6 +52,13 @@ export default function NotificationsScreen() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // Hydrate preferences from asynchronous device storage after mounting.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        loadSettings();
+        initializeNotifications();
+    }, []);
 
     const toggleSetting = async (key: keyof typeof settings) => {
         if (savingRef.current || loading || ['emailNotifications', 'paymentReminders', 'weeklyReports'].includes(key)) return;

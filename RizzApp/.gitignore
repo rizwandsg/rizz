@@ -34,6 +34,7 @@ yarn-error.*
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # typescript
 *.tsbuildinfo
@@ -47,3 +48,5 @@ app-example
 # Local verification artifacts
 coverage/
 test-results/
+supabase/.temp/
+credentials.json

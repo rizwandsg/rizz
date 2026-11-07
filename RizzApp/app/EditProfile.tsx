@@ -29,10 +29,6 @@ export default function EditProfileScreen() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    useEffect(() => {
-        loadUserData();
-    }, []);
-
     const loadUserData = async () => {
         try {
             setLoading(true);
@@ -51,6 +47,12 @@ export default function EditProfileScreen() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        // Synchronize the editable form with the authenticated backend profile.
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        loadUserData();
+    }, []);
 
     const handleSave = async () => {
         if (savingRef.current || !user) return;

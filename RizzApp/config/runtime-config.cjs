@@ -27,4 +27,16 @@ function validateEnvironment(env, release = false) {
   }
   return { appEnv, supabaseUrl: url, supabaseKey: key };
 }
-module.exports = { validateEnvironment };
+
+function configEnvironment(env) {
+  // EAS reads the project ID before fetching its remote environment. Permit
+  // metadata discovery with no runtime keys; Metro and release checks still
+  // require the complete configuration before producing an application bundle.
+  if (['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_KEY', 'EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY'].some(name => env[name])) {
+    return validateEnvironment(env, ['preview', 'production'].includes(env.EAS_BUILD_PROFILE));
+  }
+  const appEnv = env.EXPO_PUBLIC_APP_ENV || 'development';
+  if (!['development', 'staging', 'production'].includes(appEnv)) throw new Error('APP_ENV must be development, staging, or production');
+  return { appEnv };
+}
+module.exports = { validateEnvironment, configEnvironment };

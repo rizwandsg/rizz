@@ -1,6 +1,6 @@
 # Role and screen simulation — 7 November 2026
 
-**257 tests passed in 21 test files; zero failures or skipped tests.** All 28 screen routes and three navigators are included. This is local simulation evidence, not approval to deploy or a guarantee against every possible failure.
+**262 tests passed in 22 test files; zero failures or skipped tests.** All 28 screen routes and three navigators are included. This is local simulation evidence, not approval to deploy or a guarantee against every possible failure.
 
 Run from `RizzApp`:
 
@@ -12,7 +12,7 @@ npm run bundle:check -- ios
 
 The simulation creates disposable fixture data only. It does not sign in to Clerk, contact the hosted database, deploy migrations, or modify customer records. Results are saved in `test-results/simulation.json`; `simulation-manifest.json` records the run time, Node version and SHA-256 of source/test/configuration files. These generated files are ignored by Git.
 
-Final verification also passed: TypeScript, lint errors, secret checks, Git whitespace checks, and both Android and iOS Hermes bundle exports. Bundle logs are retained in `test-results/android-bundle.log` and `test-results/ios-bundle.log`. No signed native build was produced.
+Final verification also passed: TypeScript, lint errors, secret checks, Git whitespace checks, Expo Doctor (20/20), and both Android and iOS Hermes bundle exports. Bundle logs are retained in `test-results/dependency-review/sdk58-android.log` and `test-results/dependency-review/sdk58-ios.log`. No signed native build was produced.
 
 ## What was exercised
 
@@ -62,6 +62,14 @@ All rows below passed within the simulation boundaries above. Owners and members
 
 Financial form tests also passed in `America/Los_Angeles` to catch date-only timezone shifts. A route inventory test fails when a new route has no simulation import; it does not replace behavioral assertions for new features.
 
+## SDK and release setup verification
+
+The app now uses Expo SDK 58, React Native 0.88.1, React 19.3, and TypeScript 6. The SDK 55, 56, and 57 stages each passed TypeScript and the regression suite before advancing. The final SDK 58 run passed 262 tests and both platform bundles. The release audit passes with five moderate tooling findings and no high/critical findings.
+
+New production-configuration tests verify that development `.env` values are never used as a production fallback, public production settings override inherited development values, server keys cannot enter the upload file, and placeholder/test keys are rejected. EAS metadata discovery works without runtime keys; Metro and release checks still reject incomplete application configuration.
+
+Native configuration generation is checked separately in Linux CI with synthetic public settings. A local Windows prebuild stalled in Expo's Android package-refactoring plugin: its backslash-based glob timed out while the same forward-slash path returned immediately. The cloud build uses Linux for Android and macOS for iOS. This configuration check does not compile or sign either application. The upgraded iOS minimum is 16.4.
+
 ## Defects corrected during this pass
 
 - Returning to lists/details after edits left stale data; load failures could look like empty/zero balances.
@@ -78,7 +86,7 @@ Financial form tests also passed in `America/Los_Angeles` to catch date-only tim
 
 ## Acceptance still required
 
-No browser runtime or Android device was connected. Native UI layout, keyboard/date picker behavior, true Expo navigation, signed APK/AAB/iOS builds, real email/MFA policies, PDF appearance/sharing, push delivery and simultaneous hosted payment connections remain unverified. Existing high-severity dependency findings and migration/credential/account-mapping prerequisites remain in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
+No browser runtime or Android device was connected. Native UI layout, keyboard/date picker behavior, true Expo navigation, signed APK/AAB/iOS builds, real email/MFA policies, PDF appearance/sharing, push delivery and simultaneous hosted payment connections remain unverified. The audit now has zero high/critical findings and five moderate tooling findings. Migration/credential/account-mapping prerequisites remain in [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md).
 
 Hosted Realtime publication settings require a separate check. The prepared `supabase/preflight.sql` rejects private-table DELETE publication in `supabase_realtime`; its failure/success behavior is tested. Custom publications also require review. Supabase documents that DELETE events do not enforce RLS, so the client removing DELETE handlers is insufficient by itself. [Supabase Realtime documentation](https://supabase.com/docs/guides/realtime/postgres-changes#receiving-old-records).
 

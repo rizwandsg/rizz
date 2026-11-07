@@ -69,10 +69,6 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [theme, setThemeState] = useState<Theme>(THEMES.purple);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadTheme();
-  }, []);
-
   const loadTheme = async () => {
     try {
       const savedThemeId = await AsyncStorage.getItem(THEME_STORAGE_KEY);
@@ -89,6 +85,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       setIsLoading(false);
     }
   };
+
+  useEffect(() => {
+    // Hydrate the saved theme from asynchronous device storage after mounting.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadTheme();
+  }, []);
 
   const setTheme = async (themeId: ThemeId) => {
     try {

@@ -1,8 +1,9 @@
-const { validateEnvironment } = require('./config/runtime-config.cjs');
-const runtime = validateEnvironment(process.env, ['preview', 'production'].includes(process.env.EAS_BUILD_PROFILE));
+const { configEnvironment } = require('./config/runtime-config.cjs');
+const runtime = configEnvironment(process.env);
 const suffix = runtime.appEnv === 'production' ? '' : `.${runtime.appEnv}`;
 module.exports = {
   expo: {
+    owner: 'rizwan-portfolio-07',
     name: runtime.appEnv === 'production' ? 'Rizz' : `Rizz (${runtime.appEnv})`,
     slug: 'RizzApp',
     version: '1.0.0',
@@ -36,11 +37,12 @@ module.exports = {
       ]
     },
     web: {
+      output: 'single',
       favicon: './assets/favicon.png'
     },
     extra: {
       eas: {
-        projectId: 'c50bdb29-edbf-4aa1-9ff2-505cb7567378'
+        projectId: '70871b7d-8e41-4657-901c-9c10f01e259e'
       },
       router: {
         origin: false,
@@ -70,7 +72,7 @@ module.exports = {
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "16.4"
           },
           "android": {
             "minSdkVersion": 24

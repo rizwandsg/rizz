@@ -1,5 +1,5 @@
 import { useRequestGuard } from '../hooks/useRequestGuard';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { PieChart } from 'react-native-chart-kit';
 import { budgetDistribution } from '../services/budgetDistribution';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -46,11 +46,6 @@ export default function ProjectAnalytics() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>([]);
 
-  useFocusEffect(useCallback(() => {
-    void loadAnalytics();
-    return cancelRequest;
-  }, [id, cancelRequest]));
-
   const loadAnalytics = async () => {
     const isCurrent = startRequest();
     try {
@@ -86,6 +81,11 @@ export default function ProjectAnalytics() {
     const categories = budgetDistribution(expensesData, paymentData?.project_cost || 0).map(row => ({ ...row, color: getCategoryColor(row.name), icon: getCategoryIcon(row.name) }));
     setBudgetCategories(categories);
   };
+
+  useFocusEffect(useCallback(() => {
+    void loadAnalytics();
+    return cancelRequest;
+  }, [id, cancelRequest]));
 
   const handleDownloadProjectCost = async () => {
     if (!project || !paymentSummary) return;

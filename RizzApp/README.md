@@ -1,6 +1,6 @@
 # Rizz — project expenses and payments
 
-Expo SDK 54 / React Native app with Clerk authentication and Supabase workspace data. The deployable application is this directory. `myClerkApp` is a separate starter example and is excluded from the application's checks.
+Expo SDK 58 / React Native 0.88 app with Clerk authentication and Supabase workspace data. The deployable application is this directory. `myClerkApp` is a separate starter example and is excluded from the application's checks.
 
 ## Test before applying anything
 
@@ -17,7 +17,7 @@ These checks run TypeScript, lint errors, regression tests, secret checks, and A
 
 `npm run simulate` executes the complete automated suite, including all 28 screen routes and three navigators, actual authentication-provider lifecycle tests, and two-workspace SQL permission/workflow tests. It writes `test-results/simulation.json` and `test-results/simulation-manifest.json` with results, timestamp, and source checksum. Native controls, Clerk, and API responses are mocked in screen tests; SQL policy tests execute the actual migration in PGlite. See [SIMULATION_REPORT.md](SIMULATION_REPORT.md) for coverage and limits. These are executable simulations, not a device or hosted-backend acceptance certificate.
 
-For continuous regression tests, run `npm run test:watch`. For the Edge Function, install Deno 2 and run `deno check supabase/functions/account/index.ts`. GitHub Actions repeats these checks; the production dependency audit currently blocks release. See [the review and acceptance matrix](PRODUCTION_READINESS.md) for current blockers and test limits.
+For continuous regression tests, run `npm run test:watch`. For the Edge Function, install Deno 2 and run `deno check supabase/functions/account/index.ts`. GitHub Actions repeats these checks. The production dependency audit now passes its high-severity gate; five moderate tooling findings remain. See [the review and acceptance matrix](PRODUCTION_READINESS.md) for current blockers and test limits.
 
 ## Create a staging backend
 
@@ -53,7 +53,7 @@ Configure the EAS `preview` environment with the staging public settings, `EXPO_
 npx eas-cli build --platform android --profile preview
 ```
 
-The result is an internal APK named `Rizz (staging)` with a separate package ID. No build or deployment is triggered by the verification commands. Preview builds run automated checks and a read-only backend contract check. Production additionally runs `npm run audit:release`; it is currently blocked by unresolved dependency advisories. Production uses store distribution and an Android App Bundle.
+The result is an internal APK named `Rizz (staging)` with a separate package ID. No build or deployment is triggered by the verification commands. Preview builds run automated checks and a read-only backend contract check. Production additionally runs `npm run audit:release`, which now passes with zero high/critical findings and five moderate tooling findings. Production uses store distribution and an Android App Bundle.
 
 After installing the preview on a staging device, run the prepared Maestro smoke flow with staging-only credentials and a unique project name:
 
@@ -62,6 +62,10 @@ maestro test -e TEST_OWNER_EMAIL=$env:TEST_OWNER_EMAIL -e TEST_OWNER_PASSWORD=$e
 ```
 
 The flow creates a project in staging. Complete the two-owner/member acceptance matrix before release; a successful bundle export is not a native device acceptance result.
+
+## Production build
+
+The app is linked to [@rizwan-portfolio-07/RizzApp](https://expo.dev/accounts/rizwan-portfolio-07/projects/RizzApp). Complete [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md), including live Clerk settings, the migrated Supabase backend, and signing. Run `npm run production:check`, then `npm run build:production:android` or `npm run build:production:ios`. These commands run local checks before requesting a cloud build. Production uses a separate `.env.production.local`; the existing `.env` is development-only.
 
 ## Data and permission rules
 

@@ -21,6 +21,31 @@ jobs:
       - run: npm run verify
       - run: npm run bundle:check -- ios
       - run: npm run audit:release
+  native-config:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: RizzApp
+    env:
+      CI: '1'
+      EXPO_NO_DOTENV: '1'
+      EAS_BUILD_PROFILE: production
+      EXPO_PUBLIC_APP_ENV: production
+      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsuZXhhbXBsZS5jb20k
+      EXPO_PUBLIC_SUPABASE_URL: https://native-check.example.com
+      EXPO_PUBLIC_SUPABASE_KEY: sb_publishable_native_check
+      EXPO_PUBLIC_PRODUCTION_SUPABASE_URL: https://native-check.example.com
+      EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '2'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.20.0'
+          cache: npm
+          cache-dependency-path: RizzApp/package-lock.json
+      - run: npm ci
+      # Generate native configuration with fixtures; do not build, sign, or deploy.
+      - run: npx expo prebuild --platform all --no-install
   edge-types:
     runs-on: ubuntu-latest
     steps:

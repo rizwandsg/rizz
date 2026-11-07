@@ -1,5 +1,5 @@
 import { useRequestGuard } from '../hooks/useRequestGuard';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { LoadFailure } from '../components/LoadFailure';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";

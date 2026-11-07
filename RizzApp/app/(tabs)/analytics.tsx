@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { LoadFailure } from '../../components/LoadFailure';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -65,8 +65,6 @@ function AnalyticsRoute() {
 
   console.log('📊 Analytics rendering with theme:', theme.name);
 
-  useFocusEffect(useCallback(() => { void onRefresh(); }, []));
-
   const onRefresh = async () => {
     setRefreshing(true);
     setLoading(true);
@@ -120,6 +118,8 @@ function AnalyticsRoute() {
       setLoading(false);
     }
   };
+
+  useFocusEffect(useCallback(() => { void onRefresh(); }, []));
 
   if (loading) {
     return (

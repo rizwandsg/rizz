@@ -41,6 +41,8 @@ function Draft({kind}: {kind: string}) {
   return React.createElement('input', {name:kind,value:draft,onChange:(value:string)=>setDraft(value)});
 }
 function GuardedContent() {
+  // Record every render so the test detects even transient cross-session disclosure.
+  // eslint-disable-next-line react-hooks/globals
   observed = useAccount();
   const access = routeAccess(!!observed.user, observed.loading, !!observed.error);
   observations.push({session:state.sessionId,profile:observed.user?.id || null,private:access.private});

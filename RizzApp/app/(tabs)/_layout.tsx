@@ -7,6 +7,8 @@ import { useAccount } from '../../context/AuthContext';
 import { registerForPushNotificationsAsync } from "../../services/notificationService";
 import { subscribeToAll, unsubscribeFromAll, WebSocketCallbacks } from "../../services/websocketService";
 
+const tabColors = { active: '#007AFF', inactive: '#8E8E93' };
+
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
   const { user: currentUser } = useAccount();
@@ -47,8 +49,8 @@ export default function TabsLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#007AFF",
-        tabBarInactiveTintColor: "#8E8E93",
+        tabBarActiveTintColor: tabColors.active,
+        tabBarInactiveTintColor: tabColors.inactive,
         tabBarStyle: { 
           backgroundColor: "#fff", 
           borderTopWidth: 1,
@@ -64,7 +66,7 @@ export default function TabsLayout() {
         name="home"
         options={{
           title: "Projects",
-          tabBarIcon: ({ color, size }) => <Ionicons name="briefcase" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <Ionicons name="briefcase" size={size} color={focused ? tabColors.active : tabColors.inactive} />,
           headerShown: false,
         }}
       />
@@ -72,7 +74,7 @@ export default function TabsLayout() {
         name="expense"
         options={{
           title: "Expenses",
-          tabBarIcon: ({ color, size }) => <Ionicons name="cash" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <Ionicons name="cash" size={size} color={focused ? tabColors.active : tabColors.inactive} />,
           headerShown: false,
         }}
       />
@@ -80,7 +82,7 @@ export default function TabsLayout() {
         name="analytics"
         options={{
           title: "Analytics",
-          tabBarIcon: ({ color, size }) => <Ionicons name="bar-chart" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <Ionicons name="bar-chart" size={size} color={focused ? tabColors.active : tabColors.inactive} />,
           headerShown: false,
         }}
       />
@@ -89,7 +91,7 @@ export default function TabsLayout() {
         name="users"
         options={{
           title: "Users",
-          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <MaterialCommunityIcons name="account-group" size={size} color={focused ? tabColors.active : tabColors.inactive} />,
           headerShown: false,
         }}
       />
@@ -98,7 +100,7 @@ export default function TabsLayout() {
         name="profile"
         options={{
           title: "Profile",
-          tabBarIcon: ({ color, size }) => <Ionicons name="person" size={size} color={color} />,
+          tabBarIcon: ({ focused, size }) => <Ionicons name="person" size={size} color={focused ? tabColors.active : tabColors.inactive} />,
           headerShown: false,
         }}
       />

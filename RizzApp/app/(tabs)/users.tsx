@@ -3,7 +3,7 @@ import { useAccount } from '../../context/AuthContext';
 import { LoadFailure } from '../../components/LoadFailure';
 import { canManageMembers } from '../../services/routePolicy';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useCallback, useRef, useState } from 'react';
 import {

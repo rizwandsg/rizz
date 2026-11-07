@@ -50,16 +50,12 @@ vi.mock('react-native-chart-kit', () => ({ LineChart: 'LineChart', PieChart: 'Pi
 vi.mock('react-native-safe-area-context', () => ({ useSafeAreaInsets: () => ({top: 0, bottom: 0, left: 0, right: 0}), SafeAreaView: 'SafeAreaView', SafeAreaProvider: 'SafeAreaProvider' }));
 vi.mock('expo-crypto', () => ({ randomUUID: () => '90000000-0000-4000-8000-000000000001' }));
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: sim.storage }));
-vi.mock('@react-navigation/native', async () => {
-  const R = await import('react');
-  return { useNavigation: () => sim.navigation, useFocusEffect: (callback: () => any) => R.useEffect(() => sim.focused ? callback() : undefined, [callback, sim.focused, sim.focusVersion]) };
-});
 vi.mock('expo-router', async () => {
   const R = await import('react');
   const Navigator = ({children}: any) => R.createElement('Navigator', {}, children);
   Navigator.Screen = (props: any) => R.createElement('Route', props);
   Navigator.Protected = function Protected({guard, children}: any) { return guard ? children : null; };
-  return { router: sim.router, useRouter: () => sim.router, useNavigation: () => sim.navigation, useLocalSearchParams: () => sim.params, Stack: Navigator, Tabs: Navigator, Link: 'Link', Redirect: ({href}: any) => { R.useEffect(() => {sim.router.replace(href);}, [href]); return R.createElement('Redirect', {href}); } };
+  return { router: sim.router, useRouter: () => sim.router, useNavigation: () => sim.navigation, useFocusEffect: (callback: () => any) => R.useEffect(() => sim.focused ? callback() : undefined, [callback, sim.focused, sim.focusVersion]), useLocalSearchParams: () => sim.params, Stack: Navigator, Tabs: Navigator, Link: 'Link', Redirect: ({href}: any) => { R.useEffect(() => {sim.router.replace(href);}, [href]); return R.createElement('Redirect', {href}); } };
 });
 vi.mock('@clerk/clerk-expo', () => ({
   useSignIn: () => ({isLoaded: true, signIn: sim.signIn, setActive: sim.setActive}),

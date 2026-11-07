@@ -1,6 +1,6 @@
 # Production readiness review — 7 November 2026
 
-The changes are prepared locally for staging. No hosted database, Clerk account, app-store release, or deployment was modified. This is not a production acceptance certificate.
+The source is prepared for staging and production setup. A new EAS project was created and linked under `rizwan-portfolio-07`; no hosted database, Clerk account, or app-store release was modified. This is not a production acceptance certificate. See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md).
 
 ## Findings and implemented changes
 
@@ -19,7 +19,7 @@ The changes are prepared locally for staging. No hosted database, Clerk account,
 
 ## Local results
 
-The latest simulation run passed 257 tests in 21 test files. TypeScript, lint errors, and secret checks passed. Android/iOS Hermes exports and the Deno Edge Function type check passed in the original review; see [SIMULATION_REPORT.md](SIMULATION_REPORT.md) for the latest post-simulation build results. The production dependency audit previously failed with 4 high, 18 moderate, and 1 low findings. This audit failure is retained as a release gate; this simulation pass did not upgrade those dependencies.
+The latest simulation run passed 262 tests in 22 test files. TypeScript, lint errors, secret checks, Android/iOS Hermes exports, and Expo Doctor (20/20) passed. The unchanged Deno Edge Function also passed GitHub CI. Expo was upgraded incrementally from SDK 54 through SDK 58 with regression tests at each stage. The production dependency audit now passes its configured gate: zero critical/high and five moderate findings remain in the Expo CLI/fingerprint glob/minimatch chain. See [SIMULATION_REPORT.md](SIMULATION_REPORT.md) for the limits of these checks.
 
 Run `npm run verify` for the current result; tests do not use your `.env` or contact a backend. Android/iOS bundle checks use fake public configuration and produce verification artifacts, not usable signed app releases. Deno checks the deployable Edge Function separately.
 
@@ -27,7 +27,7 @@ Automated coverage includes every screen route, new-database setup, migration of
 
 ## Release blockers
 
-1. `npm run audit:release` currently fails with four high-severity findings: `image-size` and `decode-uri-component`, with the latter also reported through `query-string` and `expo-router`. Compatible dependency updates removed critical findings and fixed several high findings. Remaining fixes cross dependency API/SDK boundaries; major overrides were not forced. Review an Expo/Metro/Router upgrade and rerun all checks. The production EAS hook intentionally blocks on this audit. Moderate/low findings also remain and need review.
+1. Review the five remaining moderate Expo tooling findings (`glob`/`minimatch` and their dependents). The former high-severity findings were removed by the SDK 58 upgrade; `npm run audit:release` now passes. Do not force npm's suggested downgrade to Expo 52. Native and hosted acceptance are still required.
 2. The actual hosted schema was not accessible for inspection. Rehearse the migration on a sanitized clone and review `supabase/preflight.sql` results. Existing views, custom triggers, grants, constraints, receipt duplicates, and payment-status data may differ from the checked-in snapshot.
 3. Existing team accounts authenticated by the old local password hash must be provisioned in Clerk and mapped to the same `public.users.id`. Do not automatically link by email or generate new owner records. Real deliverable email addresses are required for password recovery; former synthetic `@rizz.com` accounts need reviewed address changes. Reconcile unmapped, duplicate, orphaned, inactive, or invalid-role records before rollout.
 4. Rotate any real secret previously committed in `.env`, including the Clerk secret setting. Untracking does not remove Git history or revoke credentials. The new account function needs `CLERK_SECRET_KEY` in server-side Supabase secrets only.

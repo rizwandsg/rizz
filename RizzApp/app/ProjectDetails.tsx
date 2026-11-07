@@ -3,7 +3,7 @@ import { LoadFailure } from '../components/LoadFailure';
 import { getCustomerPaymentsByProject } from '../api/customerPaymentsApi';
 import { receiptRows, ReceiptRow } from '../services/screenData';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useFocusEffect, useNavigation } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -109,6 +109,10 @@ export default function ProjectDetails() {
   }, [router, id]);
 
   const handleDelete = useCallback(() => {
+    if (typeof id !== 'string' || !id) {
+      Alert.alert('Error', 'No valid project ID provided');
+      return;
+    }
     Alert.alert(
       "Delete Project",
       "Are you sure you want to delete this project?",
@@ -120,7 +124,7 @@ export default function ProjectDetails() {
           onPress: async () => {
             try {
               setDeleting(true);
-              await deleteProject(id.toString());
+              await deleteProject(id);
               Alert.alert("Success", "Project deleted", [
                 { text: "OK", onPress: () => router.back() },
               ]);

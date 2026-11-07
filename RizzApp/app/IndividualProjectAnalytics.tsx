@@ -1,5 +1,5 @@
 import { useRequestGuard } from '../hooks/useRequestGuard';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
@@ -54,17 +54,6 @@ export default function IndividualProjectAnalytics() {
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  useFocusEffect(useCallback(() => {
-    if (id) {
-      loadProjectAnalytics();
-    } else {
-      setError('No project ID provided');
-      setLoading(false);
-    }
-    return cancelRequest;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, cancelRequest]));
-
   const loadProjectAnalytics = async () => {
     const isCurrent = startRequest();
     try {
@@ -102,6 +91,17 @@ export default function IndividualProjectAnalytics() {
       if (isCurrent()) setLoading(false);
     }
   };
+
+  useFocusEffect(useCallback(() => {
+    if (id) {
+      loadProjectAnalytics();
+    } else {
+      setError('No project ID provided');
+      setLoading(false);
+    }
+    return cancelRequest;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, cancelRequest]));
 
   const onRefresh = async () => {
     setRefreshing(true);

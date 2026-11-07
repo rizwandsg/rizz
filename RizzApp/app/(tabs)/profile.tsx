@@ -1,4 +1,4 @@
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect } from 'expo-router';
 import { LoadFailure } from '../../components/LoadFailure';
 import { useAuth } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -34,8 +34,6 @@ export default function ProfileScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useFocusEffect(useCallback(() => { void loadData(); }, []));
-
   const loadData = async () => {
     try {
       setLoading(true);
@@ -64,6 +62,8 @@ export default function ProfileScreen() {
       setLoading(false);
     }
   };
+
+  useFocusEffect(useCallback(() => { void loadData(); }, []));
 
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
