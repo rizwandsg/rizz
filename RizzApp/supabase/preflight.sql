@@ -11,6 +11,21 @@ SELECT tablename,policyname,roles,cmd,qual,with_check FROM pg_policies WHERE sch
 SELECT table_name,column_name,data_type FROM information_schema.columns
 WHERE table_schema='public' ORDER BY table_name,ordinal_position;
 
+-- Identity migration must preserve the existing users.id/workspace ownership.
+-- These are counts only; do not export account addresses or legacy hashes.
+SELECT 'accounts_missing_clerk_identity' issue,count(*) FROM public.users u
+WHERE nullif(trim(to_jsonb(u)->>'clerk_user_id'),'') IS NULL
+UNION ALL SELECT 'placeholder_email_accounts',count(*) FROM public.users WHERE lower(email) LIKE '%@rizz.com'
+UNION ALL SELECT 'payments_without_existing_creator',count(*) FROM public.payments p
+WHERE NOT EXISTS (SELECT 1 FROM public.users u WHERE u.id=p.user_id);
+
+-- Policies do not protect a table while RLS is disabled. Existing reports also
+-- need caller permissions; the migration follows their recursive dependencies.
+SELECT c.relname AS relation,c.relkind AS kind,c.relrowsecurity AS rls_enabled,c.reloptions,
+       has_table_privilege('anon',c.oid,'SELECT') AS anonymous_select_grant
+FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace
+WHERE n.nspname='public' AND c.relkind IN ('r','v','m') ORDER BY c.relname;
+
 -- BEGIN REALTIME DELETE SAFETY CHECK
 -- Read-only: report every publication carrying private financial/account tables.
 -- Realtime DELETE events do not enforce row-level security. Removing an app

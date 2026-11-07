@@ -24,7 +24,9 @@ DO $$ BEGIN
 END $$;
 CREATE UNIQUE INDEX IF NOT EXISTS users_clerk_identity ON public.users(clerk_user_id) WHERE clerk_user_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS users_email_normalized ON public.users(lower(email));
-ALTER TABLE public.users ADD CONSTRAINT users_role_check CHECK ((role='owner' AND parent_user_id IS NULL) OR (role='member' AND parent_user_id IS NOT NULL AND parent_user_id <> id));
+-- The hosted legacy schema already has users_role_check for the role enum.
+-- Retain it and add the stronger relationship check under a distinct name.
+ALTER TABLE public.users ADD CONSTRAINT users_workspace_role_check CHECK ((role='owner' AND parent_user_id IS NULL) OR (role='member' AND parent_user_id IS NOT NULL AND parent_user_id <> id));
 
 CREATE TABLE IF NOT EXISTS public.projects (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid REFERENCES public.users(id) NOT NULL,
@@ -138,8 +140,45 @@ END $$;
 CREATE INDEX IF NOT EXISTS projects_user_lookup ON public.projects(user_id);
 CREATE INDEX IF NOT EXISTS users_parent_lookup ON public.users(parent_user_id);
 CREATE INDEX IF NOT EXISTS vendor_payments_expense_lookup ON public.vendor_payments(expense_id);
-DO $$ BEGIN
-  IF EXISTS (SELECT 1 FROM pg_constraint WHERE contype='f' AND confdeltype='c' AND conrelid IN ('public.projects'::regclass,'public.expenses'::regclass,'public.payments'::regclass,'public.customer_payments'::regclass,'public.vendor_payments'::regclass)) THEN
+-- Reviewed against the hosted schema: preserve the existing relationships and
+-- every row, but make parent deletion fail instead of deleting financial data.
+-- Also install links missing from legacy tables (notably payments.user_id).
+-- Do not rewrite an unexpected reference or an unreviewed cascading relation.
+DO $$
+DECLARE link record; fk record; child_oid oid; parent_oid oid;
+  child_att smallint; parent_att smallint; found_link boolean;
+BEGIN
+  FOR link IN SELECT * FROM (VALUES
+    ('users','parent_user_id','users'),
+    ('projects','user_id','users'),
+    ('expenses','project_id','projects'),('expenses','user_id','users'),
+    ('payments','project_id','projects'),('payments','user_id','users'),
+    ('customer_payments','project_id','projects'),('customer_payments','user_id','users'),
+    ('vendor_payments','expense_id','expenses'),('vendor_payments','project_id','projects'),('vendor_payments','user_id','users')
+  ) AS expected(child_table,child_column,parent_table) LOOP
+    child_oid := format('public.%I',link.child_table)::regclass;
+    parent_oid := format('public.%I',link.parent_table)::regclass;
+    SELECT attnum INTO STRICT child_att FROM pg_attribute WHERE attrelid=child_oid AND attname=link.child_column AND NOT attisdropped;
+    SELECT attnum INTO STRICT parent_att FROM pg_attribute WHERE attrelid=parent_oid AND attname='id' AND NOT attisdropped;
+    found_link := false;
+    FOR fk IN SELECT * FROM pg_constraint WHERE contype='f' AND conrelid=child_oid AND conkey=ARRAY[child_att] LOOP
+      IF fk.confrelid<>parent_oid OR fk.confkey<>ARRAY[parent_att] OR fk.confdeltype NOT IN ('a','r','c') THEN
+        RAISE EXCEPTION 'Review unexpected foreign key % on %.%',fk.conname,link.child_table,link.child_column;
+      END IF;
+      found_link := true;
+      IF fk.confdeltype='c' THEN
+        EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT %I, ADD CONSTRAINT %I %s',
+          link.child_table,fk.conname,fk.conname,replace(pg_get_constraintdef(fk.oid),'ON DELETE CASCADE','ON DELETE NO ACTION'));
+      END IF;
+      -- Validate retained NOT VALID links too; legacy orphans must stop rollout.
+      EXECUTE format('ALTER TABLE public.%I VALIDATE CONSTRAINT %I',link.child_table,fk.conname);
+    END LOOP;
+    IF NOT found_link THEN
+      EXECUTE format('ALTER TABLE public.%I ADD CONSTRAINT %I FOREIGN KEY (%I) REFERENCES public.%I(id)',
+        link.child_table,link.child_table||'_'||link.child_column||'_workspace_fkey',link.child_column,link.parent_table);
+    END IF;
+  END LOOP;
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE contype='f' AND confdeltype='c' AND conrelid IN ('public.users'::regclass,'public.projects'::regclass,'public.expenses'::regclass,'public.payments'::regclass,'public.customer_payments'::regclass,'public.vendor_payments'::regclass)) THEN
     RAISE EXCEPTION 'Review cascading financial foreign keys on a staging clone before continuing';
   END IF;
 END $$;
@@ -206,4 +245,34 @@ LEFT JOIN (SELECT project_id,sum(amount) total FROM public.expenses GROUP BY pro
 LEFT JOIN (SELECT project_id,sum(amount) total FROM public.vendor_payments GROUP BY project_id) v ON v.project_id=p.id;
 REVOKE ALL ON public.project_payment_summary,public.expense_payment_status FROM PUBLIC,anon;
 GRANT SELECT ON public.project_payment_summary,public.expense_payment_status TO authenticated,service_role;
+
+-- Legacy reports otherwise execute as their owner and bypass table RLS.
+-- Follow dependencies across schemas and through nested views. Preserve their
+-- definitions and existing authenticated grants while removing anonymous access.
+DO $$ DECLARE report record; col record; BEGIN
+  FOR report IN
+    WITH RECURSIVE dependent_relations(oid) AS (
+      SELECT unnest(ARRAY['public.users'::regclass::oid,'public.projects'::regclass::oid,'public.expenses'::regclass::oid,
+        'public.payments'::regclass::oid,'public.customer_payments'::regclass::oid,'public.vendor_payments'::regclass::oid])
+      UNION
+      SELECT rewrite.ev_class FROM pg_depend dependency
+      JOIN pg_rewrite rewrite ON rewrite.oid=dependency.objid
+      JOIN dependent_relations source ON source.oid=dependency.refobjid
+      WHERE dependency.classid='pg_rewrite'::regclass AND dependency.refclassid='pg_class'::regclass
+        AND rewrite.ev_class<>dependency.refobjid
+    )
+    SELECT c.oid,c.relkind,n.nspname,c.relname FROM dependent_relations d
+    JOIN pg_class c ON c.oid=d.oid JOIN pg_namespace n ON n.oid=c.relnamespace
+    WHERE c.relkind IN ('v','m')
+  LOOP
+    IF report.relkind='m' THEN
+      RAISE EXCEPTION 'Review materialized report %.% before enabling workspace access',report.nspname,report.relname;
+    END IF;
+    EXECUTE format('ALTER VIEW %I.%I SET (security_invoker=true)',report.nspname,report.relname);
+    EXECUTE format('REVOKE ALL ON %I.%I FROM PUBLIC,anon',report.nspname,report.relname);
+    FOR col IN SELECT attname FROM pg_attribute WHERE attrelid=report.oid AND attnum>0 AND NOT attisdropped LOOP
+      EXECUTE format('REVOKE ALL (%I) ON %I.%I FROM PUBLIC,anon',col.attname,report.nspname,report.relname);
+    END LOOP;
+  END LOOP;
+END $$;
 COMMIT;

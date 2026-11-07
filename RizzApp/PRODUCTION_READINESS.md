@@ -1,6 +1,6 @@
 # Production readiness review — 7 November 2026
 
-The source is prepared for staging and production setup. A new EAS project was created and linked under `rizwan-portfolio-07`; no hosted database, Clerk account, or app-store release was modified. This is not a production acceptance certificate. See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md).
+The source is prepared for staging and production setup. A new EAS project was created and linked under `rizwan-portfolio-07`. Supabase login, read-only hosted inspection, and a local application-snapshot restore/migration rehearsal are complete. No hosted application schema, account mappings, Edge Functions, or app-store release has been deployed. This is not a production acceptance certificate. See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md).
 
 ## Findings and implemented changes
 
@@ -19,7 +19,7 @@ The source is prepared for staging and production setup. A new EAS project was c
 
 ## Local results
 
-The latest simulation run passed 262 tests in 22 test files. TypeScript, lint errors, secret checks, Android/iOS Hermes exports, and Expo Doctor (20/20) passed. The unchanged Deno Edge Function also passed GitHub CI. Expo was upgraded incrementally from SDK 54 through SDK 58 with regression tests at each stage. The production dependency audit now passes its configured gate: zero critical/high and five moderate findings remain in the Expo CLI/fingerprint glob/minimatch chain. See [SIMULATION_REPORT.md](SIMULATION_REPORT.md) for the limits of these checks.
+The latest simulation run passed 269 tests in 23 test files, including seven regressions against a schema-only fixture from the hosted backend. TypeScript, lint errors, and secret checks passed. Android/iOS Hermes exports, Expo Doctor (20/20), and the unchanged Deno Edge Function passed the preceding SDK release checks. Expo was upgraded incrementally from SDK 54 through SDK 58 with regression tests at each stage. The production dependency audit passes its configured gate: zero critical/high and five moderate findings remain in the Expo CLI/fingerprint glob/minimatch chain. See [SIMULATION_REPORT.md](SIMULATION_REPORT.md) for the limits of these checks.
 
 Run `npm run verify` for the current result; tests do not use your `.env` or contact a backend. Android/iOS bundle checks use fake public configuration and produce verification artifacts, not usable signed app releases. Deno checks the deployable Edge Function separately.
 
@@ -28,7 +28,7 @@ Automated coverage includes every screen route, new-database setup, migration of
 ## Release blockers
 
 1. Review the five remaining moderate Expo tooling findings (`glob`/`minimatch` and their dependents). The former high-severity findings were removed by the SDK 58 upgrade; `npm run audit:release` now passes. Do not force npm's suggested downgrade to Expo 52. Native and hosted acceptance are still required.
-2. The actual hosted schema was not accessible for inspection. Rehearse the migration on a sanitized clone and review `supabase/preflight.sql` results. Existing views, custom triggers, grants, constraints, receipt duplicates, and payment-status data may differ from the checked-in snapshot.
+2. The hosted schema has now been inspected. A local application-table snapshot restored successfully; after sanitization, the revised migration preserved every stored record. This is not a complete Supabase backup or hosted staging rehearsal. Complete a hosted recovery procedure and staging acceptance, reconcile payment-status data, and rerun `supabase/preflight.sql` immediately before rollout. CLI commands needing direct database access currently fail during login-role initialization with a hosted role-permission error; read-only Management API inspection works.
 3. Existing team accounts authenticated by the old local password hash must be provisioned in Clerk and mapped to the same `public.users.id`. Do not automatically link by email or generate new owner records. Real deliverable email addresses are required for password recovery; former synthetic `@rizz.com` accounts need reviewed address changes. Reconcile unmapped, duplicate, orphaned, inactive, or invalid-role records before rollout.
 4. Rotate any real secret previously committed in `.env`, including the Clerk secret setting. Untracking does not remove Git history or revoke credentials. The new account function needs `CLERK_SECRET_KEY` in server-side Supabase secrets only.
 5. Configure Clerk third-party authentication on the staging Supabase project and deploy the account function there. The app deliberately blocks access when account synchronization fails.
@@ -63,7 +63,7 @@ The Maestro owner smoke flow in `.maestro/smoke.yaml` is prepared but has not ru
 
 Take a database backup and rehearse restoring it. Deploy to a new staging backend, run the automated and device checks, then review the exact migration and mapped identities against the production snapshot. Schedule a coordinated backend/client cutover: the old local-password client is incompatible with the new policies. Restrict access during identity migration and verify that both anonymous requests and old clients fail closed.
 
-The migration runs in one transaction and refuses invalid legacy financial records or cascading financial foreign keys. It retains legacy hashes under restricted grants for a separate reviewed disposal process. Views are recreated without `CASCADE`, so unexpected dependencies stop the transaction instead of being dropped. It is a one-time migration, not an idempotent script.
+The migration runs in one transaction and refuses invalid legacy financial records. It converts only reviewed account/financial relationships from cascading deletion to non-cascading deletion, validates retained links, and adds missing links; unexpected references and other cascading relationships stop rollout. It retains legacy hashes under restricted grants for a separate reviewed disposal process. The two canonical views are recreated without `CASCADE`, so unexpected dependencies stop the transaction instead of being dropped. Other dependent views retain their definitions and execute with the caller's permissions; dependent materialized views require separate review and stop the transaction. It is a one-time migration, not an idempotent script.
 
 For application regressions, stop distribution and fix forward using the secured backend. Do not restore permissive RLS or return to local password checking to make an old client work. A database restore requires the reviewed backup/maintenance procedure and must retain access restrictions. Record the tested revision, migration checksum, test results, staging account mappings, device results, and operator sign-off before production release.
 

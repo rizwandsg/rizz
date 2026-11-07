@@ -1,6 +1,6 @@
 # Role and screen simulation — 7 November 2026
 
-**262 tests passed in 22 test files; zero failures or skipped tests.** All 28 screen routes and three navigators are included. This is local simulation evidence, not approval to deploy or a guarantee against every possible failure.
+**269 tests passed in 23 test files; zero failures or skipped tests.** All 28 screen routes and three navigators are included. This is local simulation evidence, not approval to deploy or a guarantee against every possible failure.
 
 Run from `RizzApp`:
 
@@ -19,6 +19,8 @@ Final verification also passed: TypeScript, lint errors, secret checks, Git whit
 Screen simulations execute the actual React screen components, state, effects and action handlers. Native controls, routing adapters, Clerk and business API calls are mocked. Focus is simulated by re-entering the focus effect; screen dimensions and native layout are not measured. Separate tests mount the actual AuthProvider, retaining mocked Clerk/storage/token boundaries.
 
 Database simulations execute the checked-in migration in isolated PostgreSQL through PGlite. They set test identities and database roles explicitly; they verify SQL policies, grants, constraints and totals, but do not verify JWT signatures or the hosted Supabase gateway. Screen fixture visibility and SQL isolation are separate checks, not an end-to-end hosted test.
+
+Seven additional migration regressions use the actual hosted schema with synthetic records. They cover the existing role constraint, preservation of records and relationships, non-cascading deletion, the missing payment creator foreign key, anonymous denial (including column grants), all ten legacy report views, nested reports in another schema, and rollback for unknown cascades, materialized reports, and orphaned payment creators. Separately, an ignored local snapshot of the existing application tables was restored, sanitized, and migrated with every stored record unchanged. No hosted migration was executed, and this snapshot excludes Supabase Auth, Storage, secrets, and full cluster configuration.
 
 | Role/state | Verified behavior |
 | --- | --- |
