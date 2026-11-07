@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import {
-    Linking,
     ScrollView,
     StyleSheet,
     Text,
@@ -94,54 +93,18 @@ export default function AboutScreen() {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Legal</Text>
                     
-                    <TouchableOpacity style={styles.legalItem}>
+                    <View style={styles.legalItem}>
                         <Text style={styles.legalText}>Terms of Service</Text>
-                        <MaterialCommunityIcons name="chevron-right" size={20} color="#ccc" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.legalItem}>
-                        <Text style={styles.legalText}>Privacy Policy</Text>
-                        <MaterialCommunityIcons name="chevron-right" size={20} color="#ccc" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.legalItem}>
-                        <Text style={styles.legalText}>Licenses</Text>
-                        <MaterialCommunityIcons name="chevron-right" size={20} color="#ccc" />
-                    </TouchableOpacity>
-                </View>
-
-                {/* Social Links */}
-                <View style={styles.socialSection}>
-                    <Text style={styles.sectionTitle}>Connect With Us</Text>
-                    <View style={styles.socialButtons}>
-                        <TouchableOpacity 
-                            style={styles.socialButton}
-                            onPress={() => Linking.openURL('https://twitter.com')}
-                        >
-                            <MaterialCommunityIcons name="twitter" size={28} color="#1DA1F2" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.socialButton}
-                            onPress={() => Linking.openURL('https://facebook.com')}
-                        >
-                            <MaterialCommunityIcons name="facebook" size={28} color="#4267B2" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.socialButton}
-                            onPress={() => Linking.openURL('https://instagram.com')}
-                        >
-                            <MaterialCommunityIcons name="instagram" size={28} color="#E1306C" />
-                        </TouchableOpacity>
-
-                        <TouchableOpacity 
-                            style={styles.socialButton}
-                            onPress={() => Linking.openURL('https://linkedin.com')}
-                        >
-                            <MaterialCommunityIcons name="linkedin" size={28} color="#0077B5" />
-                        </TouchableOpacity>
                     </View>
+
+                    <View style={styles.legalItem}>
+                        <Text style={styles.legalText}>Privacy Policy</Text>
+                    </View>
+
+                    <View style={styles.legalItem}>
+                        <Text style={styles.legalText}>Licenses</Text>
+                    </View>
+                    <Text style={styles.description}>These documents have not been provided in the app. Ask your workspace owner for the applicable documents.</Text>
                 </View>
 
                 {/* Footer */}

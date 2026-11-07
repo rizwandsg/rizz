@@ -1,0 +1,40 @@
+appId: com.rizz.app.staging
+name: Staging owner login and project creation
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible:
+      id: auth-email
+    timeout: 30000
+- tapOn:
+    id: auth-email
+- inputText: ${TEST_OWNER_EMAIL}
+- tapOn:
+    id: auth-password
+- inputText: ${TEST_OWNER_PASSWORD}
+- hideKeyboard
+- tapOn:
+    id: auth-submit
+- extendedWaitUntil:
+    visible: Projects
+    timeout: 30000
+- openLink: com.rizz.app.staging://AddProject
+- tapOn:
+    id: project-name
+- inputText: ${TEST_PROJECT_NAME}
+- tapOn:
+    id: project-cost
+- inputText: '1000.50'
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: project-save
+    direction: DOWN
+- tapOn:
+    id: project-save
+- assertVisible: Project created successfully!
+- tapOn: OK
+- extendedWaitUntil:
+    visible: ${TEST_PROJECT_NAME}
+    timeout: 15000

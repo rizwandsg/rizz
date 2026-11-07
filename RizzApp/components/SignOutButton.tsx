@@ -1,25 +1,34 @@
+import { logout } from '../api/authApi';
 import { useClerk } from '@clerk/clerk-expo';
 import { useRouter } from 'expo-router';
-import { StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { useRef, useState } from 'react';
+import { Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 export const SignOutButton = () => {
   const { signOut } = useClerk();
   const router = useRouter();
+  const submitting = useRef(false);
+  const [loading, setLoading] = useState(false);
 
   const handleSignOut = async () => {
+    if (submitting.current) return;
+    submitting.current = true;
+    setLoading(true);
     try {
       await signOut();
+      await logout();
       // Redirect to login page
       router.replace('/(auth)/login');
-    } catch (err) {
-      // See https://clerk.com/docs/custom-flows/error-handling
-      // for more info on error handling
-      console.error('Sign out error:', JSON.stringify(err, null, 2));
+    } catch {
+      Alert.alert('Sign Out Failed', 'Unable to finish signing out. Check your connection and try again.');
+    } finally {
+      submitting.current = false;
+      setLoading(false);
     }
   };
 
   return (
-    <TouchableOpacity onPress={handleSignOut} style={styles.button}>
+    <TouchableOpacity onPress={handleSignOut} disabled={loading} style={styles.button}>
       <Text style={styles.text}>Sign Out</Text>
     </TouchableOpacity>
   );

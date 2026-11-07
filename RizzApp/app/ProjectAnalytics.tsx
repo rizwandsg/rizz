@@ -1,8 +1,14 @@
+import { useRequestGuard } from '../hooks/useRequestGuard';
+import { useFocusEffect } from '@react-navigation/native';
+import { PieChart } from 'react-native-chart-kit';
+import { budgetDistribution } from '../services/budgetDistribution';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Dimensions,
     ScrollView,
     StyleSheet,
@@ -14,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpensesByProject } from '../api/expensesApi';
 import { getPaymentSummary, PaymentSummary } from '../api/paymentsApi';
 import { getProjectById, Project } from '../api/projectsApi';
+import { downloadProjectCostData, ProjectCostSummary, generateAndSavePDF, generateAndSharePDF } from '../services/exportService';
 
 const { width } = Dimensions.get('window');
 
@@ -29,26 +36,34 @@ export default function ProjectAnalytics() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const { start: startRequest, cancel: cancelRequest } = useRequestGuard();
   
   const [project, setProject] = useState<Project | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   const [budgetCategories, setBudgetCategories] = useState<BudgetCategory[]>([]);
 
-  useEffect(() => {
-    loadAnalytics();
-  }, [id]);
+  useFocusEffect(useCallback(() => {
+    void loadAnalytics();
+    return cancelRequest;
+  }, [id, cancelRequest]));
 
   const loadAnalytics = async () => {
+    const isCurrent = startRequest();
     try {
       setLoading(true);
+      setError(null);
+      if (typeof id !== 'string' || !id) throw new Error('No valid project ID provided');
       const [projectData, expensesData, paymentData] = await Promise.all([
         getProjectById(id as string),
         getExpensesByProject(id as string),
         getPaymentSummary(id as string),
       ]);
 
+      if (!isCurrent()) return;
       setProject(projectData);
       setExpenses(expensesData);
       setPaymentSummary(paymentData);
@@ -56,9 +71,11 @@ export default function ProjectAnalytics() {
       // Calculate budget distribution by category
       calculateBudgetDistribution(expensesData, paymentData);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Error loading analytics:', error);
+      setError(error instanceof Error ? error.message : 'Failed to load analytics');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
@@ -66,55 +83,91 @@ export default function ProjectAnalytics() {
     expensesData: Expense[],
     paymentData: PaymentSummary | null
   ) => {
-    // Group expenses by category
-    const categoryMap = new Map<string, number>();
-    
-    expensesData.forEach((expense) => {
-      const category = expense.category || 'Other';
-      const current = categoryMap.get(category) || 0;
-      categoryMap.set(category, current + expense.amount);
-    });
-
-    const totalExpenses = paymentData?.total_expenses || 0;
-    const totalBudget = paymentData?.project_cost || 0;
-
-    // Convert to array and calculate percentages
-    const categories: BudgetCategory[] = Array.from(categoryMap.entries()).map(
-      ([name, amount]) => ({
-        name,
-        amount,
-        percentage: totalBudget > 0 ? (amount / totalBudget) * 100 : 0,
-        color: getCategoryColor(name),
-        icon: getCategoryIcon(name),
-      })
-    );
-
-    // Sort by amount (highest first)
-    categories.sort((a, b) => b.amount - a.amount);
-
-    // Add payments received as a category
-    if (paymentData && paymentData.total_received > 0) {
-      categories.push({
-        name: 'Payments Received',
-        amount: paymentData.total_received,
-        percentage: totalBudget > 0 ? (paymentData.total_received / totalBudget) * 100 : 0,
-        color: '#4CAF50',
-        icon: 'cash-check',
-      });
-    }
-
-    // Add remaining budget
-    if (paymentData && paymentData.remaining_amount > 0) {
-      categories.push({
-        name: 'Remaining Budget',
-        amount: paymentData.remaining_amount,
-        percentage: totalBudget > 0 ? (paymentData.remaining_amount / totalBudget) * 100 : 0,
-        color: '#FF9800',
-        icon: 'wallet',
-      });
-    }
-
+    const categories = budgetDistribution(expensesData, paymentData?.project_cost || 0).map(row => ({ ...row, color: getCategoryColor(row.name), icon: getCategoryIcon(row.name) }));
     setBudgetCategories(categories);
+  };
+
+  const handleDownloadProjectCost = async () => {
+    if (!project || !paymentSummary) return;
+
+    // Show options for PDF export
+    Alert.alert(
+      'Export PDF',
+      'Choose how to export the project cost summary:',
+      [
+        {
+          text: 'Share',
+          onPress: async () => {
+            setIsDownloading(true);
+            try {
+              const expensesByCategory = budgetDistribution(expenses, 0)
+                .map(cat => ({
+                  category: cat.name,
+                  amount: cat.amount,
+                  percentage: cat.percentage
+                }));
+
+              const costSummary: ProjectCostSummary = {
+                projectName: project.name,
+                clientName: project.client_name || '',
+                totalBudget: paymentSummary.project_cost,
+                totalExpenses: paymentSummary.total_expenses,
+                totalReceived: paymentSummary.total_received,
+                remainingAmount: paymentSummary.remaining_amount,
+                profitLoss: paymentSummary.profit_loss,
+                expensesByCategory
+              };
+
+              // React Native equivalent of Flutter's onPressed handler
+              await generateAndSharePDF(costSummary);
+              Alert.alert('Success', 'PDF shared successfully');
+            } catch (err) {
+              console.error('Share error:', err);
+              Alert.alert('Error', 'Failed to share PDF');
+            } finally {
+              setIsDownloading(false);
+            }
+          },
+        },
+        {
+          text: 'Save to Device',
+          onPress: async () => {
+            setIsDownloading(true);
+            try {
+              const expensesByCategory = budgetDistribution(expenses, 0)
+                .map(cat => ({
+                  category: cat.name,
+                  amount: cat.amount,
+                  percentage: cat.percentage
+                }));
+
+              const costSummary: ProjectCostSummary = {
+                projectName: project.name,
+                clientName: project.client_name || '',
+                totalBudget: paymentSummary.project_cost,
+                totalExpenses: paymentSummary.total_expenses,
+                totalReceived: paymentSummary.total_received,
+                remainingAmount: paymentSummary.remaining_amount,
+                profitLoss: paymentSummary.profit_loss,
+                expensesByCategory
+              };
+
+              const filepath = await generateAndSavePDF(costSummary);
+              Alert.alert('Success', `PDF saved to device:\n${filepath}`);
+            } catch (err) {
+              console.error('Save error:', err);
+              Alert.alert('Error', `Failed to save PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            } finally {
+              setIsDownloading(false);
+            }
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
   const getCategoryColor = (category: string): string => {
@@ -192,56 +245,12 @@ export default function ProjectAnalytics() {
   };
 
   const renderPieChart = () => {
-    const chartSize = width - 80;
-    const radius = chartSize / 2;
-    const centerX = radius;
-    const centerY = radius;
-
-    let currentAngle = -90; // Start from top
-
-    return (
-      <View style={styles.pieChartContainer}>
-        <View style={[styles.pieChart, { width: chartSize, height: chartSize }]}>
-          {budgetCategories.slice(0, 8).map((category, index) => {
-            const sliceAngle = (category.percentage / 100) * 360;
-            const startAngle = currentAngle;
-            const endAngle = currentAngle + sliceAngle;
-            currentAngle = endAngle;
-
-            return (
-              <View
-                key={category.name}
-                style={[
-                  styles.pieSlice,
-                  {
-                    width: chartSize,
-                    height: chartSize,
-                    borderRadius: radius,
-                  },
-                ]}
-              >
-                <View
-                  style={{
-                    position: 'absolute',
-                    width: chartSize,
-                    height: chartSize,
-                    borderRadius: radius,
-                    backgroundColor: category.color,
-                    opacity: 0.8,
-                  }}
-                />
-              </View>
-            );
-          })}
-          <View style={styles.pieChartCenter}>
-            <Text style={styles.pieChartCenterTitle}>Total Budget</Text>
-            <Text style={styles.pieChartCenterValue}>
-              ₹{paymentSummary?.project_cost.toLocaleString('en-IN') || '0'}
-            </Text>
-          </View>
-        </View>
-      </View>
-    );
+    if (!budgetCategories.length) return <Text>No budget or expenses recorded.</Text>;
+    return <PieChart
+      data={budgetCategories.map(category => ({ name: category.name, amount: category.amount, color: category.color, legendFontColor: '#333', legendFontSize: 11 }))}
+      width={width - 48} height={220} accessor="amount" backgroundColor="transparent" paddingLeft="12" hasLegend={false}
+      chartConfig={{ color: () => '#333' }}
+    />;
   };
 
   if (loading) {
@@ -260,7 +269,7 @@ export default function ProjectAnalytics() {
     );
   }
 
-  if (!project || !paymentSummary) {
+  if (error || !project || !paymentSummary) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
         <View style={styles.header}>
@@ -270,7 +279,8 @@ export default function ProjectAnalytics() {
           <Text style={styles.headerTitle}>Project Analytics</Text>
         </View>
         <View style={styles.loadingContainer}>
-          <Text style={styles.errorText}>Project not found</Text>
+          <Text style={styles.errorText}>{error || 'Project not found'}</Text>
+          <TouchableOpacity onPress={loadAnalytics}><Text>Retry</Text></TouchableOpacity>
         </View>
       </View>
     );
@@ -278,16 +288,23 @@ export default function ProjectAnalytics() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Project Analytics</Text>
-        <TouchableOpacity onPress={loadAnalytics} style={styles.refreshButton}>
-          <MaterialCommunityIcons name="refresh" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+            <MaterialCommunityIcons name="arrow-left" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Project Analytics</Text>
+          <TouchableOpacity onPress={loadAnalytics} style={styles.refreshButton}>
+            <MaterialCommunityIcons name="refresh" size={24} color="#fff" />
+          </TouchableOpacity>
+        </View>
+      </LinearGradient>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Project Info */}
@@ -342,7 +359,23 @@ export default function ProjectAnalytics() {
 
         {/* Budget Distribution */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Budget Distribution</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Budget Distribution</Text>
+            <TouchableOpacity
+              style={[styles.downloadPdfBtn, isDownloading && styles.downloadPdfBtnActive]}
+              onPress={handleDownloadProjectCost}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <View style={styles.pdfButtonContent}>
+                  <MaterialCommunityIcons name="file-pdf-box" size={20} color="#fff" />
+                  <Text style={styles.pdfButtonText}>PDF</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
           {budgetCategories.map((category) => renderProgressBar(category))}
         </View>
 
@@ -459,46 +492,47 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     width: (width - 44) / 2,
-    padding: 16,
-    borderRadius: 16,
+    padding: 20,
+    borderRadius: 20,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
   },
   summaryLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.9)',
-    marginTop: 8,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   summaryValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
-    marginTop: 4,
+    marginTop: 6,
   },
   section: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    marginTop: 16,
-    padding: 20,
-    borderRadius: 16,
+    marginTop: 20,
+    padding: 24,
+    borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#1a1a1a',
-    marginBottom: 20,
+    marginBottom: 24,
+    letterSpacing: 0.3,
   },
   progressBarContainer: {
     marginBottom: 20,
@@ -616,5 +650,52 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#667eea',
     flexShrink: 0,
+  },
+  headerGradient: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  downloadButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  downloadPdfBtn: {
+    backgroundColor: '#667eea',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    opacity: 0.9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  downloadPdfBtnActive: {
+    opacity: 1,
+  },
+  pdfButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pdfButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

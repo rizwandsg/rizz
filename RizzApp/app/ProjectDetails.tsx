@@ -1,3 +1,7 @@
+import { useRequestGuard } from '../hooks/useRequestGuard';
+import { LoadFailure } from '../components/LoadFailure';
+import { getCustomerPaymentsByProject } from '../api/customerPaymentsApi';
+import { receiptRows, ReceiptRow } from '../services/screenData';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { LinearGradient } from "expo-linear-gradient";
@@ -20,7 +24,6 @@ import { Expense, getExpensesByProject } from "../api/expensesApi";
 import {
     getPaymentsByProject,
     getPaymentSummary,
-    Payment,
     PAYMENT_TYPES,
     PaymentSummary,
 } from "../api/paymentsApi";
@@ -35,10 +38,12 @@ export default function ProjectDetails() {
   const router = useRouter();
   const navigation = useNavigation();
   const { id } = useLocalSearchParams();
+  const { start: startRequest, cancel: cancelRequest } = useRequestGuard();
   const [project, setProject] = useState<Project | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
-  const [payments, setPayments] = useState<Payment[]>([]);
+  const [payments, setPayments] = useState<ReceiptRow[]>([]);
   const [paymentSummary, setPaymentSummary] = useState<PaymentSummary | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [deleting, setDeleting] = useState(false);
   const [statusModalVisible, setStatusModalVisible] = useState(false);
@@ -57,21 +62,17 @@ export default function ProjectDetails() {
   ];
 
   const loadProjectData = async () => {
-    if (!id) return;
+    const isCurrent = startRequest();
     try {
       setLoading(true);
-      const [projectData, expensesData, paymentsData] = await Promise.all([
+      setError(null);
+      if (typeof id !== 'string' || !id) throw new Error('No valid project ID provided');
+      const [projectData, expensesData, paymentsData, customerPayments] = await Promise.all([
         getProjectById(id.toString()),
         getExpensesByProject(id.toString()),
         getPaymentsByProject(id.toString()),
+        getCustomerPaymentsByProject(id.toString()),
       ]);
-      console.log('Loaded project data:', projectData);
-      console.log('Project scope_of_work:', projectData?.scope_of_work);
-      console.log('Loaded expenses:', expensesData);
-      console.log('Loaded payments:', paymentsData);
-      setProject(projectData);
-      setExpenses(expensesData || []);
-      setPayments(paymentsData || []);
       
       // Calculate payment summary
       const totalExpenses = (expensesData || []).reduce((sum, exp) => sum + exp.amount, 0);
@@ -80,19 +81,25 @@ export default function ProjectDetails() {
         projectData?.total_project_cost || 0,
         totalExpenses
       );
+      if (!isCurrent()) return;
+      setProject(projectData);
+      setExpenses(expensesData);
+      setPayments(receiptRows(paymentsData, customerPayments));
       setPaymentSummary(summary);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Error loading project details:', error);
-      Alert.alert("Error", "Failed to load project details");
-      router.back();
+      setProject(null);
+      setError(error instanceof Error ? error.message : 'Failed to load project details');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
   useFocusEffect(
     React.useCallback(() => {
-      loadProjectData();
+      void loadProjectData();
+      return cancelRequest;
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [id])
   );
@@ -132,14 +139,14 @@ export default function ProjectDetails() {
     if (!project) return;
     try {
       setUpdatingStatus(true);
-      await updateProject(project.id!, { status: newStatus });
-      setProject({ ...project, status: newStatus });
+      const updated = await updateProject(project.id!, { status: newStatus, updated_at: project.updated_at });
+      setProject(updated);
       setStatusModalVisible(false);
       setShowCustomInput(false);
       setCustomStatus('');
       Alert.alert("Success", "Project status updated");
-    } catch {
-      Alert.alert("Error", "Failed to update project status");
+    } catch (error) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Failed to update project status");
     } finally {
       setUpdatingStatus(false);
     }
@@ -160,7 +167,7 @@ export default function ProjectDetails() {
   // Set header buttons
   React.useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
+      headerRight: () => project && !loading && !error ? (
         <View style={{ flexDirection: 'row', marginRight: 8 }}>
           <TouchableOpacity onPress={handleEdit} style={{ padding: 8, marginRight: 8 }}>
             <MaterialCommunityIcons name="pencil" size={22} color="#667eea" />
@@ -173,9 +180,9 @@ export default function ProjectDetails() {
             )}
           </TouchableOpacity>
         </View>
-      ),
+      ) : null,
     });
-  }, [navigation, deleting, handleEdit, handleDelete]);
+  }, [navigation, deleting, handleEdit, handleDelete, project, loading, error]);
 
   const getStatusColor = (status?: string) => {
     switch (status) {
@@ -225,8 +232,8 @@ export default function ProjectDetails() {
     return new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
     }).format(amount);
   };
 
@@ -240,6 +247,8 @@ export default function ProjectDetails() {
       </View>
     );
   }
+
+  if (error) return <LoadFailure message={error} retry={loadProjectData} />;
 
   if (!project) {
     return (
@@ -543,11 +552,11 @@ export default function ProjectDetails() {
               const paymentType = PAYMENT_TYPES.find((t) => t.value === payment.payment_type);
               return (
                 <TouchableOpacity
-                  key={payment.id}
+                  key={payment.key}
                   style={styles.paymentCard}
                   onPress={() =>
                     router.push({
-                      pathname: "/AddPayment",
+                      pathname: payment.editRoute,
                       params: { id: payment.id, projectId: id },
                     })
                   }
@@ -585,6 +594,7 @@ export default function ProjectDetails() {
                   {payment.received_from && (
                     <Text style={styles.paymentFrom}>From: {payment.received_from}</Text>
                   )}
+                  {payment.notes && <Text style={styles.paymentMode}>{payment.notes}</Text>}
                   {payment.payment_mode && (
                     <Text style={styles.paymentMode}>
                       via {payment.payment_mode}

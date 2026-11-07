@@ -1,9 +1,8 @@
 import { useSignUp } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -16,7 +15,6 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { syncClerkUserToSupabase } from '../../api/authApi';
 
 export default function ClerkSignUpScreen() {
     const { isLoaded, signUp, setActive } = useSignUp();
@@ -29,9 +27,10 @@ export default function ClerkSignUpScreen() {
     const [loading, setLoading] = useState(false);
     const [pendingVerification, setPendingVerification] = useState(false);
     const [code, setCode] = useState('');
+    const submitting = useRef(false);
 
     const handleSignUp = async () => {
-        if (!isLoaded) return;
+        if (!isLoaded || submitting.current) return;
 
         // Validation
         if (!fullName.trim()) {
@@ -47,82 +46,80 @@ export default function ClerkSignUpScreen() {
             return;
         }
 
+        submitting.current = true;
         setLoading(true);
         try {
             // Step 1: Create the user in Clerk
-            const nameParts = fullName.trim().split(' ');
+            const nameParts = fullName.trim().split(/\s+/);
             const firstName = nameParts[0];
             const lastName = nameParts.slice(1).join(' ') || '';
 
             await signUp.create({
-                emailAddress: email,
+                emailAddress: email.trim(),
                 password,
                 firstName,
                 lastName,
             });
 
+            // Keep the created account available for a delivery retry.
+            setPendingVerification(true);
             // Step 2: Send email verification code
             await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
 
             // Step 3: Show verification screen
-            setPendingVerification(true);
             Alert.alert('Verification Code Sent', 'Check your email for the verification code');
         } catch (err: any) {
-            console.error('❌ Clerk Sign-Up Error:', JSON.stringify(err, null, 2));
             Alert.alert(
                 'Sign Up Failed',
-                err.errors?.[0]?.message || 'Unable to create account. Please try again.'
+                err.errors?.[0]?.message || err.message || 'Unable to create account. Please try again.'
             );
         } finally {
+            submitting.current = false;
+            setLoading(false);
+        }
+    };
+
+    const handleResend = async () => {
+        if (!isLoaded || submitting.current) return;
+        submitting.current = true;
+        setLoading(true);
+        try {
+            await signUp.prepareEmailAddressVerification({ strategy: 'email_code' });
+            Alert.alert('Verification Code Sent', 'Check your email for the verification code');
+        } catch (err: any) {
+            Alert.alert('Verification Failed', err.errors?.[0]?.message || err.message || 'Unable to send a code. Please try again.');
+        } finally {
+            submitting.current = false;
             setLoading(false);
         }
     };
 
     const handleVerify = async () => {
-        if (!isLoaded) return;
+        if (!isLoaded || submitting.current) return;
 
-        if (!code || code.length !== 6) {
+        if (!/^\d{6}$/.test(code.trim())) {
             Alert.alert('Error', 'Please enter the 6-digit verification code');
             return;
         }
 
+        submitting.current = true;
         setLoading(true);
         try {
             // Step 1: Verify the email with the code
             const completeSignUp = await signUp.attemptEmailAddressVerification({
-                code,
+                code: code.trim(),
             });
 
-            // Step 2: Set the session as active
+            if (completeSignUp.status !== 'complete' || !completeSignUp.createdSessionId) throw new Error('Email verification is incomplete');
             await setActive({ session: completeSignUp.createdSessionId });
-
-            // Step 3: Sync Clerk user to Supabase and store in AsyncStorage
-            try {
-                const clerkUserId = completeSignUp.createdUserId;
-                const supabaseUser = await syncClerkUserToSupabase(clerkUserId!, email.trim(), fullName.trim());
-                console.log('✅ Clerk user synced to Supabase successfully');
-                
-                // Store user in AsyncStorage for getCurrentUser()
-                await AsyncStorage.setItem('@rizzapp_user', JSON.stringify(supabaseUser));
-                await AsyncStorage.setItem('@rizzapp_token', supabaseUser.id);
-                console.log('✅ Clerk user stored in AsyncStorage');
-            } catch (syncError) {
-                console.error('⚠️ Failed to sync to Supabase (non-blocking):', syncError);
-                // Don't block signup if Supabase sync fails
-            }
-
-            // Step 4: Navigate to home
-            console.log('✅ Clerk Sign-Up & Verification Successful!');
-            Alert.alert('Success!', 'Your account has been created', [
-                { text: 'OK', onPress: () => router.replace('/(tabs)/home') }
-            ]);
+            router.replace('/(tabs)/home');
         } catch (err: any) {
-            console.error('❌ Verification Error:', JSON.stringify(err, null, 2));
             Alert.alert(
                 'Verification Failed',
-                err.errors?.[0]?.message || 'Invalid code. Please try again.'
+                err.errors?.[0]?.message || err.message || 'Invalid code. Please try again.'
             );
         } finally {
+            submitting.current = false;
             setLoading(false);
         }
     };
@@ -289,7 +286,8 @@ export default function ClerkSignUpScreen() {
                             {/* Resend Code */}
                             <TouchableOpacity
                                 style={styles.resendButton}
-                                onPress={handleSignUp}
+                                onPress={handleResend}
+                                disabled={loading}
                             >
                                 <Text style={styles.resendText}>Didn&apos;t receive code? Resend</Text>
                             </TouchableOpacity>

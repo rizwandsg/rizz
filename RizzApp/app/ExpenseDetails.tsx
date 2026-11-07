@@ -1,7 +1,10 @@
+import { useRequestGuard } from '../hooks/useRequestGuard';
+import { useFocusEffect } from '@react-navigation/native';
+import { LoadFailure } from '../components/LoadFailure';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
-import React, { useEffect, useLayoutEffect, useState } from "react";
+import React, { useCallback, useLayoutEffect, useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { deleteExpense, Expense, getExpenseById } from "../api/expensesApi";
 import { getProjectById, Project } from "../api/projectsApi";
@@ -10,8 +13,10 @@ export default function ExpenseDetails() {
   const router = useRouter();
   const navigation = useNavigation();
   const { id } = useLocalSearchParams();
+  const { start: startRequest, cancel: cancelRequest } = useRequestGuard();
   const [expense, setExpense] = useState<Expense | null>(null);
   const [project, setProject] = useState<Project | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const handleDelete = () => {
@@ -38,7 +43,7 @@ export default function ExpenseDetails() {
 
   useLayoutEffect(() => {
     navigation.setOptions({
-      headerRight: () => (
+      headerRight: () => expense && !loading && !error ? (
         <View style={styles.headerButtons}>
           <TouchableOpacity
             style={styles.headerButton}
@@ -50,40 +55,33 @@ export default function ExpenseDetails() {
             <MaterialCommunityIcons name="delete" size={22} color="#F44336" />
           </TouchableOpacity>
         </View>
-      ),
+      ) : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation, id, expense]);
-
-  useEffect(() => {
-    loadExpense();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [navigation, id, expense, loading, error]);
 
   const loadExpense = async () => {
+    const isCurrent = startRequest();
+    setLoading(true);
+    setError(null);
+    setExpense(null);
+    setProject(null);
     try {
-      setLoading(true);
-      if (id) {
-        const expenseData = await getExpenseById(id.toString());
-        if (expenseData) {
-          setExpense(expenseData);
-          // Load project details
-          if (expenseData.project_id) {
-            const projectData = await getProjectById(expenseData.project_id);
-            setProject(projectData);
-          }
-        } else {
-          Alert.alert("Error", "Expense not found");
-          router.back();
-        }
-      }
-    } catch {
-      Alert.alert("Error", "Failed to load expense");
-      router.back();
+      if (typeof id !== 'string' || !id) throw new Error('No valid expense ID provided');
+      const expenseData = await getExpenseById(id);
+      if (!expenseData) throw new Error('Expense not found or access denied');
+      const projectData = await getProjectById(expenseData.project_id);
+      if (!isCurrent()) return;
+      setExpense(expenseData);
+      setProject(projectData);
+    } catch (failure) {
+      if (!isCurrent()) return;
+      setError(failure instanceof Error ? failure.message : 'Failed to load expense');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
+  useFocusEffect(useCallback(() => { void loadExpense(); return cancelRequest; }, [id, cancelRequest]));
 
   const getCategoryInfo = (category?: string) => {
     const categories: Record<string, { icon: string; color: string; label: string }> = {
@@ -105,6 +103,8 @@ export default function ExpenseDetails() {
       </View>
     );
   }
+
+  if (error) return <LoadFailure message={error} retry={loadExpense} />;
 
   if (!expense) {
     return (

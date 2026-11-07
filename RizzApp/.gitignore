@@ -32,7 +32,7 @@ yarn-error.*
 
 # local env files
 .env
-.env*.local
+.env.*
 !.env.example
 
 # typescript
@@ -43,3 +43,7 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Local verification artifacts
+coverage/
+test-results/

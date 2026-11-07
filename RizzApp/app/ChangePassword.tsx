@@ -2,7 +2,7 @@ import { useUser } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -16,12 +16,13 @@ import {
     View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { changePassword, getCurrentUser } from '../api/authApi';
+
 
 export default function ChangePasswordScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
     const { user: clerkUser } = useUser();
+    const savingRef = useRef(false);
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -31,13 +32,14 @@ export default function ChangePasswordScreen() {
     const [saving, setSaving] = useState(false);
 
     const handleChangePassword = async () => {
+        if (savingRef.current) return;
         if (!currentPassword || !newPassword || !confirmPassword) {
             Alert.alert('Error', 'Please fill all fields');
             return;
         }
 
-        if (newPassword.length < 6) {
-            Alert.alert('Error', 'New password must be at least 6 characters');
+        if (newPassword.length < 8) {
+            Alert.alert('Error', 'New password must be at least 8 characters');
             return;
         }
 
@@ -46,57 +48,17 @@ export default function ChangePasswordScreen() {
             return;
         }
 
+        if (!clerkUser) { Alert.alert('Error', 'Please sign in again'); return; }
+        savingRef.current = true;
         setSaving(true);
         try {
-            // Get current user from AsyncStorage
-            const user = await getCurrentUser();
-            if (!user) {
-                Alert.alert('Error', 'Please login again');
-                setSaving(false);
-                return;
-            }
-
-            // Check if user is a Clerk owner (has clerk_user_id)
-            if (user.clerk_user_id && clerkUser) {
-                console.log('🔐 Changing password for Clerk owner user via Clerk API');
-                
-                // Use Clerk's password update method for owner users
-                try {
-                    await clerkUser.updatePassword({
-                        currentPassword: currentPassword,
-                        newPassword: newPassword,
-                    });
-                    
-                    console.log('✅ Clerk password updated successfully');
-                    Alert.alert('Success', 'Password changed successfully', [
-                        { text: 'OK', onPress: () => router.back() }
-                    ]);
-                } catch (clerkError: any) {
-                    console.error('❌ Clerk password update error:', clerkError);
-                    
-                    // Handle specific Clerk errors
-                    let errorMessage = 'Failed to change password';
-                    if (clerkError.errors?.[0]?.message) {
-                        errorMessage = clerkError.errors[0].message;
-                    } else if (clerkError.message) {
-                        errorMessage = clerkError.message;
-                    }
-                    
-                    Alert.alert('Error', errorMessage);
-                }
-            } else {
-                // Use Supabase password change for team members
-                console.log('🔐 Changing password for team member via Supabase');
-                await changePassword(user.email, currentPassword, newPassword);
-                
-                Alert.alert('Success', 'Password changed successfully', [
-                    { text: 'OK', onPress: () => router.back() }
-                ]);
-            }
-        } catch (error: any) {
-            console.error('Change password error:', error);
-            Alert.alert('Error', error.message || 'Failed to change password');
+            await clerkUser.updatePassword({ currentPassword, newPassword });
+            setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
+            Alert.alert('Success', 'Password changed successfully', [{ text: 'OK', onPress: () => router.back() }]);
+        } catch (failure: any) {
+            Alert.alert('Error', failure.errors?.[0]?.message || failure.message || 'Failed to change password');
         } finally {
+            savingRef.current = false;
             setSaving(false);
         }
     };

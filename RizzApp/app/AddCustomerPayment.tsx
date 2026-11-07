@@ -1,3 +1,8 @@
+import { useCreateId } from '../hooks/useCreateId';
+import { useRef } from 'react';
+import { parseMoney, localDate } from '../services/validation';
+import { formError, parseCalendarDate } from '../services/formValues';
+import { FormLoadState } from '../components/FormLoadState';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -31,6 +36,7 @@ export default function AddCustomerPayment() {
   const projectId = params.projectId as string;
 
   const [project, setProject] = useState<Project | null>(null);
+  const [loadedVersion, setLoadedVersion] = useState<string | undefined>(undefined);
   const [amount, setAmount] = useState("");
   const [paymentDate, setPaymentDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -39,74 +45,81 @@ export default function AddCustomerPayment() {
   const [referenceNumber, setReferenceNumber] = useState("");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingRecord, setLoadingRecord] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
-    const init = async () => {
-      await loadProject();
-      if (paymentId) {
-        await loadPayment();
+    let cancelled = false;
+    const load = async () => {
+      setLoadingRecord(true);
+      setLoadError(null);
+      try {
+        const payment = paymentId ? await getCustomerPaymentById(paymentId) : null;
+        if (paymentId && !payment) throw new Error('Payment not found or access denied');
+        if (payment && projectId && payment.project_id !== projectId) throw new Error('Payment does not belong to this project');
+        const targetId = payment?.project_id || projectId;
+        if (!targetId) throw new Error('Project is required');
+        const projectData = await getProjectById(targetId);
+        if (cancelled) return;
+        if (!projectData) throw new Error('Project not found or access denied');
+        if (payment && !payment.updated_at) throw new Error('Payment version is missing. Reload before editing.');
+        setProject(projectData);
+        if (payment) {
+          setLoadedVersion(payment.updated_at);
+          setAmount(payment.amount.toString());
+          setPaymentDate(parseCalendarDate(payment.payment_date));
+          setPaymentMethod(payment.payment_method);
+          setReferenceNumber(payment.reference_number || "");
+          setNotes(payment.notes || "");
+        }
+      } catch (error) {
+        if (!cancelled) setLoadError(formError(error, 'Failed to load payment form'));
+      } finally {
+        if (!cancelled) setLoadingRecord(false);
       }
     };
-    init();
-  }, [projectId, paymentId]);
+    void load();
+    return () => { cancelled = true; };
+  }, [projectId, paymentId, loadAttempt]);
 
-  const loadProject = async () => {
-    try {
-      const projectData = await getProjectById(projectId);
-      setProject(projectData);
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
-    }
-  };
-
-  const loadPayment = async () => {
-    if (!paymentId) return;
-    try {
-      const payment = await getCustomerPaymentById(paymentId);
-      if (payment) {
-        setAmount(payment.amount.toString());
-        setPaymentDate(new Date(payment.payment_date));
-        setPaymentMethod(payment.payment_method);
-        setReferenceNumber(payment.reference_number || "");
-        setNotes(payment.notes || "");
-      }
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
-    }
-  };
-
+  const requestId = useCreateId();
+  const savingRef = useRef(false);
   const handleSave = async () => {
+    if (savingRef.current || loadingRecord || loadError) return;
+    savingRef.current = true;
     setLoading(true);
     try {
       if (!amount?.trim()) throw new Error("Please enter payment amount");
-      if (!projectId) throw new Error("Project is required");
+      if (!project?.id) throw new Error("Project is required");
 
-      const amountValue = parseFloat(amount);
+      const amountValue = parseMoney(amount);
       if (isNaN(amountValue) || amountValue <= 0) {
         throw new Error("Please enter a valid amount");
       }
 
       const paymentData: Partial<CustomerPayment> = {
-        project_id: projectId,
+        updated_at: loadedVersion,
+        project_id: project.id,
         amount: amountValue,
-        payment_date: paymentDate.toISOString().split("T")[0],
+        payment_date: localDate(paymentDate),
         payment_method: paymentMethod,
-        reference_number: referenceNumber.trim() || undefined,
-        notes: notes.trim() || undefined,
+        reference_number: referenceNumber.trim(),
+        notes: notes.trim(),
       };
 
       if (paymentId) {
         await updateCustomerPayment(paymentId, paymentData);
         Alert.alert("Success", "Payment updated successfully");
       } else {
-        await createCustomerPayment(paymentData as CustomerPayment);
+        await createCustomerPayment({ ...paymentData, id: requestId } as CustomerPayment);
         Alert.alert("Success", "Payment recorded successfully");
       }
 
       router.back();
-    } catch (error: any) {
-      Alert.alert("Error", error.message);
-    } finally {
+    } catch (error) {
+      Alert.alert("Error", formError(error, 'Failed to save payment'));
+      savingRef.current = false;
       setLoading(false);
     }
   };
@@ -117,6 +130,8 @@ export default function AddCustomerPayment() {
       setPaymentDate(selectedDate);
     }
   };
+
+  if (loadingRecord || loadError) return <FormLoadState error={loadError} onRetry={() => setLoadAttempt(attempt => attempt + 1)} onBack={() => router.back()} />;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -171,6 +186,7 @@ export default function AddCustomerPayment() {
               <TextInput
                 style={styles.amountInput}
                 placeholder="0.00"
+                testID="customer-payment-amount"
                 value={amount}
                 onChangeText={setAmount}
                 keyboardType="decimal-pad"
@@ -289,6 +305,7 @@ export default function AddCustomerPayment() {
           <TouchableOpacity
             style={[styles.saveButton, loading && styles.saveButtonDisabled]}
             onPress={handleSave}
+            testID="customer-payment-save"
             disabled={loading}
           >
             <LinearGradient

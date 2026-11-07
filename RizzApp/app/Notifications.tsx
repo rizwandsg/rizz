@@ -2,7 +2,8 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { defaultNotificationSettings, parseNotificationSettings } from '../services/notificationSettings';
 import {
     Alert,
     ScrollView,
@@ -27,15 +28,10 @@ const NOTIFICATIONS_STORAGE_KEY = '@rizzapp_notification_settings';
 export default function NotificationsScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const [settings, setSettings] = useState({
-        pushNotifications: true,
-        emailNotifications: false,
-        projectUpdates: true,
-        expenseAlerts: true,
-        paymentReminders: true,
-        weeklyReports: false,
-    });
-    const [pushToken, setPushToken] = useState<string | null>(null);
+    const [settings, setSettings] = useState(defaultNotificationSettings);
+    const savingRef = useRef(false);
+    const [saving, setSaving] = useState(false);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         loadSettings();
@@ -44,11 +40,7 @@ export default function NotificationsScreen() {
 
     const initializeNotifications = async () => {
         try {
-            const token = await registerForPushNotificationsAsync();
-            if (token) {
-                setPushToken(token);
-                console.log('✅ Push notifications initialized:', token);
-            }
+            await registerForPushNotificationsAsync();
         } catch (error) {
             console.error('❌ Failed to initialize notifications:', error);
         }
@@ -57,15 +49,19 @@ export default function NotificationsScreen() {
     const loadSettings = async () => {
         try {
             const savedSettings = await AsyncStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
-            if (savedSettings) {
-                setSettings(JSON.parse(savedSettings));
-            }
+            setSettings(parseNotificationSettings(savedSettings));
         } catch (error) {
             console.error('Failed to load notification settings:', error);
+            Alert.alert('Settings unavailable', 'Saved notification settings could not be read. Default preferences are shown.');
+        } finally {
+            setLoading(false);
         }
     };
 
     const toggleSetting = async (key: keyof typeof settings) => {
+        if (savingRef.current || loading || ['emailNotifications', 'paymentReminders', 'weeklyReports'].includes(key)) return;
+        savingRef.current = true;
+        setSaving(true);
         const newSettings = { ...settings, [key]: !settings[key] };
         setSettings(newSettings);
         
@@ -95,6 +91,9 @@ export default function NotificationsScreen() {
             Alert.alert('Error', 'Failed to save notification settings');
             // Revert the change
             setSettings(settings);
+        } finally {
+            savingRef.current = false;
+            setSaving(false);
         }
     };
 
@@ -131,6 +130,7 @@ export default function NotificationsScreen() {
                         </View>
                         <Switch
                             value={settings.pushNotifications}
+                            disabled={saving || loading}
                             onValueChange={() => toggleSetting('pushNotifications')}
                             trackColor={{ false: '#ddd', true: '#667eea' }}
                             thumbColor="#fff"
@@ -142,11 +142,12 @@ export default function NotificationsScreen() {
                             <MaterialCommunityIcons name="email" size={24} color="#667eea" />
                             <View style={styles.settingText}>
                                 <Text style={styles.settingName}>Email Notifications</Text>
-                                <Text style={styles.settingDesc}>Receive email notifications</Text>
+                                <Text style={styles.settingDesc}>Not available in this version</Text>
                             </View>
                         </View>
                         <Switch
                             value={settings.emailNotifications}
+                            disabled
                             onValueChange={() => toggleSetting('emailNotifications')}
                             trackColor={{ false: '#ddd', true: '#667eea' }}
                             thumbColor="#fff"
@@ -168,6 +169,7 @@ export default function NotificationsScreen() {
                         </View>
                         <Switch
                             value={settings.projectUpdates}
+                            disabled={saving || loading}
                             onValueChange={() => toggleSetting('projectUpdates')}
                             trackColor={{ false: '#ddd', true: '#667eea' }}
                             thumbColor="#fff"
@@ -184,6 +186,7 @@ export default function NotificationsScreen() {
                         </View>
                         <Switch
                             value={settings.expenseAlerts}
+                            disabled={saving || loading}
                             onValueChange={() => toggleSetting('expenseAlerts')}
                             trackColor={{ false: '#ddd', true: '#667eea' }}
                             thumbColor="#fff"
@@ -195,11 +198,12 @@ export default function NotificationsScreen() {
                             <MaterialCommunityIcons name="currency-inr" size={24} color="#667eea" />
                             <View style={styles.settingText}>
                                 <Text style={styles.settingName}>Payment Reminders</Text>
-                                <Text style={styles.settingDesc}>Reminders for pending payments</Text>
+                                <Text style={styles.settingDesc}>Scheduled reminders are not available</Text>
                             </View>
                         </View>
                         <Switch
                             value={settings.paymentReminders}
+                            disabled
                             onValueChange={() => toggleSetting('paymentReminders')}
                             trackColor={{ false: '#ddd', true: '#667eea' }}
                             thumbColor="#fff"
@@ -216,11 +220,12 @@ export default function NotificationsScreen() {
                             <MaterialCommunityIcons name="chart-bar" size={24} color="#667eea" />
                             <View style={styles.settingText}>
                                 <Text style={styles.settingName}>Weekly Reports</Text>
-                                <Text style={styles.settingDesc}>Weekly summary of activities</Text>
+                                <Text style={styles.settingDesc}>Not available in this version</Text>
                             </View>
                         </View>
                         <Switch
                             value={settings.weeklyReports}
+                            disabled
                             onValueChange={() => toggleSetting('weeklyReports')}
                             trackColor={{ false: '#ddd', true: '#667eea' }}
                             thumbColor="#fff"
@@ -229,7 +234,7 @@ export default function NotificationsScreen() {
                 </View>
 
                 {/* Test Notification */}
-                <View style={styles.section}>
+                {typeof __DEV__ !== 'undefined' && __DEV__ && <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Test Notifications</Text>
                     
                     {/* Expo Go Warning */}
@@ -370,13 +375,7 @@ export default function NotificationsScreen() {
                         </Text>
                     </TouchableOpacity>
 
-                    {pushToken && (
-                        <View style={styles.tokenContainer}>
-                            <Text style={styles.tokenLabel}>Push Token:</Text>
-                            <Text style={styles.tokenText} numberOfLines={2}>{pushToken}</Text>
-                        </View>
-                    )}
-                </View>
+                </View>}
 
                 <View style={{ height: 40 }} />
             </ScrollView>

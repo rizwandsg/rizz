@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import React from 'react';
 import {
     Alert,
-    Linking,
     ScrollView,
     StyleSheet,
     Text,
@@ -20,18 +19,7 @@ export default function HelpSupportScreen() {
     const handleContactSupport = () => {
         Alert.alert(
             'Contact Support',
-            'Choose a method to contact support:',
-            [
-                {
-                    text: 'Email',
-                    onPress: () => Linking.openURL('mailto:support@rizzapp.com'),
-                },
-                {
-                    text: 'Phone',
-                    onPress: () => Linking.openURL('tel:+919876543210'),
-                },
-                { text: 'Cancel', style: 'cancel' },
-            ]
+            'Contact your workspace owner for account access and project support. A support email or phone number has not been configured in this app.'
         );
     };
 
@@ -42,7 +30,7 @@ export default function HelpSupportScreen() {
         },
         {
             question: 'How do I track expenses?',
-            answer: 'Open a project and tap the Expenses tab, then add expenses for different categories.',
+            answer: 'Open a project and tap Add in the Expenses section, or use the + button in the Expenses tab.',
         },
         {
             question: 'Can I export my data?',
@@ -50,7 +38,7 @@ export default function HelpSupportScreen() {
         },
         {
             question: 'How do I delete a project?',
-            answer: 'Long press on a project card and select Delete from the options.',
+            answer: 'Long press a project card and select Delete. Projects with recorded expenses or payments cannot be deleted while those records exist.',
         },
     ];
 
@@ -87,29 +75,6 @@ export default function HelpSupportScreen() {
                     </LinearGradient>
                 </TouchableOpacity>
 
-                {/* Quick Links */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Quick Links</Text>
-                    
-                    <TouchableOpacity style={styles.linkItem}>
-                        <MaterialCommunityIcons name="book-open-variant" size={24} color="#667eea" />
-                        <Text style={styles.linkText}>User Guide</Text>
-                        <MaterialCommunityIcons name="chevron-right" size={20} color="#ccc" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.linkItem}>
-                        <MaterialCommunityIcons name="video" size={24} color="#667eea" />
-                        <Text style={styles.linkText}>Video Tutorials</Text>
-                        <MaterialCommunityIcons name="chevron-right" size={20} color="#ccc" />
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={styles.linkItem}>
-                        <MaterialCommunityIcons name="forum" size={24} color="#667eea" />
-                        <Text style={styles.linkText}>Community Forum</Text>
-                        <MaterialCommunityIcons name="chevron-right" size={20} color="#ccc" />
-                    </TouchableOpacity>
-                </View>
-
                 {/* FAQ */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Frequently Asked Questions</Text>
@@ -129,16 +94,8 @@ export default function HelpSupportScreen() {
                 <View style={styles.infoBox}>
                     <MaterialCommunityIcons name="email" size={20} color="#667eea" />
                     <View style={{ flex: 1 }}>
-                        <Text style={styles.infoLabel}>Email</Text>
-                        <Text style={styles.infoValue}>support@rizzapp.com</Text>
-                    </View>
-                </View>
-
-                <View style={styles.infoBox}>
-                    <MaterialCommunityIcons name="phone" size={20} color="#667eea" />
-                    <View style={{ flex: 1 }}>
-                        <Text style={styles.infoLabel}>Phone</Text>
-                        <Text style={styles.infoValue}>+91 10000001</Text>
+                        <Text style={styles.infoLabel}>Support contact</Text>
+                        <Text style={styles.infoValue}>Ask your workspace owner</Text>
                     </View>
                 </View>
 

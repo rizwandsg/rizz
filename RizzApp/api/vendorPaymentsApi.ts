@@ -69,7 +69,7 @@ export const getVendorPaymentsByExpense = async (expenseId: string): Promise<Ven
         const result = await database.loadData<VendorPayment>(
             'vendor_payments',
             {
-                filter: `user_id.eq.${user.id},expense_id.eq.${expenseId}`,
+                filter: `expense_id.eq.${expenseId}`,
                 order: 'payment_date.desc'
             }
         );
@@ -94,7 +94,7 @@ export const getVendorPaymentsByProject = async (projectId: string): Promise<Ven
         const result = await database.loadData<VendorPayment>(
             'vendor_payments',
             {
-                filter: `user_id.eq.${user.id},project_id.eq.${projectId}`,
+                filter: `project_id.eq.${projectId}`,
                 order: 'payment_date.desc'
             }
         );
@@ -119,9 +119,7 @@ export const getVendorPaymentById = async (id: string): Promise<VendorPayment | 
         const result = await database.loadDataById<VendorPayment>('vendor_payments', id);
 
         // Verify the payment belongs to the current user
-        if (result && result.user_id !== user.id) {
-            throw new Error('Unauthorized access to payment');
-        }
+
 
         return result;
     } catch (error) {
@@ -142,18 +140,11 @@ export const updateVendorPayment = async (id: string, payment: Partial<VendorPay
 
         // Verify the payment belongs to the current user
         const existingPayment = await database.loadDataById<VendorPayment>('vendor_payments', id);
-        if (!existingPayment || existingPayment.user_id !== user.id) {
+        if (!existingPayment) {
             throw new Error('Unauthorized access to payment');
         }
 
-        const updatedPayment = {
-            ...existingPayment,
-            ...payment,
-            id,
-            updated_at: new Date().toISOString(),
-        };
-
-        const result = await database.upsertData<VendorPayment>('vendor_payments', updatedPayment);
+        const result = await database.updateData<VendorPayment>('vendor_payments', id, { ...payment, updated_at: payment.updated_at || existingPayment.updated_at });
         return result;
     } catch (error) {
         console.error('Update vendor payment error:', error);
@@ -173,7 +164,7 @@ export const deleteVendorPayment = async (id: string): Promise<void> => {
 
         // Verify the payment belongs to the current user
         const existingPayment = await database.loadDataById<VendorPayment>('vendor_payments', id);
-        if (!existingPayment || existingPayment.user_id !== user.id) {
+        if (!existingPayment) {
             throw new Error('Unauthorized access to payment');
         }
 
@@ -217,6 +208,6 @@ export const calculateTotalPaid = async (expenseId: string): Promise<number> => 
         return payments.reduce((total, payment) => total + payment.amount, 0);
     } catch (error) {
         console.error('Calculate total paid error:', error);
-        return 0;
+        throw error;
     }
 };

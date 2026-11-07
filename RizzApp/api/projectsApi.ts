@@ -199,7 +199,7 @@ export interface Project {
     client_name?: string;
     description?: string;
     start_date: string;
-    end_date?: string;
+    end_date?: string | null;
     status?: string;
     total_project_cost?: number;
     scope_of_work?: ScopeOfWork[]; // Array to support multiple selections
@@ -256,231 +256,22 @@ export const createProject = async (project: Project): Promise<Project> => {
  * Get all projects for the current user
  */
 export const getProjects = async (): Promise<Project[]> => {
-    try {
-        const user = await getCurrentUser();
-        if (!user) {
-            throw new Error('User not authenticated');
-        }
-
-        console.log('📂 Loading projects for user:', user.email, 'role:', user.role);
-        console.log('🆔 User ID:', user.id);
-
-        // Load ALL projects (RLS is set to true, we filter in JavaScript)
-        const allProjects = await database.loadData<Project>(TABLES.PROJECTS, {
-            order: 'created_at.desc'
-        });
-
-        if (!allProjects) return [];
-
-        console.log('📊 Total projects in database:', allProjects.length);
-        console.log('👤 Project owners:', [...new Set(allProjects.map(p => p.user_id))]);
-
-        // Get list of user IDs that this user can see projects from
-        const accessibleUserIds: string[] = [user.id];
-
-        // If user is a member (sub-user), also include parent's projects
-        if (user.parent_user_id) {
-            accessibleUserIds.push(user.parent_user_id);
-            console.log('👥 Sub-user - including parent projects:', user.parent_user_id);
-        }
-
-        // If user is owner, include all sub-users' projects
-        if (user.role === 'owner' && !user.parent_user_id) {
-            const allUsers = await database.loadData<any>('users');
-            const subUserIds = allUsers
-                ?.filter(u => u.parent_user_id === user.id)
-                .map(u => u.id) || [];
-            
-            if (subUserIds.length > 0) {
-                accessibleUserIds.push(...subUserIds);
-                console.log('👑 Owner - including', subUserIds.length, 'sub-users projects');
-            }
-        }
-
-        console.log('🔑 Accessible user IDs:', accessibleUserIds);
-
-        // Filter projects by accessible user IDs
-        const projects = allProjects.filter(p => p.user_id && accessibleUserIds.includes(p.user_id));
-        
-        console.log('✅ Found', projects.length, 'accessible projects out of', allProjects.length, 'total');
-
-        return projects;
-    } catch (error) {
-        console.error('Get projects error:', error);
-        throw error;
-    }
+    if (!await getCurrentUser()) throw new Error('User not authenticated');
+    return database.loadData<Project>(TABLES.PROJECTS, { order: 'created_at.desc' });
 };
-
-/**
- * Get a single project by ID
- */
 export const getProjectById = async (id: string): Promise<Project | null> => {
-    try {
-        const user = await getCurrentUser();
-        if (!user) {
-            throw new Error('User not authenticated');
-        }
-
-        const project = await database.loadDataById<Project>(TABLES.PROJECTS, id);
-        
-        if (!project) {
-            return null;
-        }
-
-        // Get list of user IDs that this user can access projects from
-        const accessibleUserIds: string[] = [user.id];
-
-        // If user is a member (sub-user), also include parent's projects
-        if (user.parent_user_id) {
-            accessibleUserIds.push(user.parent_user_id);
-        }
-
-        // If user is owner, include all sub-users' projects
-        if (user.role === 'owner' && !user.parent_user_id) {
-            const allUsers = await database.loadData<any>('users');
-            const subUserIds = allUsers
-                ?.filter(u => u.parent_user_id === user.id)
-                .map(u => u.id) || [];
-            
-            if (subUserIds.length > 0) {
-                accessibleUserIds.push(...subUserIds);
-            }
-        }
-
-        // Verify the project belongs to an accessible user
-        if (!project.user_id || !accessibleUserIds.includes(project.user_id)) {
-            throw new Error('Unauthorized access to project');
-        }
-
-        return project;
-    } catch (error) {
-        console.error('Get project by ID error:', error);
-        throw error;
-    }
+    if (!await getCurrentUser()) throw new Error('User not authenticated');
+    return database.loadDataById<Project>(TABLES.PROJECTS, id);
 };
-
-/**
- * Update a project
- */
 export const updateProject = async (id: string, updates: Partial<Project>): Promise<Project> => {
-    try {
-        const user = await getCurrentUser();
-        if (!user) {
-            throw new Error('User not authenticated');
-        }
-
-        // Get the existing project
-        const existingProject = await database.loadDataById<Project>(TABLES.PROJECTS, id);
-        if (!existingProject) {
-            throw new Error('Project not found');
-        }
-
-        // Get list of user IDs that this user can access projects from
-        const accessibleUserIds: string[] = [user.id];
-
-        // If user is a member (sub-user), also include parent's projects
-        if (user.parent_user_id) {
-            accessibleUserIds.push(user.parent_user_id);
-        }
-
-        // If user is owner, include all sub-users' projects
-        if (user.role === 'owner' && !user.parent_user_id) {
-            const allUsers = await database.loadData<any>('users');
-            const subUserIds = allUsers
-                ?.filter(u => u.parent_user_id === user.id)
-                .map(u => u.id) || [];
-            
-            if (subUserIds.length > 0) {
-                accessibleUserIds.push(...subUserIds);
-            }
-        }
-
-        // Verify the project belongs to an accessible user
-        if (!existingProject.user_id || !accessibleUserIds.includes(existingProject.user_id)) {
-            throw new Error('Unauthorized access to project');
-        }
-
-        const updatedProject = {
-            ...existingProject,
-            ...updates,
-            id,
-            updated_at: new Date().toISOString(),
-        };
-
-        const result = await database.upsertData<Project>(TABLES.PROJECTS, updatedProject);
-        return result;
-    } catch (error) {
-        console.error('Update project error:', error);
-        throw error;
-    }
+    if (!await getCurrentUser()) throw new Error('User not authenticated');
+    return database.updateData<Project>(TABLES.PROJECTS, id, updates);
 };
-
-/**
- * Delete a project
- */
 export const deleteProject = async (id: string): Promise<void> => {
-    try {
-        const user = await getCurrentUser();
-        if (!user) {
-            throw new Error('User not authenticated');
-        }
-
-        // Get the existing project
-        const existingProject = await database.loadDataById<Project>(TABLES.PROJECTS, id);
-        if (!existingProject) {
-            throw new Error('Project not found');
-        }
-
-        // Get list of user IDs that this user can access projects from
-        const accessibleUserIds: string[] = [user.id];
-
-        // If user is a member (sub-user), also include parent's projects
-        if (user.parent_user_id) {
-            accessibleUserIds.push(user.parent_user_id);
-        }
-
-        // If user is owner, include all sub-users' projects
-        if (user.role === 'owner' && !user.parent_user_id) {
-            const allUsers = await database.loadData<any>('users');
-            const subUserIds = allUsers
-                ?.filter(u => u.parent_user_id === user.id)
-                .map(u => u.id) || [];
-            
-            if (subUserIds.length > 0) {
-                accessibleUserIds.push(...subUserIds);
-            }
-        }
-
-        // Verify the project belongs to an accessible user
-        if (!existingProject.user_id || !accessibleUserIds.includes(existingProject.user_id)) {
-            throw new Error('Unauthorized access to project');
-        }
-
-        await database.deleteData(TABLES.PROJECTS, id);
-    } catch (error) {
-        console.error('Delete project error:', error);
-        throw error;
-    }
+    if (!await getCurrentUser()) throw new Error('User not authenticated');
+    await database.deleteData(TABLES.PROJECTS, id);
 };
-
-/**
- * Get projects by status
- */
 export const getProjectsByStatus = async (status: string): Promise<Project[]> => {
-    try {
-        const user = await getCurrentUser();
-        if (!user) {
-            throw new Error('User not authenticated');
-        }
-
-        const projects = await database.loadData<Project>(TABLES.PROJECTS, {
-            filter: `user_id.eq.${user.id},status.eq.${status}`,
-            order: 'created_at.desc'
-        });
-
-        return projects || [];
-    } catch (error) {
-        console.error('Get projects by status error:', error);
-        throw error;
-    }
+    if (!await getCurrentUser()) throw new Error('User not authenticated');
+    return database.loadData<Project>(TABLES.PROJECTS, { filter: 'status.eq.' + status, order: 'created_at.desc' });
 };

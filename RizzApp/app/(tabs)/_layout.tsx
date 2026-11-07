@@ -1,23 +1,19 @@
+import { canManageMembers } from '../../services/routePolicy';
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect } from "@react-navigation/native";
 import { Tabs } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useEffect } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { getCurrentUser, User } from "../../api/authApi";
+import { useAccount } from '../../context/AuthContext';
 import { registerForPushNotificationsAsync } from "../../services/notificationService";
 import { subscribeToAll, unsubscribeFromAll, WebSocketCallbacks } from "../../services/websocketService";
 
 export default function TabsLayout() {
   const insets = useSafeAreaInsets();
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { user: currentUser } = useAccount();
 
   // Initialize push notifications on mount
   useEffect(() => {
-    registerForPushNotificationsAsync().then((token) => {
-      if (token) {
-        console.log('📱 Push notifications registered in tabs layout');
-      }
-    }).catch((error) => {
+    registerForPushNotificationsAsync().catch((error) => {
       console.error('❌ Failed to register push notifications:', error);
     });
   }, []);
@@ -27,18 +23,6 @@ export default function TabsLayout() {
     if (!currentUser) return;
 
     const callbacks: WebSocketCallbacks = {
-      onProjectCreated: (project) => {
-        console.log('🔔 WebSocket: Project created -', project.name);
-      },
-      onProjectUpdated: (project) => {
-        console.log('🔔 WebSocket: Project updated -', project.name);
-      },
-      onExpenseCreated: (expense) => {
-        console.log('🔔 WebSocket: Expense created - ₹', expense.amount);
-      },
-      onExpenseUpdated: (expense) => {
-        console.log('🔔 WebSocket: Expense updated - ₹', expense.amount);
-      },
       onError: (error) => {
         console.error('❌ WebSocket error:', error);
       },
@@ -57,44 +41,8 @@ export default function TabsLayout() {
     };
   }, [currentUser]);
 
-  // Load user on mount and whenever tabs gain focus
-  useFocusEffect(
-    React.useCallback(() => {
-      let interval: NodeJS.Timeout | null = null;
-      
-      const loadUser = async () => {
-        const user = await getCurrentUser();
-        setCurrentUser(user);
-        console.log('👤 Tabs Layout - Current User:', user?.email, 'Role:', user?.role);
-        
-        // If user not found, start polling
-        if (!user) {
-          interval = setInterval(async () => {
-            const polledUser = await getCurrentUser();
-            if (polledUser) {
-              setCurrentUser(polledUser);
-              console.log('👤 Tabs Layout - User loaded after poll:', polledUser?.email, 'Role:', polledUser?.role);
-              if (interval) clearInterval(interval);
-            }
-          }, 1000);
-          
-          // Clean up interval after 10 seconds
-          setTimeout(() => {
-            if (interval) clearInterval(interval);
-          }, 10000);
-        }
-      };
-      loadUser();
-      
-      return () => {
-        if (interval) clearInterval(interval);
-      };
-    }, [])
-  );
-
   // Check if user is an owner (not a sub-user)
-  const isOwner = currentUser && (!currentUser.parent_user_id || currentUser.role === 'owner');
-  console.log('🔑 Tabs Layout - Is Owner:', isOwner, 'User Role:', currentUser?.role);
+  const isOwner = canManageMembers(currentUser);
   
   return (
     <Tabs
@@ -136,15 +84,16 @@ export default function TabsLayout() {
           headerShown: false,
         }}
       />
+      <Tabs.Protected guard={isOwner}>
       <Tabs.Screen
         name="users"
         options={{
           title: "Users",
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="account-group" size={size} color={color} />,
           headerShown: false,
-          href: isOwner ? '/users' : null,
         }}
       />
+      </Tabs.Protected>
       <Tabs.Screen
         name="profile"
         options={{

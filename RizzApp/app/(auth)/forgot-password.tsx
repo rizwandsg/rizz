@@ -1,9 +1,9 @@
 import { useClerk, useSignIn } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import { logout } from '../../api/authApi';
 import {
     ActivityIndicator,
     Alert,
@@ -27,13 +27,13 @@ export default function ForgotPasswordScreen() {
     const [newPassword, setNewPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [step, setStep] = useState<'email' | 'code' | 'success'>('email');
+    const [step, setStep] = useState<'email' | 'code' | 'complete' | 'success'>('email');
+    const submitting = useRef(false);
 
     // Auto-navigate to login after successful password reset
     useEffect(() => {
         if (step === 'success') {
             const timer = setTimeout(() => {
-                console.log('🔐 Auto-navigating to login after successful password reset');
                 router.replace('/(auth)/clerk-signin');
             }, 2500);
 
@@ -42,7 +42,7 @@ export default function ForgotPasswordScreen() {
     }, [step, router]);
 
     const handleSendCode = async () => {
-        if (!isLoaded) return;
+        if (!isLoaded || submitting.current) return;
 
         if (!email.trim()) {
             Alert.alert('Error', 'Please enter your email address');
@@ -55,6 +55,7 @@ export default function ForgotPasswordScreen() {
             return;
         }
 
+        submitting.current = true;
         setLoading(true);
         try {
             await signIn.create({
@@ -62,28 +63,47 @@ export default function ForgotPasswordScreen() {
                 identifier: email.trim(),
             });
             
-            console.log('✅ Password reset code sent to:', email);
             Alert.alert(
                 'Code Sent!',
                 'Please check your email for the verification code.',
                 [{ text: 'OK', onPress: () => setStep('code') }]
             );
         } catch (err: any) {
-            console.error('❌ Send Code Error:', err);
             Alert.alert(
                 'Error',
                 err.errors?.[0]?.message || 'Failed to send reset code. Please check your email and try again.'
             );
         } finally {
+            submitting.current = false;
+            setLoading(false);
+        }
+    };
+
+    const finishSignOut = async () => {
+        await signOut();
+        await logout();
+        setStep('success');
+    };
+
+    const retrySignOut = async () => {
+        if (submitting.current) return;
+        submitting.current = true;
+        setLoading(true);
+        try {
+            await finishSignOut();
+        } catch {
+            Alert.alert('Sign Out Failed', 'Your password was changed. Check your connection and retry signing out.');
+        } finally {
+            submitting.current = false;
             setLoading(false);
         }
     };
 
     const handleResetPassword = async () => {
-        if (!isLoaded) return;
+        if (!isLoaded || submitting.current) return;
 
-        if (!code.trim()) {
-            Alert.alert('Error', 'Please enter the verification code');
+        if (!/^\d{6}$/.test(code.trim())) {
+            Alert.alert('Error', 'Please enter the 6-digit verification code');
             return;
         }
 
@@ -92,6 +112,7 @@ export default function ForgotPasswordScreen() {
             return;
         }
 
+        submitting.current = true;
         setLoading(true);
         try {
             const result = await signIn.attemptFirstFactor({
@@ -101,34 +122,28 @@ export default function ForgotPasswordScreen() {
             });
 
             if (result.status === 'complete') {
-                console.log('✅ Password reset successful!');
-                
-                // Sign out the user after password reset so they can sign in with new password
+                // The code is consumed: retry cleanup separately if sign-out fails.
+                setStep('complete');
                 try {
-                    await signOut();
-                    await AsyncStorage.removeItem('@rizzapp_user');
-                    await AsyncStorage.removeItem('@rizzapp_token');
-                    console.log('✅ Signed out after password reset - user can now sign in with new password');
-                } catch (signOutError) {
-                    console.error('⚠️ Sign out error after password reset:', signOutError);
+                    await finishSignOut();
+                } catch {
+                    Alert.alert('Sign Out Failed', 'Your password was changed. Check your connection and retry signing out.');
                 }
-                
-                setStep('success');
             } else {
                 Alert.alert('Error', 'Password reset incomplete. Please try again.');
             }
         } catch (err: any) {
-            console.error('❌ Reset Password Error:', err);
             Alert.alert(
                 'Error',
                 err.errors?.[0]?.message || 'Invalid code or failed to reset password. Please try again.'
             );
         } finally {
+            submitting.current = false;
             setLoading(false);
         }
     };
 
-    if (step === 'success') {
+    if (step === 'complete' || step === 'success') {
         return (
             <View style={styles.container}>
                 <LinearGradient
@@ -149,16 +164,17 @@ export default function ForgotPasswordScreen() {
                             Your password has been reset successfully.
                         </Text>
                         <Text style={styles.instructionText}>
-                            Please sign in with your new password.
+                            {step === 'success' ? 'Please sign in with your new password.' : 'Finish signing out before signing in with your new password.'}
                         </Text>
                         <Text style={[styles.instructionText, { marginTop: 10, fontSize: 12, color: '#999' }]}>
-                            Redirecting to sign in...
+                            {step === 'success' ? 'Redirecting to sign in...' : 'Your password is saved. You do not need another reset code.'}
                         </Text>
                     </View>
 
                     <TouchableOpacity
                         style={styles.signInButton}
-                        onPress={() => router.replace('/(auth)/clerk-signin')}
+                        onPress={step === 'success' ? () => router.replace('/(auth)/clerk-signin') : retrySignOut}
+                        disabled={loading}
                     >
                         <LinearGradient
                             colors={['#667eea', '#764ba2']}
@@ -167,7 +183,7 @@ export default function ForgotPasswordScreen() {
                             style={styles.buttonGradient}
                         >
                             <MaterialCommunityIcons name="login" size={20} color="#fff" />
-                            <Text style={styles.buttonText}>Go to Sign In</Text>
+                            <Text style={styles.buttonText}>{step === 'success' ? 'Go to Sign In' : 'Retry Sign Out'}</Text>
                         </LinearGradient>
                     </TouchableOpacity>
                 </View>
@@ -289,7 +305,7 @@ export default function ForgotPasswordScreen() {
                                 onPress={handleSendCode}
                                 disabled={loading}
                             >
-                                <Text style={styles.resendButtonText}>Didn't receive the code? Resend</Text>
+                                <Text style={styles.resendButtonText}>Did not receive the code? Resend</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -320,7 +336,7 @@ export default function ForgotPasswordScreen() {
                         <View style={styles.infoBox}>
                             <MaterialCommunityIcons name="information" size={24} color="#667eea" />
                             <Text style={styles.infoText}>
-                                Enter your email address and we'll send you a verification code to reset your password.
+                                Enter your email address and we will send you a verification code to reset your password.
                             </Text>
                         </View>
 

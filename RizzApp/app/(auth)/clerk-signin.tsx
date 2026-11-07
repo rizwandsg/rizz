@@ -1,9 +1,8 @@
-import { useAuth, useClerk, useSignIn } from '@clerk/clerk-expo';
+import { useSignIn } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -16,145 +15,30 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { getSupabaseUserFromClerk, syncClerkUserToSupabase } from '../../api/authApi';
 
 export default function ClerkSignInScreen() {
     const { signIn, setActive, isLoaded } = useSignIn();
-    const { getToken, isSignedIn } = useAuth();
-    const { signOut } = useClerk();
     const router = useRouter();
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
-
-    // Check if user is already signed in
-    useEffect(() => {
-        if (isLoaded && isSignedIn) {
-            console.log('⚠️ User already signed in, redirecting to home...');
-            router.replace('/(tabs)/home');
-        }
-    }, [isLoaded, isSignedIn, router]);
+    const submitting = useRef(false);
 
     const handleSignIn = async () => {
-        if (!isLoaded) return;
-
-        // Validation
-        if (!email.trim()) {
-            Alert.alert('Error', 'Please enter your email');
-            return;
-        }
-        if (!password) {
-            Alert.alert('Error', 'Please enter your password');
-            return;
-        }
-
+        if (!isLoaded || submitting.current) return;
+        if (!email.trim() || !password) { Alert.alert('Error', 'Enter your email and password'); return; }
+        submitting.current = true;
         setLoading(true);
         try {
-            // Step 1: Create sign-in attempt with Clerk
-            const completeSignIn = await signIn.create({
-                identifier: email,
-                password,
-            });
-
-            // Step 2: Set the session as active
-            await setActive({ session: completeSignIn.createdSessionId });
-            console.log('✅ Clerk session active');
-
-            // Step 3: Get Clerk user ID from the JWT token
-            // After setActive, we can get the token which contains the userId
-            const token = await getToken();
-            
-            if (!token) {
-                console.error('❌ Failed to get token from Clerk session');
-                throw new Error('Failed to get authentication token');
-            }
-            
-            // Decode JWT to get userId (JWT format: header.payload.signature)
-            // We need the payload which is the middle part
-            const payload = token.split('.')[1];
-            const decodedPayload = JSON.parse(atob(payload));
-            const currentUserId = decodedPayload.sub; // 'sub' contains the user ID in JWT
-            
-            if (!currentUserId) {
-                console.error('❌ Failed to extract userId from token');
-                throw new Error('Failed to get Clerk user ID from token');
-            }
-            
-            console.log('🔑 Clerk User ID:', currentUserId);
-
-            // Step 4: Sync to Supabase + AsyncStorage
-            try {
-                // Get user from Supabase using Clerk ID
-                let supabaseUser = await getSupabaseUserFromClerk(currentUserId);
-                
-                // If user doesn't exist in Supabase, create them
-                if (!supabaseUser) {
-                    console.log('📝 User not found in Supabase, creating...');
-                    // Get email from the sign-in object
-                    const userEmail = completeSignIn.identifier || email;
-                    // Use email as full name if we don't have it (user can update later)
-                    const userFullName = userEmail.split('@')[0];
-                    
-                    supabaseUser = await syncClerkUserToSupabase(currentUserId, userEmail, userFullName);
-                    console.log('✅ Clerk user created in Supabase');
-                }
-                
-                if (supabaseUser) {
-                    // Store in AsyncStorage for getCurrentUser()
-                    await AsyncStorage.setItem('@rizzapp_user', JSON.stringify(supabaseUser));
-                    await AsyncStorage.setItem('@rizzapp_token', supabaseUser.id);
-                    console.log('✅ Clerk user stored in AsyncStorage');
-                    console.log('✅ User data:', { id: supabaseUser.id, email: supabaseUser.email, clerk_user_id: supabaseUser.clerk_user_id });
-                } else {
-                    throw new Error('Failed to get or create Supabase user');
-                }
-            } catch (syncError) {
-                console.error('❌ CRITICAL: Failed to sync user data:', syncError);
-                Alert.alert('Sync Error', 'Failed to sync your account data. Please try signing in again.');
-                throw syncError; // Block sign-in if sync fails
-            }
-
-            // Step 5: Navigate to home screen
-            console.log('✅ Clerk Sign-In Successful!');
+            const result = await signIn.create({ identifier: email.trim(), password });
+            if (result.status !== 'complete' || !result.createdSessionId) throw new Error('Additional verification is required. Complete your account verification before signing in.');
+            await setActive({ session: result.createdSessionId });
             router.replace('/(tabs)/home');
-        } catch (err: any) {
-            console.error('❌ Clerk Sign-In Error:', JSON.stringify(err, null, 2));
-
-            // Handle session already exists error
-            if (err?.errors?.[0]?.code === 'session_exists') {
-                console.log('⚠️ Session already exists - clearing stale session and redirecting...');
-                try {
-                    // Sign out from Clerk to clear the stale session
-                    await signOut();
-                    console.log('✅ Cleared Clerk session');
-                    
-                    // Clear AsyncStorage
-                    await AsyncStorage.removeItem('@rizzapp_user');
-                    await AsyncStorage.removeItem('@rizzapp_token');
-                    console.log('✅ Cleared AsyncStorage');
-                    
-                    // Show message and redirect to login to try again
-                    Alert.alert(
-                        'Session Conflict',
-                        'Please try signing in again.',
-                        [{ text: 'OK' }]
-                    );
-                } catch (clearError) {
-                    console.error('❌ Failed to clear session:', clearError);
-                }
-                setLoading(false);
-                return;
-            }
-
-            Alert.alert(
-                'Sign In Failed',
-                err.errors?.[0]?.message || 'Invalid email or password. Please try again.'
-            );
-        } finally {
-            setLoading(false);
-        }
+        } catch (error: any) {
+            Alert.alert('Sign In Failed', error.errors?.[0]?.message || error.message || 'Please try again');
+        } finally { submitting.current = false; setLoading(false); }
     };
 
     return (
@@ -187,7 +71,7 @@ export default function ClerkSignInScreen() {
                             <MaterialCommunityIcons name="email" size={20} color="#999" />
                             <TextInput
                                 style={styles.input}
-                                value={email}
+                                testID="auth-email" value={email}
                                 onChangeText={setEmail}
                                 placeholder="Enter your email"
                                 placeholderTextColor="#999"
@@ -205,7 +89,7 @@ export default function ClerkSignInScreen() {
                             <MaterialCommunityIcons name="lock" size={20} color="#999" />
                             <TextInput
                                 style={styles.input}
-                                value={password}
+                                testID="auth-password" value={password}
                                 onChangeText={setPassword}
                                 placeholder="Enter your password"
                                 placeholderTextColor="#999"
@@ -233,7 +117,7 @@ export default function ClerkSignInScreen() {
                     {/* Sign In Button */}
                     <TouchableOpacity
                         style={styles.signInButton}
-                        onPress={handleSignIn}
+                        testID="auth-submit" onPress={handleSignIn}
                         disabled={loading}
                     >
                         <LinearGradient

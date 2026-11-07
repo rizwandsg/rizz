@@ -1,8 +1,12 @@
+import { useRequestGuard } from '../hooks/useRequestGuard';
+import { useFocusEffect } from '@react-navigation/native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
+    Alert,
     Dimensions,
     RefreshControl,
     ScrollView,
@@ -14,8 +18,9 @@ import {
 import { BarChart, LineChart, ProgressChart } from 'react-native-chart-kit';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpensesByProject } from '../api/expensesApi';
-import { getPaymentsByProject, getPaymentSummary, PaymentSummary } from '../api/paymentsApi';
+import { getPaymentSummary, PaymentSummary } from '../api/paymentsApi';
 import { getProjectById, Project } from '../api/projectsApi';
+import { downloadProjectCostData, ProjectCostSummary, generateAndSavePDF, generateAndSharePDF } from '../services/exportService';
 
 const { width } = Dimensions.get('window');
 
@@ -39,6 +44,7 @@ const chartConfig = {
 export default function IndividualProjectAnalytics() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
+  const { start: startRequest, cancel: cancelRequest } = useRequestGuard();
   
   const [project, setProject] = useState<Project | null>(null);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -46,23 +52,25 @@ export default function IndividualProjectAnalytics() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState(false);
 
-  useEffect(() => {
-    console.log('IndividualProjectAnalytics loaded with ID:', id);
+  useFocusEffect(useCallback(() => {
     if (id) {
       loadProjectAnalytics();
     } else {
       setError('No project ID provided');
       setLoading(false);
     }
+    return cancelRequest;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, cancelRequest]));
 
   const loadProjectAnalytics = async () => {
+    const isCurrent = startRequest();
     try {
       setLoading(true);
       setError(null);
-      console.log('Loading analytics for project:', id);
+      if (typeof id !== 'string' || !id) throw new Error('No valid project ID provided');
       
       // First, load project and expenses
       const [projectData, expensesData] = await Promise.all([
@@ -70,13 +78,9 @@ export default function IndividualProjectAnalytics() {
         getExpensesByProject(id as string),
       ]);
 
-      console.log('Project data loaded:', projectData);
-      console.log('Project scope_of_work:', projectData?.scope_of_work);
-      console.log('Loaded expenses:', expensesData);
       
       // Calculate total expenses
       const totalExpenses = expensesData.reduce((sum, expense) => sum + expense.amount, 0);
-      console.log('Total expenses calculated:', totalExpenses);
       
       // Now get payment summary with correct values
       const paymentData = await getPaymentSummary(
@@ -85,17 +89,17 @@ export default function IndividualProjectAnalytics() {
         totalExpenses
       );
       
-      console.log('Loaded payments:', await getPaymentsByProject(id as string));
-      console.log('Payment summary:', paymentData);
       
+      if (!isCurrent()) return;
       setProject(projectData);
       setExpenses(expensesData);
       setPaymentSummary(paymentData);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error('Error loading project analytics:', error);
       setError('Failed to load project analytics');
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
   };
 
@@ -103,6 +107,104 @@ export default function IndividualProjectAnalytics() {
     setRefreshing(true);
     await loadProjectAnalytics();
     setRefreshing(false);
+  };
+
+  const handleDownloadProjectCost = async () => {
+    if (!project || !paymentSummary) return;
+
+    // Show options for PDF export
+    Alert.alert(
+      'Export PDF',
+      'Choose how to export the project cost summary:',
+      [
+        {
+          text: 'Share',
+          onPress: async () => {
+            setIsDownloading(true);
+            try {
+              // Group expenses by category
+              const categoryMap = new Map<string, number>();
+              expenses.forEach((expense) => {
+                const category = expense.category || 'Other';
+                categoryMap.set(category, (categoryMap.get(category) || 0) + expense.amount);
+              });
+
+              const expensesByCategory = Array.from(categoryMap.entries())
+                .map(([category, amount]) => ({
+                  category,
+                  amount,
+                  percentage: paymentSummary.project_cost > 0 ? (amount / paymentSummary.project_cost) * 100 : 0
+                }))
+                .sort((a, b) => b.amount - a.amount);
+
+              const costSummary: ProjectCostSummary = {
+                projectName: project.name,
+                clientName: project.client_name || '',
+                totalBudget: paymentSummary.project_cost,
+                totalExpenses: paymentSummary.total_expenses,
+                totalReceived: paymentSummary.total_received,
+                remainingAmount: paymentSummary.remaining_amount,
+                profitLoss: paymentSummary.profit_loss,
+                expensesByCategory
+              };
+
+              await downloadProjectCostData(costSummary, 'pdf');
+              Alert.alert('Success', 'PDF ready to share');
+            } catch (err) {
+              console.error('Share error:', err);
+              Alert.alert('Error', 'Failed to share PDF');
+            } finally {
+              setIsDownloading(false);
+            }
+          },
+        },
+        {
+          text: 'Save to Device',
+          onPress: async () => {
+            setIsDownloading(true);
+            try {
+              // Group expenses by category
+              const categoryMap = new Map<string, number>();
+              expenses.forEach((expense) => {
+                const category = expense.category || 'Other';
+                categoryMap.set(category, (categoryMap.get(category) || 0) + expense.amount);
+              });
+
+              const expensesByCategory = Array.from(categoryMap.entries())
+                .map(([category, amount]) => ({
+                  category,
+                  amount,
+                  percentage: paymentSummary.project_cost > 0 ? (amount / paymentSummary.project_cost) * 100 : 0
+                }))
+                .sort((a, b) => b.amount - a.amount);
+
+              const costSummary: ProjectCostSummary = {
+                projectName: project.name,
+                clientName: project.client_name || '',
+                totalBudget: paymentSummary.project_cost,
+                totalExpenses: paymentSummary.total_expenses,
+                totalReceived: paymentSummary.total_received,
+                remainingAmount: paymentSummary.remaining_amount,
+                profitLoss: paymentSummary.profit_loss,
+                expensesByCategory
+              };
+
+              const filepath = await generateAndSavePDF(costSummary);
+              Alert.alert('Success', `PDF saved to device:\n${filepath}`);
+            } catch (err) {
+              console.error('Save error:', err);
+              Alert.alert('Error', `Failed to save PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            } finally {
+              setIsDownloading(false);
+            }
+          },
+        },
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+      ]
+    );
   };
 
   // Prepare expense data by category
@@ -222,10 +324,17 @@ export default function IndividualProjectAnalytics() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Project Analytics</Text>
-      </View>
+      {/* Header with Gradient */}
+      <LinearGradient
+        colors={['#667eea', '#764ba2']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Project Analytics</Text>
+        </View>
+      </LinearGradient>
 
       <ScrollView 
         style={styles.scrollView} 
@@ -393,7 +502,23 @@ export default function IndividualProjectAnalytics() {
 
         {/* Expense Details List */}
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>Expense Breakdown</Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Expense Breakdown</Text>
+            <TouchableOpacity
+              style={[styles.downloadPdfBtn, isDownloading && styles.downloadPdfBtnActive]}
+              onPress={handleDownloadProjectCost}
+              disabled={isDownloading}
+            >
+              {isDownloading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <View style={styles.pdfButtonContent}>
+                  <MaterialCommunityIcons name="file-pdf-box" size={20} color="#fff" />
+                  <Text style={styles.pdfButtonText}>PDF</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
           {expensesByCategory.map((category, index) => {
             const percentage = paymentSummary.total_expenses > 0 
               ? (category.value / paymentSummary.total_expenses) * 100 
@@ -429,25 +554,19 @@ export default function IndividualProjectAnalytics() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f5f5fa',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#667eea',
     paddingHorizontal: 20,
     paddingVertical: 16,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    shadowColor: '#667eea',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: '700',
     color: '#fff',
   },
@@ -493,39 +612,39 @@ const styles = StyleSheet.create({
   },
   summaryCard: {
     width: (width - 44) / 2,
-    padding: 18,
-    borderRadius: 16,
+    padding: 20,
+    borderRadius: 20,
     alignItems: 'center',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 12,
+    elevation: 5,
   },
   summaryLabel: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.95)',
-    marginTop: 8,
+    fontSize: 11,
+    color: 'rgba(255,255,255,0.85)',
+    marginTop: 10,
     fontWeight: '600',
     textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    letterSpacing: 1,
   },
   summaryValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: '700',
     color: '#fff',
-    marginTop: 4,
+    marginTop: 6,
   },
   chartSection: {
     backgroundColor: '#fff',
     marginHorizontal: 16,
-    marginTop: 16,
-    padding: 20,
-    borderRadius: 16,
+    marginTop: 20,
+    padding: 24,
+    borderRadius: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
     elevation: 3,
   },
   sectionTitle: {
@@ -630,5 +749,48 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  headerGradient: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: '#667eea',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  downloadPdfBtn: {
+    backgroundColor: '#667eea',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    flexDirection: 'row',
+    opacity: 0.9,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  downloadPdfBtnActive: {
+    opacity: 1,
+  },
+  pdfButtonContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  pdfButtonText: {
+    color: '#fff',
+    fontWeight: '600',
+    fontSize: 14,
   },
 });

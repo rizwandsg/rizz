@@ -1,7 +1,10 @@
+import { useFocusEffect } from '@react-navigation/native';
+import { LoadFailure } from '../../components/LoadFailure';
+import { projectExpenseSummaries } from '../../services/screenData';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from "expo-router";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpenses } from "../../api/expensesApi";
@@ -21,6 +24,7 @@ export default function ExpenseScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
   const [projectSummaries, setProjectSummaries] = useState<ProjectExpenseSummary[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const router = useRouter();
@@ -29,51 +33,13 @@ export default function ExpenseScreen() {
 
   const loadData = async () => {
     try {
-      // Load projects and expenses
-      const projectsList = await getProjects();
-      const expensesList = await getExpenses();
-
-      // Group expenses by project
-      const projectMap = new Map<string, ProjectExpenseSummary>();
-
-      // Initialize all projects with zero expenses
-      projectsList.forEach(project => {
-        if (project.id) {
-          projectMap.set(project.id, {
-            projectId: project.id,
-            projectName: project.name,
-            totalAmount: 0,
-            expenseCount: 0,
-            expenses: [],
-            lastExpenseDate: new Date().toISOString(),
-          });
-        }
-      });
-
-      // Add expenses to their respective projects
-      expensesList.forEach(expense => {
-        if (expense.project_id && projectMap.has(expense.project_id)) {
-          const summary = projectMap.get(expense.project_id)!;
-          summary.totalAmount += expense.amount || 0;
-          summary.expenseCount += 1;
-          summary.expenses.push(expense);
-          
-          // Update last expense date
-          if (expense.expense_date && 
-              new Date(expense.expense_date) > new Date(summary.lastExpenseDate)) {
-            summary.lastExpenseDate = expense.expense_date;
-          }
-        }
-      });
-
-      // Convert to array and sort by total amount (highest first)
-      const summaries = Array.from(projectMap.values())
-        .filter(s => s.expenseCount > 0) // Only show projects with expenses
-        .sort((a, b) => b.totalAmount - a.totalAmount);
-
-      setProjectSummaries(summaries);
+      setLoading(true);
+      setError(null);
+      const [projectsList, expensesList] = await Promise.all([getProjects(), getExpenses()]);
+      setProjectSummaries(projectExpenseSummaries(projectsList, expensesList));
     } catch (error) {
-      console.error("Error loading data:", error);
+      setProjectSummaries([]);
+      setError("Failed to load expenses. Please retry.");
     } finally {
       setLoading(false);
     }
@@ -85,9 +51,7 @@ export default function ExpenseScreen() {
     setRefreshing(false);
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useFocusEffect(useCallback(() => { void loadData(); }, []));
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', {
@@ -105,6 +69,8 @@ export default function ExpenseScreen() {
       </View>
     );
   }
+
+  if (error) return <LoadFailure message={error} retry={loadData} />;
 
   const totalExpenses = projectSummaries.reduce((sum, project) => sum + project.totalAmount, 0);
   const totalTransactions = projectSummaries.reduce((sum, project) => sum + project.expenseCount, 0);

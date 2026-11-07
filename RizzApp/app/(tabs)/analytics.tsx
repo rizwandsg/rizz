@@ -1,12 +1,15 @@
+import { useFocusEffect } from '@react-navigation/native';
+import { LoadFailure } from '../../components/LoadFailure';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useEffect, useState } from "react";
-import { ActivityIndicator, Dimensions, RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useState } from "react";
+import { ActivityIndicator, Alert, Dimensions, RefreshControl, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { LineChart, PieChart } from "react-native-chart-kit";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Expense, getExpenses } from "../../api/expensesApi";
+import { CategorySummary, Expense, getExpenses, getTopExpenseCategories } from "../../api/expensesApi";
 import { getProjects, Project } from "../../api/projectsApi";
 import { useTheme } from '../../context/ThemeContext';
+import { downloadCategoriesData } from '../../services/exportService';
 
 interface ChartDataPoint {
   name: string;
@@ -54,83 +57,30 @@ function AnalyticsRoute() {
   const [refreshing, setRefreshing] = useState(false);
   const [projectData, setProjectData] = useState<ChartDataPoint[]>([]);
   const [expenseData, setExpenseData] = useState<ExpenseData[]>([]);
+  const [topCategories, setTopCategories] = useState<CategorySummary[]>([]);
+  const [downloadingFormat, setDownloadingFormat] = useState<'csv' | 'json' | null>(null);
   const [totalBudget, setTotalBudget] = useState(0);
   const [totalExpenses, setTotalExpenses] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   console.log('📊 Analytics rendering with theme:', theme.name);
 
-  useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Load projects
-        const projects = await getProjects();
-        
-        // Calculate total budget from project costs
-        const calculatedBudget = projects.reduce((sum, p) => sum + (p.total_project_cost || 0), 0);
-        setTotalBudget(calculatedBudget || projects.length * 100000);
-          
-        const projectChartData = projects.map((p: Project, index: number) => {
-          const projectBudget = p.total_project_cost || 100000;
-          // Truncate name to fit better
-          let displayName = p.name;
-          if (displayName.length > 12) {
-            displayName = displayName.substring(0, 12) + '...';
-          }
-          
-          return {
-            name: displayName,
-            population: projectBudget,
-            color: getProjectColor(index),
-            legendFontColor: "#333",
-            legendFontSize: 10
-          };
-        });
-        
-        setProjectData(projectChartData);
-
-        // Load expenses
-        const expenses = await getExpenses();
-        const expenseTotal = expenses.reduce((sum: number, e: Expense) => sum + (e.amount ?? 0), 0);
-        setTotalExpenses(expenseTotal);
-        
-        // Convert Expense to ExpenseData format
-        const expenseDataList: ExpenseData[] = expenses.map(e => ({
-          id: e.id || '',
-          projectId: e.project_id || '',
-          description: e.description,
-          cost: e.amount || 0,
-          date: e.expense_date
-        }));
-        setExpenseData(expenseDataList);
-        
-        if (projects.length === 0 && expenses.length === 0) {
-          setError('No data available yet. Add some projects and expenses to see analytics.');
-        } else {
-          setError(null);
-        }
-      } catch (error) {
-        console.error("Error loading data:", error);
-        alert(error instanceof Error ? error.message : "Failed to load analytics data");
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadData();
-  }, []);
+  useFocusEffect(useCallback(() => { void onRefresh(); }, []));
 
   const onRefresh = async () => {
     setRefreshing(true);
+    setLoading(true);
+    setError(null);
     try {
       const projects = await getProjects();
       const expenses = await getExpenses();
+      const categories = await getTopExpenseCategories(10);
 
       const calculatedBudget = projects.reduce((sum, p) => sum + (p.total_project_cost || 0), 0);
-      setTotalBudget(calculatedBudget || projects.length * 100000);
+      setTotalBudget(calculatedBudget);
 
       const projectChartData = projects.map((p: Project, index: number) => {
-        const projectBudget = p.total_project_cost || 100000;
+        const projectBudget = p.total_project_cost || 0;
         const displayName = p.name.length > 10 ? p.name.substring(0, 10) + '...' : p.name;
         
         return {
@@ -156,6 +106,7 @@ function AnalyticsRoute() {
       }));
       
       setExpenseData(expenseDataList);
+      setTopCategories(categories);
       
       if (projects.length === 0 && expenses.length === 0) {
         setError('No data available yet. Add some projects and expenses to see analytics.');
@@ -163,9 +114,10 @@ function AnalyticsRoute() {
         setError(null);
       }
     } catch (error) {
-      console.error("Error refreshing data:", error);
+      setError("Failed to load analytics. Please retry.");
     } finally {
       setRefreshing(false);
+      setLoading(false);
     }
   };
 
@@ -178,14 +130,22 @@ function AnalyticsRoute() {
     );
   }
 
-  if (error) {
-    return (
-      <View style={styles.errorContainer}>
-        <MaterialCommunityIcons name="alert-circle-outline" size={48} color="#FF3B30" />
-        <Text style={styles.errorText}>{error}</Text>
-      </View>
-    );
-  }
+  if (error) return <LoadFailure message={error} retry={onRefresh} />;
+
+  // Download handler for categories
+  const handleDownloadCategories = (format: 'csv' | 'json') => {
+    setDownloadingFormat(format);
+    downloadCategoriesData(topCategories, format)
+      .then(() => {
+        Alert.alert('Success', `Top categories exported as ${format.toUpperCase()}`);
+        setDownloadingFormat(null);
+      })
+      .catch((err) => {
+        console.error('Download error:', err);
+        Alert.alert('Error', `Failed to download categories: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        setDownloadingFormat(null);
+      });
+  };
 
   // Prepare expense data for line chart
   const expensesByMonth = expenseData.reduce<{ [key: string]: number }>((acc, expense) => {
@@ -195,10 +155,15 @@ function AnalyticsRoute() {
     return acc;
   }, {});
 
+  const months = Object.keys(expensesByMonth).sort((a, b) => {
+    const [am, ay] = a.split('/').map(Number);
+    const [bm, by] = b.split('/').map(Number);
+    return ay - by || am - bm;
+  }).slice(-6);
   const expenseChartData = {
-    labels: Object.keys(expensesByMonth).slice(-6), // Last 6 months
+    labels: months, // Last 6 months
     datasets: [{
-      data: Object.values(expensesByMonth).slice(-6),
+      data: months.map(month => expensesByMonth[month]),
       color: (opacity = 1) => `rgba(52, 199, 89, ${opacity})`,
       strokeWidth: 2
     }]
@@ -272,6 +237,65 @@ function AnalyticsRoute() {
           <View style={styles.emptyChart}>
             <MaterialCommunityIcons name="chart-pie" size={48} color="#ccc" />
             <Text style={styles.emptyText}>No project data available</Text>
+          </View>
+        )}
+      </View>
+
+      <View style={styles.chartContainer}>
+        <View style={styles.categoryHeader}>
+          <Text style={styles.chartTitle}>Top Expense Categories</Text>
+          {topCategories.length > 0 && (
+            <View style={styles.downloadButtons}>
+              <TouchableOpacity
+                style={[styles.downloadBtn, downloadingFormat === 'csv' && styles.downloadBtnActive]}
+                onPress={() => handleDownloadCategories('csv')}
+                disabled={downloadingFormat !== null}
+              >
+                {downloadingFormat === 'csv' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons name="download" size={18} color="#fff" />
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.downloadBtn, downloadingFormat === 'json' && styles.downloadBtnActive]}
+                onPress={() => handleDownloadCategories('json')}
+                disabled={downloadingFormat !== null}
+              >
+                {downloadingFormat === 'json' ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <MaterialCommunityIcons name="file-export" size={18} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+
+        {topCategories.length > 0 ? (
+          <View>
+            {topCategories.map((category, index) => (
+              <View key={index} style={styles.categoryRow}>
+                <View style={styles.categoryInfo}>
+                  <View style={[styles.categoryBadge, { backgroundColor: '#667eea' }]}>
+                    <Text style={styles.categoryIndex}>{index + 1}</Text>
+                  </View>
+                  <View style={styles.categoryDetails}>
+                    <Text style={styles.categoryName}>{category.category}</Text>
+                    <Text style={styles.categoryCount}>{category.expenseCount} expense{category.expenseCount !== 1 ? 's' : ''}</Text>
+                  </View>
+                </View>
+                <View style={styles.categoryAmount}>
+                  <Text style={styles.categoryAmountValue}>₹{category.totalAmount.toFixed(0)}</Text>
+                  <Text style={styles.categoryPercentage}>{category.percentage.toFixed(1)}%</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : (
+          <View style={styles.emptyChart}>
+            <MaterialCommunityIcons name="tag-multiple-outline" size={48} color="#ccc" />
+            <Text style={styles.emptyText}>No expense categories available</Text>
           </View>
         )}
       </View>
@@ -431,6 +455,80 @@ const styles = StyleSheet.create({
     marginTop: 16,
     color: '#666',
     fontSize: 16,
+  },
+  categoryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  downloadButtons: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  downloadBtn: {
+    backgroundColor: '#667eea',
+    borderRadius: 8,
+    padding: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0.9,
+  },
+  downloadBtnActive: {
+    opacity: 1,
+  },
+  categoryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 0,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  categoryInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  categoryBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  categoryIndex: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 14,
+  },
+  categoryDetails: {
+    flex: 1,
+  },
+  categoryName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1a1a1a',
+    marginBottom: 4,
+  },
+  categoryCount: {
+    fontSize: 12,
+    color: '#999',
+  },
+  categoryAmount: {
+    alignItems: 'flex-end',
+  },
+  categoryAmountValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#667eea',
+    marginBottom: 4,
+  },
+  categoryPercentage: {
+    fontSize: 12,
+    color: '#666',
   }
 });
 

@@ -1,3 +1,8 @@
+import { useCreateId } from '../hooks/useCreateId';
+import { useRef } from 'react';
+import { parseMoney, localDate } from '../services/validation';
+import { formError, parseCalendarDate } from '../services/formValues';
+import { FormLoadState } from '../components/FormLoadState';
 ﻿import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -62,6 +67,7 @@ export default function AddProject() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams();
+  const [loadedVersion, setLoadedVersion] = useState<string | undefined>(undefined);
   const [name, setName] = useState("");
   const [clientName, setClientName] = useState("");
   const [description, setDescription] = useState("");
@@ -73,107 +79,103 @@ export default function AddProject() {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showEndPicker, setShowEndPicker] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [loadingProject, setLoadingProject] = useState(!!id);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
+    let cancelled = false;
     const loadProject = async () => {
       if (id) {
-        setLoading(true);
+        setLoadingProject(true);
+        setLoadError(null);
         try {
           const project = await getProjectById(id.toString());
+          if (cancelled) return;
           if (project) {
+            if (!project.updated_at) throw new Error('Project version is missing. Reload before editing.');
+            setLoadedVersion(project.updated_at);
             setName(project.name);
             setClientName(project.client_name || "");
             setDescription(project.description || "");
-            setStartDate(project.start_date ? new Date(project.start_date) : new Date());
-            setEndDate(project.end_date ? new Date(project.end_date) : null);
+            setStartDate(parseCalendarDate(project.start_date));
+            setEndDate(project.end_date ? parseCalendarDate(project.end_date) : null);
             setStatus(project.status || "active");
             setTotalProjectCost(project.total_project_cost?.toString() || "");
             setScopeOfWork(project.scope_of_work || []); // Handle undefined
           } else {
-            console.log('❌ Project not found');
-            Alert.alert("Error", "Project not found");
-            router.back();
+            throw new Error('Project not found or access denied');
           }
         } catch (error) {
-          console.error('❌ Failed to load project:', error);
-          Alert.alert("Error", "Failed to load project");
-          router.back();
+          if (!cancelled) setLoadError(formError(error, 'Failed to load project'));
         } finally {
-          setLoading(false);
+          if (!cancelled) setLoadingProject(false);
         }
       }
     };
     loadProject();
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, loadAttempt]);
 
+  const requestId = useCreateId();
+  const savingRef = useRef(false);
   const handleSave = async () => {
+    if (savingRef.current || loadingProject || loadError) return;
+    savingRef.current = true;
     setLoading(true);
     try {
       if (!name?.trim()) {
         throw new Error("Please enter a project name");
       }
-      
-      const costValue = totalProjectCost.trim() ? parseFloat(totalProjectCost) : undefined;
+      if (endDate && localDate(endDate) < localDate(startDate)) throw new Error('End date must follow start date');
+
+      const costValue = totalProjectCost.trim() ? parseMoney(totalProjectCost, true) : 0;
       if (totalProjectCost.trim() && (isNaN(costValue!) || costValue! < 0)) {
         throw new Error("Please enter a valid project cost");
       }
-      
-      const projectData: Omit<Project, "id" | "user_id" | "created_at" | "updated_at"> = {
+
+      const projectData: Omit<Project, "id" | "user_id" | "created_at"> = {
+        updated_at: loadedVersion,
         name: name.trim(),
-        client_name: clientName.trim() || undefined,
-        description: description.trim() || undefined,
-        start_date: startDate.toISOString().split("T")[0],
-        end_date: endDate ? endDate.toISOString().split("T")[0] : undefined,
+        client_name: clientName.trim(),
+        description: description.trim(),
+        start_date: localDate(startDate),
+        end_date: endDate ? localDate(endDate) : null,
         status: status,
         total_project_cost: costValue,
-        scope_of_work: scopeOfWork.length > 0 ? scopeOfWork : undefined // Only send if selections exist
+        scope_of_work: scopeOfWork
       };
-      
-      console.log('Saving project with data:', projectData);
-      console.log('Scope of work being saved:', projectData.scope_of_work);
-      
+
       if (id) {
         await updateProject(id.toString(), projectData);
         console.log('✅ Project updated successfully');
       } else {
-        await createProject(projectData as Project);
+        await createProject({ ...projectData, id: requestId } as Project);
         console.log('✅ Project created successfully');
       }
-      
-      // Set loading to false BEFORE showing alert
-      setLoading(false);
-      
-      // Show success alert with a tiny delay to ensure it renders
-      console.log('🔔 Showing success alert...');
-      setTimeout(() => {
+
+
+
         Alert.alert(
           "Success", 
           `Project ${id ? "updated" : "created"} successfully!`, 
           [{ 
             text: "OK", 
             onPress: () => {
-              console.log('Alert OK pressed, navigating back...');
               router.back();
             }
           }]
         );
-      }, 100);
     } catch (error) {
       console.error('❌ Error saving project:', error);
       Alert.alert("Error", error instanceof Error ? error.message : "Failed to save project");
+      savingRef.current = false;
       setLoading(false);
     }
   };
 
-  if (loading && id) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#667eea" />
-        <Text style={styles.loadingText}>Loading project...</Text>
-      </View>
-    );
-  }
+  if (loadingProject || loadError) return <FormLoadState error={loadError} onRetry={() => setLoadAttempt(attempt => attempt + 1)} onBack={() => router.back()} />;
 
   return (
     <KeyboardAvoidingView 
@@ -204,7 +206,7 @@ export default function AddProject() {
               <MaterialCommunityIcons name="briefcase" size={20} color="#667eea" />
             </View>
             <TextInput 
-              placeholder="Enter project name" 
+              testID="project-name" placeholder="Enter project name"
               value={name} 
               onChangeText={setName} 
               style={styles.input} 
@@ -240,7 +242,7 @@ export default function AddProject() {
               <MaterialCommunityIcons name="currency-usd" size={20} color="#667eea" />
             </View>
             <TextInput 
-              placeholder="Enter total cost" 
+              testID="project-cost" placeholder="Enter total cost"
               value={totalProjectCost} 
               onChangeText={setTotalProjectCost} 
               style={styles.input} 
@@ -258,6 +260,7 @@ export default function AddProject() {
             {scopeOfWork.length > 0 && (
               <TouchableOpacity 
                 onPress={() => setScopeOfWork([])}
+                testID="project-clear-scopes"
                 style={styles.clearAllButton}
               >
                 <Text style={styles.clearAllText}>Clear All ({scopeOfWork.length})</Text>
@@ -268,7 +271,7 @@ export default function AddProject() {
           <View style={styles.scopeCardsGrid}>
             {SCOPE_OPTIONS.map((option) => {
               const isSelected = scopeOfWork.includes(option.value);
-              
+
               return (
                 <TouchableOpacity
                   key={option.value}
@@ -364,7 +367,7 @@ export default function AddProject() {
                 {endDate ? endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Optional'}
               </Text>
               {endDate && (
-                <TouchableOpacity onPress={() => setEndDate(null)} style={styles.clearButton}>
+                <TouchableOpacity testID="project-clear-end-date" disabled={loading} onPress={() => setEndDate(null)} style={styles.clearButton}>
                   <MaterialCommunityIcons name="close-circle" size={18} color="#999" />
                 </TouchableOpacity>
               )}
@@ -393,7 +396,7 @@ export default function AddProject() {
         {/* Save Button */}
         <TouchableOpacity 
           style={[styles.saveButton, loading && styles.saveButtonDisabled]} 
-          onPress={handleSave} 
+          testID="project-save" onPress={handleSave}
           disabled={loading}
         >
           <LinearGradient 

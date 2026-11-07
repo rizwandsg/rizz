@@ -1,12 +1,15 @@
+const { validateEnvironment } = require('./config/runtime-config.cjs');
+const runtime = validateEnvironment(process.env, ['preview', 'production'].includes(process.env.EAS_BUILD_PROFILE));
+const suffix = runtime.appEnv === 'production' ? '' : `.${runtime.appEnv}`;
 module.exports = {
   expo: {
-    name: 'Rizz',
+    name: runtime.appEnv === 'production' ? 'Rizz' : `Rizz (${runtime.appEnv})`,
     slug: 'RizzApp',
     version: '1.0.0',
     orientation: 'portrait',
     icon: './assets/icon.png',
     userInterfaceStyle: 'light',
-    scheme: 'com.rizz.app',
+    scheme: `com.rizz.app${suffix}`,
     splash: {
       image: './assets/splash.png',
       resizeMode: 'contain',
@@ -15,21 +18,20 @@ module.exports = {
     assetBundlePatterns: ['**/*'],
     ios: {
       supportsTablet: true,
-      bundleIdentifier: 'com.rizz.app',
-      googleServicesFile: './GoogleService-Info.plist'
+      bundleIdentifier: `com.rizz.app${suffix}`,
+      ...(runtime.appEnv === 'production' ? { googleServicesFile: './GoogleService-Info.plist' } : {}),
     },
     android: {
       adaptiveIcon: {
         foregroundImage: './assets/adaptive-icon.png',
         backgroundColor: '#ffffff'
       },
-      package: 'com.rizz.app',
-      googleServicesFile: './google-services.json',
+      package: `com.rizz.app${suffix}`,
+      ...(runtime.appEnv === 'production' ? { googleServicesFile: './google-services.json' } : {}),
       permissions: [
         "INTERNET",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "USE_FULL_SCREEN_INTENT",
         "POST_NOTIFICATIONS"
       ]
     },
@@ -42,12 +44,12 @@ module.exports = {
       },
       router: {
         origin: false,
-        scheme: 'com.rizz.app'
+        scheme: `com.rizz.app${suffix}`
       },
-      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
-      supabaseKey: process.env.EXPO_PUBLIC_SUPABASE_KEY,
+      supabaseUrl: runtime.supabaseUrl,
+      supabaseKey: runtime.supabaseKey,
       apiUrl: process.env.EXPO_PUBLIC_API_URL,
-      appEnv: process.env.EXPO_PUBLIC_APP_ENV,
+      appEnv: runtime.appEnv,
       appName: process.env.EXPO_PUBLIC_APP_NAME
     },
     experiments: {
@@ -55,8 +57,8 @@ module.exports = {
       reactCompiler: true
     },
     plugins: [
-      "@react-native-google-signin/google-signin",
       "expo-router",
+      "expo-secure-store",
       [
         "expo-notifications",
         {
@@ -71,9 +73,6 @@ module.exports = {
             "deploymentTarget": "15.1"
           },
           "android": {
-            "compileSdkVersion": 35,
-            "targetSdkVersion": 35,
-            "buildToolsVersion": "35.0.0",
             "minSdkVersion": 24
           }
         }

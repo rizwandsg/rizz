@@ -1,0 +1,5 @@
+project_id = "rizzapp-staging"
+
+[functions.account]
+# Clerk tokens are verified by the request_identity RPC before any privileged work.
+verify_jwt = false

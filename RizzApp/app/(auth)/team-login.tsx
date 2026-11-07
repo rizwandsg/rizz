@@ -1,7 +1,8 @@
+import { useSignIn } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -14,58 +15,34 @@ import {
     TouchableOpacity,
     View,
 } from 'react-native';
-import { login } from '../../api/authApi';
 
 export default function TeamLoginScreen() {
     const router = useRouter();
+    const { signIn, setActive, isLoaded } = useSignIn();
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const submitting = useRef(false);
 
-    // Handle email input with automatic @rizz.com domain
-    const handleEmailChange = (text: string) => {
-        // Remove any existing @rizz.com to prevent duplicates
-        const cleanText = text.replace('@rizz.com', '');
-        setEmail(cleanText);
-    };
+    const handleEmailChange = (text: string) => setEmail(text);
+    const getFullEmail = () => email.trim();
 
-    // Get full email with @rizz.com domain
-    const getFullEmail = () => {
-        const cleanEmail = email.trim();
-        if (cleanEmail && !cleanEmail.includes('@')) {
-            return `${cleanEmail}@rizz.com`;
-        }
-        return cleanEmail;
-    };
 
     const handleLogin = async () => {
-        // Validation
-        if (!email.trim()) {
-            Alert.alert('Error', 'Please enter your email');
-            return;
-        }
-        if (!password) {
-            Alert.alert('Error', 'Please enter your password');
-            return;
-        }
-
+        if (!isLoaded || submitting.current) return;
+        if (!email.trim() || !password) { Alert.alert('Error', 'Enter your email and password'); return; }
+        submitting.current = true;
         setLoading(true);
         try {
-            const fullEmail = getFullEmail();
-            await login({ email: fullEmail, password });
-            console.log('✅ Team Member Login Successful!');
+            const result = await signIn.create({ identifier: getFullEmail(), password });
+            if (result.status !== 'complete' || !result.createdSessionId) throw new Error('Additional verification is required. Complete your account verification before signing in.');
+            await setActive({ session: result.createdSessionId });
             router.replace('/(tabs)/home');
-        } catch (err: any) {
-            console.error('❌ Login Error:', err);
-            Alert.alert(
-                'Login Failed',
-                err.message || 'Invalid email or password. Please try again.'
-            );
-        } finally {
-            setLoading(false);
-        }
+        } catch (error: any) {
+            Alert.alert('Sign In Failed', error.errors?.[0]?.message || error.message || 'Please try again');
+        } finally { submitting.current = false; setLoading(false); }
     };
 
     return (
@@ -108,13 +85,12 @@ export default function TeamLoginScreen() {
                                 style={styles.emailUsernameInput}
                                 value={email}
                                 onChangeText={handleEmailChange}
-                                placeholder="username"
+                                placeholder="name@example.com"
                                 placeholderTextColor="#999"
                                 keyboardType="email-address"
                                 autoCapitalize="none"
                                 autoComplete="email"
                             />
-                            <Text style={styles.emailDomain}>@rizz.com</Text>
                         </View>
                     </View>
 
@@ -141,6 +117,10 @@ export default function TeamLoginScreen() {
                             </TouchableOpacity>
                         </View>
                     </View>
+
+                    <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
+                        <Text style={styles.backText}>Forgot Password?</Text>
+                    </TouchableOpacity>
 
                     {/* Login Button */}
                     <TouchableOpacity
@@ -175,7 +155,7 @@ export default function TeamLoginScreen() {
                     {/* Back to Owner Login */}
                     <TouchableOpacity
                         style={styles.backButton}
-                        onPress={() => router.back()}
+                        onPress={() => router.replace('/(auth)/clerk-signin')}
                     >
                         <MaterialCommunityIcons name="arrow-left" size={20} color="#667eea" />
                         <Text style={styles.backText}>Back to Owner Login</Text>

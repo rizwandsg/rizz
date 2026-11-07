@@ -1,85 +1,37 @@
 import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo';
 import { tokenCache } from '@clerk/clerk-expo/token-cache';
-import { Stack } from 'expo-router';
-import { LogBox } from 'react-native';
+import { Stack, useRouter } from 'expo-router';
+import { Pressable, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import ProtectedRoute from '../components/ProtectedRoute';
+import { AuthProvider, useAccount } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
+import { nativeHeaderTitles, protectedScreens, routeAccess } from '../services/routePolicy';
 
-// Suppress Clerk development key warning (normal for development)
-LogBox.ignoreLogs([
-  'Clerk: Clerk has been loaded with development keys',
-]);
+const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
+if (!publishableKey) throw new Error('Configure EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY');
 
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY!;
-
-if (!publishableKey) {
-  throw new Error('Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY in .env file');
+function Navigator() {
+  const router = useRouter();
+  const { user, loading, error } = useAccount();
+  const access = routeAccess(!!user, loading, !!error);
+  // Always mount the root navigator. Guards remove private routes before their screens run.
+  return <Stack screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="index" />
+    <Stack.Protected guard={access.public}><Stack.Screen name="(auth)" /></Stack.Protected>
+    <Stack.Protected guard={access.private}>
+      {protectedScreens.map(name => <Stack.Screen key={name} name={name} options={nativeHeaderTitles[name] ? {
+        headerShown: true, title: nativeHeaderTitles[name],
+        headerLeft: () => <Pressable accessibilityRole="button" accessibilityLabel="Back to projects" style={{padding: 8}}
+          onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/home')}><Text>Back</Text></Pressable>,
+      } : {headerShown: false}} />)}
+    </Stack.Protected>
+  </Stack>;
 }
 
 export default function RootLayout() {
-  return (
-    <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
-      <ClerkLoaded>
-        <SafeAreaProvider>
-          <ThemeProvider>
-            <ProtectedRoute>
-              <Stack screenOptions={{
-                headerShown: false,
-                headerStyle: {
-                  backgroundColor: '#fff',
-                },
-                headerShadowVisible: false,
-                headerTintColor: '#000',
-                headerTitleStyle: {
-                  fontWeight: '600',
-                },
-              }}>
-                <Stack.Screen 
-                  name="(auth)" 
-                  options={{ 
-                    headerShown: false 
-                  }} 
-                />
-                <Stack.Screen 
-                  name="(tabs)" 
-                  options={{ 
-                    headerShown: false 
-                  }} 
-                />
-                <Stack.Screen 
-                  name="AddExpense" 
-                  options={{ 
-                    title: "Add Expense",
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="AddProject" 
-                  options={{ 
-                    title: "Add Project",
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="ProjectDetails" 
-                  options={{ 
-                    title: "Project Details",
-                    headerShown: false,
-                  }} 
-                />
-                <Stack.Screen 
-                  name="ExpenseDetails" 
-                  options={{ 
-                    title: "Expense Details",
-                    headerShown: false,
-                  }} 
-                />
-              </Stack>
-            </ProtectedRoute>
-          </ThemeProvider>
-        </SafeAreaProvider>
-      </ClerkLoaded>
-    </ClerkProvider>
-  );
+  return <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
+    <ClerkLoaded><SafeAreaProvider><ThemeProvider><AuthProvider>
+      <Navigator />
+    </AuthProvider></ThemeProvider></SafeAreaProvider></ClerkLoaded>
+  </ClerkProvider>;
 }

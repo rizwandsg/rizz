@@ -1,7 +1,11 @@
+import { Redirect } from 'expo-router';
+import { useAccount } from '../../context/AuthContext';
+import { LoadFailure } from '../../components/LoadFailure';
+import { canManageMembers } from '../../services/routePolicy';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -21,13 +25,16 @@ import {
     CreateSubUserData,
     deleteSubUser,
     getSubUsers,
-    resetSubUserPassword,
     SubUser,
     updateSubUser
 } from '../../api/authApi';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function UsersScreen() {
+    const { user } = useAccount();
+    const isOwner = canManageMembers(user);
+    const savingRef = useRef(false);
+    const [error, setError] = useState<string | null>(null);
     const insets = useSafeAreaInsets();
     const { theme } = useTheme();
     const [users, setUsers] = useState<SubUser[]>([]);
@@ -43,30 +50,21 @@ export default function UsersScreen() {
     const [isActive, setIsActive] = useState(true);
     const [saving, setSaving] = useState(false);
 
-    // Handle email input with automatic @rizz.com domain
-    const handleEmailChange = (text: string) => {
-        // Remove any existing @rizz.com to prevent duplicates
-        const cleanText = text.replace('@rizz.com', '');
-        setEmail(cleanText);
-    };
+    const handleEmailChange = (text: string) => setEmail(text);
+    const getFullEmail = () => email.trim();
 
-    // Get full email with @rizz.com domain
-    const getFullEmail = () => {
-        const cleanEmail = email.trim();
-        if (cleanEmail && !cleanEmail.includes('@')) {
-            return `${cleanEmail}@rizz.com`;
-        }
-        return cleanEmail;
-    };
 
     // Load sub-users
     const loadUsers = async () => {
+        if (!isOwner) return;
         try {
+            setError(null);
             setLoading(true);
             const data = await getSubUsers();
             setUsers(data);
         } catch (error: any) {
-            Alert.alert('Error', error.message || 'Failed to load users');
+            setUsers([]);
+            setError('Failed to load team members. Please retry.');
         } finally {
             setLoading(false);
         }
@@ -74,8 +72,8 @@ export default function UsersScreen() {
 
     useFocusEffect(
         useCallback(() => {
-            loadUsers();
-        }, [])
+            void loadUsers();
+        }, [isOwner])
     );
 
     // Open add user modal
@@ -102,6 +100,7 @@ export default function UsersScreen() {
 
     // Save user (create or update)
     const handleSaveUser = async () => {
+        if (savingRef.current || !isOwner) return;
         // Validation
         if (!fullName.trim()) {
             Alert.alert('Validation Error', 'Please enter full name');
@@ -114,13 +113,14 @@ export default function UsersScreen() {
                 Alert.alert('Validation Error', 'Please enter email');
                 return;
             }
-            if (!password.trim() || password.length < 6) {
-                Alert.alert('Validation Error', 'Password must be at least 6 characters');
+            if (!password.trim() || password.length < 8) {
+                Alert.alert('Validation Error', 'Password must be at least 8 characters');
                 return;
             }
         }
 
         try {
+            savingRef.current = true;
             setSaving(true);
 
             if (editingUser) {
@@ -149,6 +149,7 @@ export default function UsersScreen() {
         } catch (error: any) {
             Alert.alert('Error', error.message || 'Failed to save user');
         } finally {
+            savingRef.current = false;
             setSaving(false);
         }
     };
@@ -156,17 +157,17 @@ export default function UsersScreen() {
     // Delete user
     const handleDeleteUser = (user: SubUser) => {
         Alert.alert(
-            'Delete User',
-            `Are you sure you want to delete ${user.full_name}? This action cannot be undone.`,
+            'Deactivate User',
+            `Are you sure you want to deactivate ${user.full_name}? Their financial records will be retained.`,
             [
                 { text: 'Cancel', style: 'cancel' },
                 {
-                    text: 'Delete',
+                    text: 'Deactivate',
                     style: 'destructive',
                     onPress: async () => {
                         try {
                             await deleteSubUser(user.id);
-                            Alert.alert('Success', 'User deleted successfully');
+                            Alert.alert('Success', 'User deactivated successfully');
                             loadUsers();
                         } catch (error: any) {
                             Alert.alert('Error', error.message || 'Failed to delete user');
@@ -177,32 +178,8 @@ export default function UsersScreen() {
         );
     };
 
-    // Reset user password
-    const handleResetPassword = (user: SubUser) => {
-        Alert.alert(
-            'Reset Password',
-            `Generate a new temporary password for ${user.full_name}?`,
-            [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                    text: 'Reset',
-                    onPress: async () => {
-                        try {
-                            const tempPassword = await resetSubUserPassword(user.id);
-                            Alert.alert(
-                                'Password Reset',
-                                `New temporary password: ${tempPassword}\n\nPlease share this with the user securely.`,
-                                [
-                                    { text: 'OK' }
-                                ]
-                            );
-                        } catch (error: any) {
-                            Alert.alert('Error', error.message || 'Failed to reset password');
-                        }
-                    }
-                }
-            ]
-        );
+    const handleResetPassword = (_user: SubUser) => {
+        Alert.alert('Password Reset', 'The team member must use Forgot password and verify their email address. Passwords cannot be retrieved or displayed.');
     };
 
     // Toggle active status
@@ -279,7 +256,7 @@ export default function UsersScreen() {
                     onPress={() => handleDeleteUser(item)}
                 >
                     <MaterialCommunityIcons name="delete" size={20} color="#F44336" />
-                    <Text style={styles.actionButtonText}>Delete</Text>
+                    <Text style={styles.actionButtonText}>Deactivate</Text>
                 </TouchableOpacity>
             </View>
 
@@ -290,6 +267,9 @@ export default function UsersScreen() {
             )}
         </View>
     );
+
+    if (!isOwner) return <Redirect href="/(tabs)/home" />;
+    if (error) return <LoadFailure message={error} retry={loadUsers} />;
 
     if (loading) {
         return (
@@ -394,11 +374,10 @@ export default function UsersScreen() {
                                             style={styles.emailUsernameInput}
                                             value={email}
                                             onChangeText={handleEmailChange}
-                                            placeholder="username"
+                                            placeholder="name@example.com"
                                             keyboardType="email-address"
                                             autoCapitalize="none"
                                         />
-                                        <Text style={styles.emailDomain}>@rizz.com</Text>
                                     </View>
                                 </View>
                             )}
@@ -411,7 +390,7 @@ export default function UsersScreen() {
                                         style={styles.input}
                                         value={password}
                                         onChangeText={setPassword}
-                                        placeholder="Minimum 6 characters"
+                                        placeholder="Minimum 8 characters"
                                         secureTextEntry
                                     />
                                 </View>

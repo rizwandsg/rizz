@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Crypto from 'expo-crypto';
 import { database } from '../services/databaseService';
+import { requireAccessToken, supabase } from '../services/supabaseClient';
 
 export interface User {
     id: string;
@@ -46,651 +46,88 @@ export interface SignupData {
     full_name: string;
 }
 
-const USER_STORAGE_KEY = '@rizzapp_user';
-const TOKEN_STORAGE_KEY = '@rizzapp_token';
 
-/**
- * Hash password using SHA256
- */
-const hashPassword = async (password: string): Promise<string> => {
-    return await Crypto.digestStringAsync(
-        Crypto.CryptoDigestAlgorithm.SHA256,
-        password
-    );
-};
+let currentUser: User | null = null;
+let revision = 0;
+let cacheQueue: Promise<void> = Promise.resolve();
+function queueCache(operation: () => Promise<void>) {
+    const pending = cacheQueue.catch(() => {}).then(operation);
+    cacheQueue = pending;
+    return pending;
+}
+const listeners = new Set<() => void>();
+export function subscribeToSession(listener: () => void) { listeners.add(listener); return () => { listeners.delete(listener); }; }
+export function sessionRevision() { return revision; }
+export function getSessionUser(): User | null { return currentUser; }
+function changed() { revision++; listeners.forEach(listener => listener()); }
+export async function clearSessionUser() {
+    currentUser = null;
+    changed();
+    await queueCache(() => AsyncStorage.multiRemove(['@rizzapp_user', '@rizzapp_token', '@rizzapp_projects', '@rizzapp_expenses']));
+}
+async function account<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
+    const token = await requireAccessToken();
+    const { data, error } = await supabase.functions.invoke('account', { body: { action, ...payload }, headers: { Authorization: 'Bearer ' + token } });
+    if (error) throw new Error('Account service failed. Please retry or contact your workspace owner.');
+    if (data?.error) throw new Error(data.error);
+    return data as T;
+}
+export async function refreshCurrentUser(): Promise<User> {
+    const started = revision;
+    const user = await account<User>('sync');
+    if (started !== revision) throw new Error('Session changed while loading the account');
+    if (!user.id || !user.clerk_user_id || !user.is_active || !['owner', 'member'].includes(user.role || '')) throw new Error('This account is inactive or has not been migrated');
+    currentUser = user;
+    changed();
+    const committed = revision;
+    // Cached profile is display data only. It never establishes authentication.
+    await queueCache(async () => {
+        if (committed !== revision) return;
+        await AsyncStorage.setItem('@rizzapp_user', JSON.stringify(user));
+        await AsyncStorage.removeItem('@rizzapp_token');
+    });
+    if (committed !== revision) throw new Error('Session changed while loading the account');
+    return user;
+}
+export async function getCurrentUser(): Promise<User | null> {
+    try { await requireAccessToken(); return currentUser; } catch { return null; }
+}
+export const getCurrentUserWithClerk = getCurrentUser;
+export async function isAuthenticated() { return !!(await getCurrentUser()); }
+export const logout = clearSessionUser;
 
-/**
- * Sign up a new user
- */
-export const signup = async (data: SignupData): Promise<User> => {
-    try {
-        console.log('Starting signup process for:', data.email);
-        
-        // Hash the password
-        const passwordHash = await hashPassword(data.password);
-        console.log('Password hashed successfully');
-
-        // Check if user already exists
-        const existingUser = await database.loadData<User>('users', {
-            filter: `email.eq.${data.email}`
-        });
-
-        if (existingUser && existingUser.length > 0) {
-            throw new Error('User with this email already exists');
-        }
-
-        console.log('Creating new user...');
-        
-        // Create new user (signup always creates an owner account)
-        const newUser = {
-            email: data.email,
-            password_hash: passwordHash,
-            full_name: data.full_name,
-            role: 'owner', // New signups are always owners
-            is_active: true,
-            parent_user_id: null
-        };
-
-        const createdUser = await database.saveData('users', newUser);
-        console.log('User created:', createdUser);
-
-        // Remove password_hash from the user object before storing
-        const { password_hash, ...userWithoutPassword } = createdUser as any;
-
-        // Store user data locally
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userWithoutPassword));
-        await AsyncStorage.setItem(TOKEN_STORAGE_KEY, userWithoutPassword.id);
-
-        return userWithoutPassword as User;
-    } catch (error) {
-        console.error('Signup error:', error);
-        if (error instanceof Error) {
-            throw error;
-        }
-        throw new Error('Failed to create user');
-    }
-};
-
-/**
- * Login user
- */
-export const login = async (credentials: LoginCredentials): Promise<User> => {
-    try {
-        console.log('🔐 Login attempt for email:', credentials.email);
-        
-        // Hash the password
-        const passwordHash = await hashPassword(credentials.password);
-        console.log('🔑 Password hashed:', passwordHash.substring(0, 10) + '...');
-
-        // Get ALL users and filter in JavaScript (workaround for email filter issue with dots)
-        const allUsers = await database.loadData<any>('users');
-        console.log('📊 Total users loaded:', allUsers?.length || 0);
-
-        // Filter by email and password in JavaScript
-        const users = allUsers?.filter(u => 
-            u.email.toLowerCase() === credentials.email.toLowerCase() && 
-            u.password_hash === passwordHash
-        ) || [];
-
-        console.log('👥 Users matching credentials:', users.length);
-
-        if (users.length === 0) {
-            // Check if email exists
-            const emailExists = allUsers?.some(u => u.email.toLowerCase() === credentials.email.toLowerCase());
-            
-            if (!emailExists) {
-                console.log('❌ Email not found in database');
-                throw new Error('Invalid email or password');
-            } else {
-                console.log('❌ Email found but password incorrect');
-                throw new Error('Invalid email or password');
-            }
-        }
-
-        const user = users[0];
-        console.log('✅ Login successful for user:', user.full_name);
-
-        // If user doesn't have role set, set it to 'owner' (for existing users)
-        if (!user.role || (user.role !== 'owner' && user.role !== 'member')) {
-            console.log('⚠️ User missing role, setting to owner');
-            await database.updateData('users', user.id, {
-                role: 'owner',
-                is_active: true,
-                parent_user_id: null,
-                last_login: new Date().toISOString()
-            });
-            user.role = 'owner';
-            user.is_active = true;
-            user.parent_user_id = null;
-        } else {
-            // Update last login only
-            await database.updateData('users', user.id, {
-                last_login: new Date().toISOString()
-            });
-        }
-
-        console.log('👤 User role:', user.role);
-
-        // Remove password_hash from user object
-        const { password_hash, ...userWithoutPassword } = user;
-
-        // Store user data locally
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(userWithoutPassword));
-        await AsyncStorage.setItem(TOKEN_STORAGE_KEY, user.id);
-
-        return userWithoutPassword;
-    } catch (error) {
-        console.error('❌ Login error:', error);
-        throw error;
-    }
-};
-
-/**
- * Change password for team members (Supabase users only)
- * For Clerk owner users, use Clerk's password update API instead
- */
-export const changePassword = async (
-    email: string,
-    currentPassword: string,
-    newPassword: string
-): Promise<void> => {
-    try {
-        console.log('🔐 Starting password change for team member:', email);
-
-        // Get ALL users and filter in JavaScript
-        const allUsers = await database.loadData<User>('users');
-        const users = allUsers?.filter(u => u.email.toLowerCase() === email.toLowerCase()) || [];
-
-        console.log('📊 Total users loaded:', allUsers?.length || 0);
-        console.log('👥 Users matching email:', users.length);
-
-        if (users.length === 0) {
-            console.log('❌ User not found');
-            throw new Error('User not found');
-        }
-
-        const user = users[0] as any;
-
-        // This function should only be called for team members (non-Clerk users)
-        // Clerk users should use Clerk's password update API
-        if (user.clerk_user_id) {
-            console.log('❌ This function is for team members only. Clerk users should use Clerk API.');
-            throw new Error('Please use the Clerk password update method for owner accounts.');
-        }
-
-        // Check if user has a password set
-        if (!user.password_hash) {
-            console.log('❌ User has no password set');
-            throw new Error('No password is set for this account. Please contact support.');
-        }
-
-        // Hash the current password to verify it
-        const currentPasswordHash = await hashPassword(currentPassword);
-        console.log('🔑 Current password hashed:', currentPasswordHash.substring(0, 10) + '...');
-
-        // Verify current password
-        if (user.password_hash !== currentPasswordHash) {
-            console.log('❌ Current password is incorrect');
-            throw new Error('Current password is incorrect');
-        }
-
-        console.log('✅ Current password verified');
-
-        // Hash the new password
-        const newPasswordHash = await hashPassword(newPassword);
-        console.log('🔑 New password hashed:', newPasswordHash.substring(0, 10) + '...');
-
-        // Update user's password in database
-        await database.updateData('users', user.id, {
-            password_hash: newPasswordHash,
-            updated_at: new Date().toISOString()
-        });
-
-        console.log('✅ Password changed successfully for team member');
-    } catch (error: any) {
-        console.error('❌ Change password error:', error);
-        throw error;
-    }
-};
-
-/**
- * Logout user
- */
-export const logout = async (): Promise<void> => {
-    try {
-        await AsyncStorage.removeItem(USER_STORAGE_KEY);
-        await AsyncStorage.removeItem(TOKEN_STORAGE_KEY);
-    } catch (error) {
-        console.error('Logout error:', error);
-        throw error;
-    }
-};
-
-/**
- * Get current logged in user
- */
-export const getCurrentUser = async (): Promise<User | null> => {
-    try {
-        const userData = await AsyncStorage.getItem(USER_STORAGE_KEY);
-        return userData ? JSON.parse(userData) : null;
-    } catch (error) {
-        console.error('Get current user error:', error);
-        return null;
-    }
-};
-
-/**
- * Get current user with Clerk support
- * Checks both regular auth (AsyncStorage) and Clerk auth
- */
-export const getCurrentUserWithClerk = async (): Promise<User | null> => {
-    try {
-        // First check regular auth (AsyncStorage)
-        const userData = await AsyncStorage.getItem(USER_STORAGE_KEY);
-        if (userData) {
-            console.log('✅ Found regular auth user in AsyncStorage');
-            return JSON.parse(userData);
-        }
-
-        // If no regular user, try to get Clerk user
-        // Note: This function is called from React components where useAuth() is available
-        // For now, return null and let components handle Clerk auth separately
-        console.log('⚠️ No regular auth user found');
-        return null;
-    } catch (error) {
-        console.error('Get current user error:', error);
-        return null;
-    }
-};
-
-/**
- * Check if user is authenticated (regular or Clerk)
- */
-export const isAuthenticated = async (): Promise<boolean> => {
-    try {
-        const token = await AsyncStorage.getItem(TOKEN_STORAGE_KEY);
-        return !!token;
-    } catch (error) {
-        console.error('Authentication check error:', error);
-        return false;
-    }
-};
-
-/**
- * Reset password - Generates a temporary password
- * Returns the temporary password (in production, this would be emailed)
- */
-export const resetPassword = async (email: string): Promise<string> => {
-    try {
-        console.log('🔄 Starting password reset for:', email);
-        
-        // Get ALL users and filter in JavaScript (workaround for email.eq filter issue with dots)
-        const allUsers = await database.loadData<User>('users');
-        
-        console.log('📊 Total users in database:', allUsers?.length || 0);
-        
-        // Filter by email in JavaScript
-        const users = allUsers?.filter(u => u.email.toLowerCase() === email.toLowerCase()) || [];
-        
-        console.log('📊 Users matching email:', users.length);
-        
-        if (users.length === 0) {
-            console.log('❌ No users found with email:', email);
-            throw new Error('No account found with this email address');
-        }
-
-        const user = users[0];
-        
-        // Generate a temporary password (6 digits)
-        const tempPassword = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        // Hash the temporary password
-        const passwordHash = await hashPassword(tempPassword);
-        
-        // Update user's password in database
-        await database.updateData('users', user.id, {
-            password_hash: passwordHash,
-            updated_at: new Date().toISOString()
-        });
-
-        console.log('🔑 Temporary password generated:', tempPassword);
-        console.log('✅ Password reset completed successfully');
-        
-        // Return the temporary password so it can be shown to user
-        // In production, this would be sent via email instead
-        return tempPassword;
-    } catch (error: any) {
-        console.error('❌ Reset password error:', error);
-        console.error('Error message:', error.message);
-        throw error;
-    }
-};
-
-/**
- * Update user profile - COMPLETELY REWRITTEN 2025-10-22 15:30:00
- * This function ONLY modifies full_name and phone fields
- * Email field is NEVER touched to prevent NOT NULL violations
- */
-export const updateProfile = async (profileData: { full_name?: string; phone?: string }): Promise<User> => {
-    console.log('�🔥🔥 NEW updateProfile function executing!', profileData);
-    
+// Legacy local-password entry points fail closed; all sign-in uses Clerk.
+export async function login(_credentials: LoginCredentials): Promise<User> { throw new Error('Sign in through the secure sign-in screen'); }
+export async function signup(_data: SignupData): Promise<User> { throw new Error('Create your account through the verified sign-up screen'); }
+export async function changePassword(_email: string, _currentPassword: string, _newPassword: string): Promise<void> { throw new Error('Change your password through your signed-in Clerk account'); }
+export async function resetPassword(_email: string): Promise<string> { throw new Error('Use Forgot password to verify your email and reset your password'); }
+export async function updateProfile(data: { full_name?: string; phone?: string }): Promise<User> {
+    const started = revision;
+    const identity = currentUser;
+    if (!identity) throw new Error('Please sign in again');
+    const result = await account<User>('updateProfile', { profile: data });
+    if (started !== revision) throw new Error('Session changed while updating the profile');
+    if (!result || result.id !== identity.id || result.clerk_user_id !== identity.clerk_user_id || !result.is_active || result.role !== identity.role || result.parent_user_id !== identity.parent_user_id) throw new Error('Profile identity changed. Please sign in again');
+    currentUser = result; changed();
+    const committed = revision;
+    await queueCache(async () => {
+        if (committed === revision) await AsyncStorage.setItem('@rizzapp_user', JSON.stringify(result));
+    });
+    if (committed !== revision) throw new Error('Session changed while updating the profile');
+    return result;
+}
+export async function createSubUser(data: CreateSubUserData): Promise<SubUser> { return account('createMember', { member: data }); }
+export async function getSubUsers(): Promise<SubUser[]> {
     const user = await getCurrentUser();
-    if (!user) throw new Error('User not logged in');
-
-    console.log('Current user email:', user.email, 'ID:', user.id);
-
-    // Prepare ONLY the fields to update
-    const fieldsToUpdate: Record<string, any> = {
-        updated_at: new Date().toISOString()
-    };
-    
-    if (profileData.full_name?.trim()) {
-        fieldsToUpdate.full_name = profileData.full_name.trim();
-        console.log('Will update full_name to:', fieldsToUpdate.full_name);
-    }
-    
-    if (profileData.phone !== undefined) {
-        fieldsToUpdate.phone = profileData.phone.trim() || null;
-        console.log('Will update phone to:', fieldsToUpdate.phone);
-    }
-
-    console.log('🎯🎯🎯 About to call database.updateData with:', fieldsToUpdate);
-
-    try {
-        // Call updateData (NOT upsertData!)
-        const result = await database.updateData<User>('users', user.id, fieldsToUpdate);
-        
-        console.log('✅✅✅ SUCCESS! Database returned:', result);
-
-        // Save to local storage
-        const updatedUserData: User = { ...user, ...result, email: user.email };
-        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(updatedUserData));
-
-        console.log('💾💾💾 Saved to AsyncStorage successfully');
-        return updatedUserData;
-    } catch (err: any) {
-        console.error('❌❌❌ ERROR in updateProfile:', err);
-        console.error('Error message:', err.message);
-        console.error('Error code:', err.code);
-        throw new Error(`Profile update failed: ${err.message}`);
-    }
-};
-
-// =====================================================
-// SUB-USER MANAGEMENT FUNCTIONS
-// =====================================================
-
-/**
- * Create a sub-user (team member)
- * Only owners can create sub-users
- */
-export const createSubUser = async (data: CreateSubUserData): Promise<SubUser> => {
-    try {
-        console.log('👥 Creating sub-user:', data.email);
-        
-        const currentUser = await getCurrentUser();
-        if (!currentUser) throw new Error('User not logged in');
-        
-        console.log('👤 Current user role:', currentUser.role, 'parent_user_id:', currentUser.parent_user_id);
-        
-        // Only owners can create sub-users (role must be 'owner' and no parent)
-        if (currentUser.role !== 'owner' || currentUser.parent_user_id) {
-            throw new Error('Only owner accounts can create team members');
-        }
-
-        // Hash the password
-        const passwordHash = await hashPassword(data.password);
-
-        // Check if email already exists
-        const allUsers = await database.loadData<User>('users');
-        const emailExists = allUsers?.some(u => u.email.toLowerCase() === data.email.toLowerCase());
-        
-        if (emailExists) {
-            throw new Error('User with this email already exists');
-        }
-
-        // Create sub-user
-        const newSubUser = {
-            email: data.email.toLowerCase(),
-            password_hash: passwordHash,
-            full_name: data.full_name,
-            phone: data.phone || null,
-            parent_user_id: currentUser.id,
-            role: 'member',
-            is_active: true
-        };
-
-        const createdUser = await database.saveData('users', newSubUser);
-        console.log('✅ Sub-user created:', createdUser);
-
-        // Remove password_hash
-        const { password_hash, ...subUserWithoutPassword } = createdUser as any;
-        return subUserWithoutPassword as SubUser;
-    } catch (error) {
-        console.error('❌ Create sub-user error:', error);
-        throw error;
-    }
-};
-
-/**
- * Get all sub-users for the current owner
- */
-export const getSubUsers = async (): Promise<SubUser[]> => {
-    try {
-        const currentUser = await getCurrentUser();
-        if (!currentUser) throw new Error('User not logged in');
-
-        console.log('📋 Loading sub-users for:', currentUser.email);
-
-        // Load all users and filter for sub-users
-        const allUsers = await database.loadData<any>('users');
-        const subUsers = allUsers?.filter(u => 
-            u.parent_user_id === currentUser.id
-        ) || [];
-
-        console.log('✅ Found', subUsers.length, 'sub-users');
-
-        // Remove password_hash from all
-        return subUsers.map(({ password_hash, ...user }) => user as SubUser);
-    } catch (error) {
-        console.error('❌ Get sub-users error:', error);
-        throw error;
-    }
-};
-
-/**
- * Update sub-user details
- * Only owners can update their sub-users
- */
-export const updateSubUser = async (
-    subUserId: string, 
-    data: { full_name?: string; phone?: string; is_active?: boolean }
-): Promise<SubUser> => {
-    try {
-        console.log('✏️ Updating sub-user:', subUserId);
-        
-        const currentUser = await getCurrentUser();
-        if (!currentUser) throw new Error('User not logged in');
-
-        // Verify the sub-user belongs to this owner
-        const allUsers = await database.loadData<any>('users');
-        const subUser = allUsers?.find(u => u.id === subUserId && u.parent_user_id === currentUser.id);
-        
-        if (!subUser) {
-            throw new Error('Sub-user not found or access denied');
-        }
-
-        // Prepare update data
-        const updateData: Record<string, any> = {
-            updated_at: new Date().toISOString()
-        };
-        
-        if (data.full_name) updateData.full_name = data.full_name;
-        if (data.phone !== undefined) updateData.phone = data.phone || null;
-        if (data.is_active !== undefined) updateData.is_active = data.is_active;
-
-        const updated = await database.updateData('users', subUserId, updateData);
-        console.log('✅ Sub-user updated');
-
-        const { password_hash, ...updatedWithoutPassword } = updated as any;
-        return updatedWithoutPassword as SubUser;
-    } catch (error) {
-        console.error('❌ Update sub-user error:', error);
-        throw error;
-    }
-};
-
-/**
- * Delete a sub-user
- * Only owners can delete their sub-users
- */
-export const deleteSubUser = async (subUserId: string): Promise<void> => {
-    try {
-        console.log('🗑️ Deleting sub-user:', subUserId);
-        
-        const currentUser = await getCurrentUser();
-        if (!currentUser) throw new Error('User not logged in');
-
-        // Verify the sub-user belongs to this owner
-        const allUsers = await database.loadData<any>('users');
-        const subUser = allUsers?.find(u => u.id === subUserId && u.parent_user_id === currentUser.id);
-        
-        if (!subUser) {
-            throw new Error('Sub-user not found or access denied');
-        }
-
-        await database.deleteData('users', subUserId);
-        console.log('✅ Sub-user deleted');
-    } catch (error) {
-        console.error('❌ Delete sub-user error:', error);
-        throw error;
-    }
-};
-
-/**
- * Reset sub-user password
- * Generates a temporary password
- */
-export const resetSubUserPassword = async (subUserId: string): Promise<string> => {
-    try {
-        console.log('🔄 Resetting password for sub-user:', subUserId);
-        
-        const currentUser = await getCurrentUser();
-        if (!currentUser) throw new Error('User not logged in');
-
-        // Verify the sub-user belongs to this owner
-        const allUsers = await database.loadData<any>('users');
-        const subUser = allUsers?.find(u => u.id === subUserId && u.parent_user_id === currentUser.id);
-        
-        if (!subUser) {
-            throw new Error('Sub-user not found or access denied');
-        }
-
-        // Generate temporary password (6 digits)
-        const tempPassword = Math.floor(100000 + Math.random() * 900000).toString();
-        const passwordHash = await hashPassword(tempPassword);
-
-        await database.updateData('users', subUserId, {
-            password_hash: passwordHash,
-            updated_at: new Date().toISOString()
-        });
-
-        console.log('✅ Password reset for sub-user');
-        return tempPassword;
-    } catch (error) {
-        console.error('❌ Reset sub-user password error:', error);
-        throw error;
-    }
-};
-
-/**
- * Get Supabase user data for current Clerk user
- */
-export const getSupabaseUserFromClerk = async (clerkUserId: string): Promise<User | null> => {
-    try {
-        const users = await database.loadData<User>('users', {
-            filter: `clerk_user_id.eq.${clerkUserId}`
-        });
-
-        if (users && users.length > 0) {
-            return users[0];
-        }
-
-        console.log('⚠️ No Supabase user found for Clerk ID:', clerkUserId);
-        return null;
-    } catch (error) {
-        console.error('❌ Failed to get Supabase user from Clerk ID:', error);
-        return null;
-    }
-};
-
-/**
- * Create or sync Clerk user to Supabase
- */
-export const syncClerkUserToSupabase = async (
-    clerkUserId: string,
-    email: string,
-    fullName: string
-): Promise<User> => {
-    try {
-        console.log('🔄 Syncing Clerk user to Supabase...', { clerkUserId, email, fullName });
-
-        // Check if user already exists
-        const existingUser = await getSupabaseUserFromClerk(clerkUserId);
-        
-        if (existingUser) {
-            console.log('✅ Clerk user already exists in Supabase:', existingUser.id);
-            
-            // Update last_login
-            await database.updateData('users', existingUser.id, {
-                last_login: new Date().toISOString(),
-            });
-            
-            return existingUser;
-        }
-
-        // Create new user in Supabase
-        const newUser = {
-            clerk_user_id: clerkUserId,
-            email: email.toLowerCase(),
-            password_hash: null, // Clerk users don't have password_hash
-            full_name: fullName,
-            role: 'owner', // New Clerk signups are always owners
-            is_active: true,
-            parent_user_id: null,
-        };
-
-        const createdUser = await database.saveData('users', newUser);
-        console.log('✅ Clerk user synced to Supabase:', createdUser);
-
-        return createdUser as unknown as User;
-    } catch (error) {
-        console.error('❌ Failed to sync Clerk user to Supabase:', error);
-        throw error;
-    }
-};
-
-/**
- * Update last login for Clerk user and store in AsyncStorage
- */
-export const updateClerkUserLastLogin = async (clerkUserId: string): Promise<void> => {
-    try {
-        const user = await getSupabaseUserFromClerk(clerkUserId);
-        
-        if (user) {
-            await database.updateData('users', user.id, {
-                last_login: new Date().toISOString(),
-            });
-            console.log('✅ Updated last_login for Clerk user');
-            
-            // Store Clerk user in AsyncStorage for getCurrentUser()
-            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-            await AsyncStorage.setItem(TOKEN_STORAGE_KEY, user.id);
-            console.log('✅ Stored Clerk user in AsyncStorage');
-        }
-    } catch (error) {
-        console.error('⚠️ Failed to update last_login:', error);
-        // Don't throw - this shouldn't block login
-    }
-};
-
+    if (user?.role !== 'owner' || user.parent_user_id) throw new Error('Only workspace owners can manage team members');
+    return database.loadData<SubUser>('users', { filter: 'parent_user_id.eq.' + user.id, order: 'created_at.desc' });
+}
+export async function updateSubUser(id: string, data: { full_name?: string; phone?: string; is_active?: boolean }): Promise<SubUser> { return account('updateMember', { id, member: data }); }
+export async function deleteSubUser(id: string): Promise<void> { await account('deactivateMember', { id }); }
+export async function resetSubUserPassword(_id: string): Promise<void> { throw new Error('Team members must use Forgot password with their verified email address'); }
+export async function getSupabaseUserFromClerk(clerkUserId: string): Promise<User | null> {
+    const users = await database.loadData<User>('users', { filter: 'clerk_user_id.eq.' + clerkUserId });
+    return users[0] ?? null;
+}
+export async function syncClerkUserToSupabase(_clerkUserId: string, _email: string, _fullName: string): Promise<User> { return refreshCurrentUser(); }
+export async function updateClerkUserLastLogin(_clerkUserId: string): Promise<void> { await refreshCurrentUser(); }

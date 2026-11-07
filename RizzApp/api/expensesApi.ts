@@ -47,7 +47,7 @@ export const createExpense = async (expense: Expense, projectName?: string): Pro
         };
 
         const result = await database.saveData<Expense>(TABLES.EXPENSES, newExpense);
-        
+
         // Send notification for expense creation
         try {
             console.log('🔔 Attempting to send expense creation notification...');
@@ -69,7 +69,7 @@ export const createExpense = async (expense: Expense, projectName?: string): Pro
             console.error('⚠️ Failed to send expense notification:', notifError);
             // Don't throw - notification failure shouldn't break expense creation
         }
-        
+
         return result;
     } catch (error) {
         console.error('Create expense error:', error);
@@ -88,7 +88,6 @@ export const getExpenses = async (): Promise<Expense[]> => {
         }
 
         const expenses = await database.loadData<Expense>(TABLES.EXPENSES, {
-            filter: `user_id.eq.${user.id}`,
             order: 'expense_date.desc'
         });
 
@@ -110,7 +109,7 @@ export const getExpensesByProject = async (projectId: string): Promise<Expense[]
         }
 
         const expenses = await database.loadData<Expense>(TABLES.EXPENSES, {
-            filter: `user_id.eq.${user.id},project_id.eq.${projectId}`,
+            filter: `project_id.eq.${projectId}`,
             order: 'expense_date.desc'
         });
 
@@ -132,11 +131,9 @@ export const getExpenseById = async (id: string): Promise<Expense | null> => {
         }
 
         const expense = await database.loadDataById<Expense>(TABLES.EXPENSES, id);
-        
+
         // Verify the expense belongs to the current user
-        if (expense && expense.user_id !== user.id) {
-            throw new Error('Unauthorized access to expense');
-        }
+
 
         return expense;
     } catch (error) {
@@ -157,18 +154,11 @@ export const updateExpense = async (id: string, updates: Partial<Expense>): Prom
 
         // Verify the expense belongs to the current user
         const existingExpense = await database.loadDataById<Expense>(TABLES.EXPENSES, id);
-        if (!existingExpense || existingExpense.user_id !== user.id) {
+        if (!existingExpense) {
             throw new Error('Unauthorized access to expense');
         }
 
-        const updatedExpense = {
-            ...existingExpense,
-            ...updates,
-            id,
-            updated_at: new Date().toISOString(),
-        };
-
-        const result = await database.upsertData<Expense>(TABLES.EXPENSES, updatedExpense);
+        const result = await database.updateData<Expense>(TABLES.EXPENSES, id, { ...updates, updated_at: updates.updated_at || existingExpense.updated_at });
         return result;
     } catch (error) {
         console.error('Update expense error:', error);
@@ -188,7 +178,7 @@ export const deleteExpense = async (id: string): Promise<void> => {
 
         // Verify the expense belongs to the current user
         const existingExpense = await database.loadDataById<Expense>(TABLES.EXPENSES, id);
-        if (!existingExpense || existingExpense.user_id !== user.id) {
+        if (!existingExpense) {
             throw new Error('Unauthorized access to expense');
         }
 
@@ -210,7 +200,7 @@ export const getExpensesByCategory = async (category: string): Promise<Expense[]
         }
 
         const expenses = await database.loadData<Expense>(TABLES.EXPENSES, {
-            filter: `user_id.eq.${user.id},category.eq.${category}`,
+            filter: `category.eq.${category}`,
             order: 'expense_date.desc'
         });
 
@@ -245,7 +235,6 @@ export const getUniqueVendors = async (): Promise<VendorInfo[]> => {
         }
 
         const expenses = await database.loadData<Expense>(TABLES.EXPENSES, {
-            filter: `user_id.eq.${user.id}`,
             order: 'created_at.desc'
         });
 
@@ -253,7 +242,7 @@ export const getUniqueVendors = async (): Promise<VendorInfo[]> => {
 
         // Group by vendor_name and get unique vendors with their info
         const vendorMap = new Map<string, VendorInfo>();
-        
+
         expenses.forEach(expense => {
             if (expense.vendor_name && expense.vendor_name.trim()) {
                 const existing = vendorMap.get(expense.vendor_name);
@@ -318,13 +307,71 @@ export const getExpensesByDateRange = async (startDate: string, endDate: string)
         }
 
         const expenses = await database.loadData<Expense>(TABLES.EXPENSES, {
-            filter: `user_id.eq.${user.id},expense_date.gte.${startDate},expense_date.lte.${endDate}`,
+            filter: `expense_date.gte.${startDate},expense_date.lte.${endDate}`,
             order: 'expense_date.desc'
         });
 
         return expenses || [];
     } catch (error) {
         console.error('Get expenses by date range error:', error);
+        throw error;
+    }
+};
+
+/**
+ * Get top expense categories with aggregated data
+ */
+export interface CategorySummary {
+    category: string;
+    totalAmount: number;
+    expenseCount: number;
+    percentage: number;
+}
+
+export const getTopExpenseCategories = async (limit: number = 10): Promise<CategorySummary[]> => {
+    try {
+        const user = await getCurrentUser();
+        if (!user) {
+            throw new Error('User not authenticated');
+        }
+
+        const expenses = await database.loadData<Expense>(TABLES.EXPENSES, {
+            order: 'created_at.desc'
+        });
+
+        if (!expenses || expenses.length === 0) return [];
+
+        // Group by category
+        const categoryMap = new Map<string, { totalAmount: number; count: number }>();
+
+        expenses.forEach(expense => {
+            const category = expense.category || 'Uncategorized';
+            const existing = categoryMap.get(category);
+            if (!existing) {
+                categoryMap.set(category, { totalAmount: expense.amount, count: 1 });
+            } else {
+                existing.totalAmount += expense.amount;
+                existing.count += 1;
+            }
+        });
+
+        // Calculate total for percentage
+        const totalAmount = Array.from(categoryMap.values()).reduce((sum, cat) => sum + cat.totalAmount, 0);
+
+        // Convert to array and sort by total amount
+        const result: CategorySummary[] = Array.from(categoryMap.entries())
+            .map(([category, data]) => ({
+                category,
+                totalAmount: data.totalAmount,
+                expenseCount: data.count,
+                percentage: totalAmount > 0 ? (data.totalAmount / totalAmount) * 100 : 0
+            }))
+            .sort((a, b) => b.totalAmount - a.totalAmount)
+            .slice(0, limit);
+
+        return result;
+    } catch (error) {
+        console.error('Get top expense categories error:', error);
         throw error;
     }
 };

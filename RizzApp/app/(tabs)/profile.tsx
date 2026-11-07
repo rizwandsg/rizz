@@ -1,8 +1,10 @@
+import { useFocusEffect } from '@react-navigation/native';
+import { LoadFailure } from '../../components/LoadFailure';
 import { useAuth } from '@clerk/clerk-expo';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -29,15 +31,17 @@ export default function ProfileScreen() {
     expenseCount: 0,
     totalExpenses: 0,
   });
+  const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useFocusEffect(useCallback(() => { void loadData(); }, []));
 
   const loadData = async () => {
     try {
+      setLoading(true);
+      setError(null);
       const currentUser = await getCurrentUser();
+      if (!currentUser) throw new Error('Please sign in again');
       setUser(currentUser);
 
       if (currentUser) {
@@ -55,7 +59,7 @@ export default function ProfileScreen() {
         });
       }
     } catch (error) {
-      console.error('Failed to load user data:', error);
+      setError('Failed to load profile and totals. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -69,19 +73,8 @@ export default function ProfileScreen() {
         style: 'destructive',
         onPress: async () => {
           try {
-            // Logout from both regular auth and Clerk
-            await logout(); // Clear AsyncStorage
-            
-            // Sign out from Clerk if user is signed in with Clerk
-            try {
-              await signOut();
-              console.log('✅ Signed out from Clerk');
-            } catch {
-              console.log('⚠️ No Clerk session to sign out from');
-            }
-            
-            // Navigate to login
-            router.replace('/(auth)/login');
+            await signOut();
+            await logout();
           } catch (err) {
             console.error('Logout error:', err);
             Alert.alert('Error', 'Failed to logout');
@@ -99,6 +92,8 @@ export default function ProfileScreen() {
       </View>
     );
   }
+
+  if (error) return <LoadFailure message={error} retry={loadData} />;
 
   return (
     <View style={styles.container}>
@@ -138,7 +133,7 @@ export default function ProfileScreen() {
             <View style={[styles.iconCircle, { backgroundColor: '#FFF3E0' }]}>
               <MaterialCommunityIcons name="currency-inr" size={24} color="#FF9800" />
             </View>
-            <Text style={styles.statValue}>₹{(stats.totalExpenses / 1000).toFixed(0)}K</Text>
+            <Text style={styles.statValue}>₹{stats.totalExpenses.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</Text>
             <Text style={styles.statLabel}>Total Spent</Text>
           </View>
         </View>

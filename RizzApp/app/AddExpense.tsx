@@ -1,3 +1,8 @@
+import { useCreateId } from '../hooks/useCreateId';
+import { useRef } from 'react';
+import { parseMoney, localDate } from '../services/validation';
+import { formError, parseCalendarDate } from '../services/formValues';
+import { FormLoadState } from '../components/FormLoadState';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -5,7 +10,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ExpenseCategory, getCategoriesForScope } from "../api/expenseCategoriesApi";
+import { getCategoriesForScope } from "../api/expenseCategoriesApi";
 import { createExpense, Expense, getExpenseById, getUniqueVendors, PAYMENT_METHODS, PAYMENT_STATUS_OPTIONS, PaymentMethod, PaymentStatus, updateExpense, VendorInfo } from "../api/expensesApi";
 import { getProjects, Project, ScopeOfWork } from "../api/projectsApi";
 
@@ -13,11 +18,12 @@ export default function AddExpense() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id, projectId: initialProjectId } = useLocalSearchParams();
-  
+
   // Feature flag - set to true after running database migration
   const VENDOR_PAYMENT_ENABLED = true; // Vendor and payment tracking enabled
-  
+
   const [description, setDescription] = useState("");
+  const [loadedVersion, setLoadedVersion] = useState<string | undefined>(undefined);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("general");
   const [expenseDate, setExpenseDate] = useState(new Date());
@@ -25,9 +31,9 @@ export default function AddExpense() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(initialProjectId as string || null);
   const [selectedScope, setSelectedScope] = useState<ScopeOfWork | 'Other' | null>(null);
-  const [availableScopes, setAvailableScopes] = useState<ScopeOfWork[]>([]);
-  const [expenseCategories, setExpenseCategories] = useState<ExpenseCategory[]>([]);
-  
+  const availableScopes = projects.find(project => project.id === selectedProjectId)?.scope_of_work || [];
+  const expenseCategories = selectedScope ? getCategoriesForScope(selectedScope) : [];
+
   // Vendor and payment fields
   const [vendorName, setVendorName] = useState("");
   const [vendorContact, setVendorContact] = useState("");
@@ -37,194 +43,129 @@ export default function AddExpense() {
   const [showVendorDropdown, setShowVendorDropdown] = useState(false);
   const [showPaymentMethodDropdown, setShowPaymentMethodDropdown] = useState(false);
   const [showPaymentStatusDropdown, setShowPaymentStatusDropdown] = useState(false);
-  
+
   const [loading, setLoading] = useState(false);
   const [loadingProjects, setLoadingProjects] = useState(true);
-  const [loadingExpense, setLoadingExpense] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [showProjectDropdown, setShowProjectDropdown] = useState(false);
   const [showScopeDropdown, setShowScopeDropdown] = useState(false);
   const [projectSearchQuery, setProjectSearchQuery] = useState("");
 
   useEffect(() => {
-    loadProjects();
-    loadVendors();
-    if (id) {
-      loadExpense();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  const loadVendors = async () => {
-    try {
-      const vendorsList = await getUniqueVendors();
-      setVendors(vendorsList);
-    } catch (error) {
-      console.error('Failed to load vendors:', error);
-    }
-  };
-
-  const loadExpense = async () => {
-    try {
-      setLoadingExpense(true);
-      if (id) {
-        const expense = await getExpenseById(id.toString());
+    let cancelled = false;
+    const load = async () => {
+      setLoadingProjects(true);
+      setLoadError(null);
+      try {
+        const [projectsList, expense] = await Promise.all([getProjects(), id ? getExpenseById(id.toString()) : Promise.resolve(null)]);
+        if (cancelled) return;
+        if (id && !expense) throw new Error('Expense not found or access denied');
+        const targetId = expense?.project_id || (initialProjectId ? initialProjectId.toString() : projectsList[0]?.id);
+        const target = projectsList.find(project => project.id === targetId);
+        if (targetId && !target) throw new Error('Project not found or access denied');
+        if (expense && !expense.updated_at) throw new Error('Expense version is missing. Reload before editing.');
+        setProjects(projectsList);
+        setSelectedProjectId(targetId || null);
         if (expense) {
+          setLoadedVersion(expense.updated_at);
           setDescription(expense.description);
           setAmount(expense.amount.toString());
-          setCategory(expense.category || "general");
-          setExpenseDate(new Date(expense.expense_date));
-          setSelectedProjectId(expense.project_id);
-          if (expense.scope_of_work) {
-            setSelectedScope(expense.scope_of_work);
-          }
-          // Load vendor and payment info
-          if (expense.vendor_name) {
-            setVendorName(expense.vendor_name);
-          }
-          if (expense.vendor_contact) {
-            setVendorContact(expense.vendor_contact);
-          }
-          if (expense.payment_method) {
-            setPaymentMethod(expense.payment_method);
-          }
-          if (expense.payment_status) {
-            setPaymentStatus(expense.payment_status);
-          }
+          setCategory(expense.category || 'general');
+          setExpenseDate(parseCalendarDate(expense.expense_date));
+          setSelectedScope(expense.scope_of_work || null);
+          setVendorName(expense.vendor_name || '');
+          setVendorContact(expense.vendor_contact || '');
+          setPaymentMethod(expense.payment_method || 'Cash');
+          setPaymentStatus(expense.payment_status || 'Unpaid');
         } else {
-          Alert.alert("Error", "Expense not found");
-          router.back();
+          const scope = target?.scope_of_work?.length === 1 ? target.scope_of_work[0] : null;
+          setSelectedScope(scope);
+          setCategory(scope ? getCategoriesForScope(scope)[0]?.name || 'general' : 'general');
         }
+      } catch (error) {
+        if (!cancelled) setLoadError(formError(error, 'Failed to load expense form'));
+      } finally {
+        if (!cancelled) setLoadingProjects(false);
       }
-    } catch {
-      Alert.alert("Error", "Failed to load expense");
-      router.back();
-    } finally {
-      setLoadingExpense(false);
-    }
+    };
+    void load();
+    getUniqueVendors().then(list => { if (!cancelled) setVendors(list); }).catch(() => { /* Optional suggestions must not block the form. */ });
+    return () => { cancelled = true; };
+  }, [id, initialProjectId, loadAttempt]);
+
+  const chooseScope = (scope: ScopeOfWork | 'Other' | null) => {
+    setSelectedScope(scope);
+    setCategory(scope ? getCategoriesForScope(scope)[0]?.name || 'general' : 'general');
   };
 
-  const loadProjects = async () => {
-    try {
-      setLoadingProjects(true);
-      const projectsList = await getProjects();
-      setProjects(projectsList);
-      if (!selectedProjectId && projectsList.length > 0 && projectsList[0].id) {
-        setSelectedProjectId(projectsList[0].id);
-      }
-    } catch {
-      Alert.alert("Error", "Failed to load projects");
-    } finally {
-      setLoadingProjects(false);
-    }
-  };
-
-  // Load scopes when project changes
-  useEffect(() => {
-    if (selectedProjectId) {
-      const project = projects.find(p => p.id === selectedProjectId);
-      if (project?.scope_of_work && project.scope_of_work.length > 0) {
-        setAvailableScopes(project.scope_of_work);
-        // Auto-select first scope if not already selected
-        if (!selectedScope && project.scope_of_work.length === 1) {
-          setSelectedScope(project.scope_of_work[0]);
-        }
-      } else {
-        setAvailableScopes([]);
-        setSelectedScope(null);
-      }
-    }
-  }, [selectedProjectId, projects, selectedScope]);
-
-  // Load categories when scope changes
-  useEffect(() => {
-    if (selectedScope) {
-      const categories = getCategoriesForScope(selectedScope);
-      setExpenseCategories(categories);
-      // Reset category to first available category or empty
-      if (categories.length > 0) {
-        setCategory(categories[0].name);
-      } else {
-        setCategory('');
-      }
-    } else {
-      setExpenseCategories([]);
-      setCategory('general'); // Reset to general when no scope
-    }
-  }, [selectedScope]);
-
+  const requestId = useCreateId();
+  const savingRef = useRef(false);
   const handleSave = async () => {
+    if (savingRef.current || loadingProjects || loadError) return;
+    savingRef.current = true;
     setLoading(true);
     try {
       if (!description?.trim()) throw new Error("Please enter a description");
       if (!amount) throw new Error("Please enter an amount");
       if (!selectedProjectId) throw new Error("Please select a project");
-      if (!selectedScope) throw new Error("Please select a scope of work");
-      const amountValue = parseFloat(amount);
+      if (!projects.some(project => project.id === selectedProjectId)) throw new Error('Project not found or access denied');
+      if (availableScopes.length > 0 && !selectedScope) throw new Error("Please select a scope of work");
+      const amountValue = parseMoney(amount);
       if (isNaN(amountValue) || amountValue <= 0) throw new Error("Please enter a valid amount");
-      
+
       // Build expense data - only include vendor/payment fields if they have values
       const expenseData: Partial<Expense> = {
+        updated_at: loadedVersion,
         project_id: selectedProjectId,
         description: description.trim(),
         amount: amountValue,
         category: category,
-        expense_date: expenseDate.toISOString().split("T")[0],
-        scope_of_work: selectedScope,
+        expense_date: localDate(expenseDate),
+        scope_of_work: selectedScope || 'Other',
       };
 
       // Only add vendor/payment fields if database has been migrated
       // This prevents errors if migration hasn't been run yet
-      if (vendorName.trim()) {
-        expenseData.vendor_name = vendorName.trim();
-      }
-      if (vendorContact.trim()) {
-        expenseData.vendor_contact = vendorContact.trim();
-      }
+      expenseData.vendor_name = vendorName.trim();
+      expenseData.vendor_contact = vendorName.trim() ? vendorContact.trim() : '';
       // Add payment fields (database migration completed)
       expenseData.payment_method = paymentMethod;
       expenseData.payment_status = paymentStatus;
 
-      // Set loading to false BEFORE showing alert
-      setLoading(false);
-      
+
+
       if (id) {
         await updateExpense(id.toString(), expenseData);
         console.log('✅ Expense updated successfully');
-        // Show alert with tiny delay to ensure it renders
-        setTimeout(() => {
           Alert.alert(
             "Success", 
             "Expense updated successfully!", 
             [{ 
               text: "OK", 
               onPress: () => {
-                console.log('Alert OK pressed, navigating back...');
                 router.back();
               }
             }]
           );
-        }, 100);
       } else {
-        await createExpense(expenseData as Expense);
+        await createExpense({ ...expenseData, id: requestId } as Expense);
         console.log('✅ Expense created successfully');
-        // Show alert with tiny delay to ensure it renders
-        setTimeout(() => {
           Alert.alert(
             "Success", 
             "Expense created successfully!", 
             [{ 
               text: "OK", 
               onPress: () => {
-                console.log('Alert OK pressed, navigating back...');
                 router.back();
               }
             }]
           );
-        }, 100);
       }
     } catch (error) {
       console.error('❌ Error saving expense:', error);
       Alert.alert("Error", error instanceof Error ? error.message : "Failed to save expense");
+      savingRef.current = false;
       setLoading(false);
     }
   };
@@ -287,14 +228,7 @@ export default function AddExpense() {
     { value: "other", label: "Other", icon: "dots-horizontal", color: "#999" }
   ];
 
-  if (loadingProjects || (id && loadingExpense)) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#667eea" />
-        <Text style={styles.loadingText}>{id ? "Loading expense..." : "Loading projects..."}</Text>
-      </View>
-    );
-  }
+  if (loadingProjects || loadError) return <FormLoadState error={loadError} onRetry={() => setLoadAttempt(attempt => attempt + 1)} onBack={() => router.back()} />;
 
   if (projects.length === 0) {
     return (
@@ -387,6 +321,7 @@ export default function AddExpense() {
                       onPress={() => {
                         if (project.id) {
                           setSelectedProjectId(project.id);
+                          chooseScope(project.scope_of_work?.length === 1 ? project.scope_of_work[0] : null);
                           setShowProjectDropdown(false);
                           setProjectSearchQuery("");
                         }
@@ -418,7 +353,7 @@ export default function AddExpense() {
               <MaterialCommunityIcons name="text" size={20} color="#667eea" />
             </View>
             <TextInput 
-              placeholder="Enter expense description" 
+              testID="expense-description" placeholder="Enter expense description"
               value={description} 
               onChangeText={setDescription} 
               style={styles.input} 
@@ -436,7 +371,7 @@ export default function AddExpense() {
               <MaterialCommunityIcons name="currency-inr" size={20} color="#667eea" />
             </View>
             <TextInput 
-              placeholder="0.00" 
+              testID="expense-amount" placeholder="0.00"
               value={amount} 
               onChangeText={setAmount} 
               keyboardType="decimal-pad" 
@@ -463,7 +398,7 @@ export default function AddExpense() {
           </TouchableOpacity>
         </View>
           {showDatePicker && <DateTimePicker value={expenseDate} mode="date" display={Platform.OS === "ios" ? "spinner" : "default"} onChange={(event, selectedDate) => { setShowDatePicker(Platform.OS === "ios"); if (selectedDate) setExpenseDate(selectedDate); }} maximumDate={new Date()} />}
-          
+
           {/* Scope of Work */}
           {availableScopes.length > 0 && (
             <View style={styles.inputGroup}>
@@ -485,7 +420,7 @@ export default function AddExpense() {
                 </Text>
                 <MaterialCommunityIcons name={showScopeDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
               </TouchableOpacity>
-              
+
               {showScopeDropdown && (
                 <View style={styles.dropdownList}>
                   <ScrollView 
@@ -501,7 +436,7 @@ export default function AddExpense() {
                           selectedScope === scope && styles.dropdownItemSelected
                         ]}
                         onPress={() => {
-                          setSelectedScope(scope);
+                          chooseScope(scope);
                           setShowScopeDropdown(false);
                         }}
                       >
@@ -546,7 +481,7 @@ export default function AddExpense() {
               </Text>
               <MaterialCommunityIcons name={showVendorDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
             </TouchableOpacity>
-            
+
             {showVendorDropdown && (
               <View style={styles.dropdownList}>
                 {/* Manual entry option */}
@@ -559,7 +494,7 @@ export default function AddExpense() {
                     placeholderTextColor="#999"
                   />
                 </View>
-                
+
                 {/* Recent vendors */}
                 {vendors.length > 0 && (
                   <>
@@ -644,7 +579,7 @@ export default function AddExpense() {
                 <Text style={styles.dropdownText}>{paymentMethod}</Text>
                 <MaterialCommunityIcons name={showPaymentMethodDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
               </TouchableOpacity>
-              
+
               {showPaymentMethodDropdown && (
                 <View style={styles.dropdownList}>
                   {PAYMENT_METHODS.map((method) => (
@@ -696,7 +631,7 @@ export default function AddExpense() {
                 <Text style={styles.dropdownText}>{paymentStatus}</Text>
                 <MaterialCommunityIcons name={showPaymentStatusDropdown ? "chevron-up" : "chevron-down"} size={20} color="#999" />
               </TouchableOpacity>
-              
+
               {showPaymentStatusDropdown && (
                 <View style={styles.dropdownList}>
                   {PAYMENT_STATUS_OPTIONS.map((status) => (
@@ -730,6 +665,7 @@ export default function AddExpense() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Category *</Text>
+            <Text>Selected: {category}</Text>
             <View style={styles.categoryGrid}>
               {(expenseCategories.length > 0 ? expenseCategories : categories).map((cat) => {
                 const catName = 'name' in cat ? cat.name : cat.value;
@@ -760,7 +696,7 @@ export default function AddExpense() {
               })}
             </View>
           </View>
-          <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} onPress={handleSave} disabled={loading}>
+          <TouchableOpacity style={[styles.saveButton, loading && styles.saveButtonDisabled]} testID="expense-save" onPress={handleSave} disabled={loading}>
             <LinearGradient colors={loading ? ["#999", "#666"] : ["#667eea", "#764ba2"]} style={styles.saveButtonGradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               {loading ? <ActivityIndicator color="#fff" /> : <><MaterialCommunityIcons name="check" size={20} color="#fff" /><Text style={styles.saveButtonText}>{id ? "Update Expense" : "Save Expense"}</Text></>}
             </LinearGradient>

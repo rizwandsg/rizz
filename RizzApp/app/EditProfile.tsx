@@ -1,7 +1,8 @@
+import { LoadFailure } from '../components/LoadFailure';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -23,6 +24,8 @@ export default function EditProfileScreen() {
     const [user, setUser] = useState<User | null>(null);
     const [fullName, setFullName] = useState('');
     const [phone, setPhone] = useState('');
+    const savingRef = useRef(false);
+    const [error, setError] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -32,7 +35,10 @@ export default function EditProfileScreen() {
 
     const loadUserData = async () => {
         try {
+            setLoading(true);
+            setError(null);
             const currentUser = await getCurrentUser();
+            if (!currentUser) throw new Error('Please sign in again');
             if (currentUser) {
                 setUser(currentUser);
                 setFullName(currentUser.full_name || '');
@@ -40,25 +46,27 @@ export default function EditProfileScreen() {
             }
         } catch (error) {
             console.error('Failed to load user:', error);
-            Alert.alert('Error', 'Failed to load profile');
+            setError('Failed to load profile. Please retry.');
         } finally {
             setLoading(false);
         }
     };
 
     const handleSave = async () => {
+        if (savingRef.current || !user) return;
         if (!fullName.trim()) {
             Alert.alert('Error', 'Please enter your full name');
             return;
         }
 
         try {
+            savingRef.current = true;
             setSaving(true);
             
             // Update profile
             await updateProfile({
                 full_name: fullName.trim(),
-                phone: phone.trim() || undefined,
+                phone: phone.trim(),
             });
 
             Alert.alert(
@@ -78,6 +86,7 @@ export default function EditProfileScreen() {
                 'Failed to update profile. Please try again.'
             );
         } finally {
+            savingRef.current = false;
             setSaving(false);
         }
     };
@@ -89,6 +98,8 @@ export default function EditProfileScreen() {
             </View>
         );
     }
+
+    if (error) return <LoadFailure message={error} retry={loadUserData} />;
 
     return (
         <View style={styles.container}>

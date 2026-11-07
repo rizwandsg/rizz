@@ -19,6 +19,8 @@ if (!isExpoGo) {
         Notifications.setNotificationHandler({
             handleNotification: async () => ({
                 shouldShowAlert: true,
+                shouldShowBanner: true,
+                shouldShowList: true,
                 shouldPlaySound: true,
                 shouldSetBadge: true,
             }),
@@ -65,6 +67,8 @@ export async function registerForPushNotificationsAsync(): Promise<string | unde
         Notifications.setNotificationHandler({
             handleNotification: async () => ({
                 shouldShowAlert: true,
+                shouldShowBanner: true,
+                shouldShowList: true,
                 shouldPlaySound: true,
                 shouldSetBadge: true,
             }),
@@ -103,7 +107,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | unde
             }
 
             token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-            console.log('✅ Push token:', token);
 
             if (token) {
                 await AsyncStorage.setItem(PUSH_TOKEN_KEY, token);

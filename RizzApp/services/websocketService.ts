@@ -3,15 +3,11 @@
  * Handles real-time communication for projects, expenses, and payments
  */
 
-import { createClient, RealtimeChannel } from '@supabase/supabase-js';
-import { getCurrentUser } from '../api/authApi';
+import { RealtimeChannel } from '@supabase/supabase-js';
+import { getCurrentUser, sessionRevision } from '../api/authApi';
 import { NotificationType, sendAppNotification } from './notificationService';
 
-const SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL!;
-const SUPABASE_KEY = process.env.EXPO_PUBLIC_SUPABASE_KEY!;
-
-// Create Supabase client for realtime
-const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
+import { supabase } from './supabaseClient';
 
 // Store active channels
 const activeChannels: Map<string, RealtimeChannel> = new Map();
@@ -42,6 +38,7 @@ export async function subscribeToProjects(
     userId: string,
     callbacks: WebSocketCallbacks
 ): Promise<void> {
+    const started = sessionRevision();
     try {
         const channelName = `projects:${userId}`;
         
@@ -49,6 +46,7 @@ export async function subscribeToProjects(
         if (activeChannels.has(channelName)) {
             await unsubscribeFromChannel(channelName);
         }
+        if (started !== sessionRevision()) return;
 
         const channel = supabase
             .channel(channelName)
@@ -58,10 +56,9 @@ export async function subscribeToProjects(
                     event: 'INSERT',
                     schema: 'public',
                     table: 'projects',
-                    filter: `user_id=eq.${userId}`,
                 },
                 (payload) => {
-                    console.log('🔔 New project created:', payload.new);
+                    if (started !== sessionRevision()) return;
                     callbacks.onProjectCreated?.(payload.new);
                     
                     // Send notification
@@ -77,10 +74,9 @@ export async function subscribeToProjects(
                     event: 'UPDATE',
                     schema: 'public',
                     table: 'projects',
-                    filter: `user_id=eq.${userId}`,
                 },
                 (payload) => {
-                    console.log('🔔 Project updated:', payload.new);
+                    if (started !== sessionRevision()) return;
                     callbacks.onProjectUpdated?.(payload.new);
                     
                     // Send notification if status changed to completed
@@ -97,22 +93,8 @@ export async function subscribeToProjects(
                     }
                 }
             )
-            .on(
-                'postgres_changes',
-                {
-                    event: 'DELETE',
-                    schema: 'public',
-                    table: 'projects',
-                    filter: `user_id=eq.${userId}`,
-                },
-                (payload) => {
-                    console.log('🔔 Project deleted:', payload.old);
-                    callbacks.onProjectDeleted?.(payload.old);
-                }
-            )
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
-                    console.log('✅ Subscribed to projects channel');
                 } else if (status === 'CHANNEL_ERROR') {
                     console.error('❌ Error subscribing to projects channel');
                     callbacks.onError?.(new Error('Failed to subscribe to projects'));
@@ -133,6 +115,7 @@ export async function subscribeToExpenses(
     userId: string,
     callbacks: WebSocketCallbacks
 ): Promise<void> {
+    const started = sessionRevision();
     try {
         const channelName = `expenses:${userId}`;
         
@@ -140,6 +123,7 @@ export async function subscribeToExpenses(
         if (activeChannels.has(channelName)) {
             await unsubscribeFromChannel(channelName);
         }
+        if (started !== sessionRevision()) return;
 
         const channel = supabase
             .channel(channelName)
@@ -149,10 +133,9 @@ export async function subscribeToExpenses(
                     event: 'INSERT',
                     schema: 'public',
                     table: 'expenses',
-                    filter: `user_id=eq.${userId}`,
                 },
                 (payload) => {
-                    console.log('🔔 New expense created:', payload.new);
+                    if (started !== sessionRevision()) return;
                     callbacks.onExpenseCreated?.(payload.new);
                     
                     // Send notification
@@ -169,29 +152,14 @@ export async function subscribeToExpenses(
                     event: 'UPDATE',
                     schema: 'public',
                     table: 'expenses',
-                    filter: `user_id=eq.${userId}`,
                 },
                 (payload) => {
-                    console.log('🔔 Expense updated:', payload.new);
+                    if (started !== sessionRevision()) return;
                     callbacks.onExpenseUpdated?.(payload.new);
-                }
-            )
-            .on(
-                'postgres_changes',
-                {
-                    event: 'DELETE',
-                    schema: 'public',
-                    table: 'expenses',
-                    filter: `user_id=eq.${userId}`,
-                },
-                (payload) => {
-                    console.log('🔔 Expense deleted:', payload.old);
-                    callbacks.onExpenseDeleted?.(payload.old);
                 }
             )
             .subscribe((status) => {
                 if (status === 'SUBSCRIBED') {
-                    console.log('✅ Subscribed to expenses channel');
                 } else if (status === 'CHANNEL_ERROR') {
                     console.error('❌ Error subscribing to expenses channel');
                     callbacks.onError?.(new Error('Failed to subscribe to expenses'));
@@ -209,13 +177,14 @@ export async function subscribeToExpenses(
  * Subscribe to all real-time updates for a user
  */
 export async function subscribeToAll(callbacks: WebSocketCallbacks): Promise<void> {
+    const started = sessionRevision();
     try {
         const user = await getCurrentUser();
+        if (started !== sessionRevision()) return;
         if (!user) {
             throw new Error('User not authenticated');
         }
 
-        console.log('🔌 Subscribing to real-time updates for user:', user.email);
         
         // Subscribe to projects and expenses
         await Promise.all([
@@ -223,7 +192,6 @@ export async function subscribeToAll(callbacks: WebSocketCallbacks): Promise<voi
             subscribeToExpenses(user.id, callbacks),
         ]);
 
-        console.log('✅ Subscribed to all real-time updates');
     } catch (error) {
         console.error('❌ Error subscribing to real-time updates:', error);
         callbacks.onError?.(error as Error);
@@ -239,7 +207,6 @@ export async function unsubscribeFromChannel(channelName: string): Promise<void>
         if (channel) {
             await supabase.removeChannel(channel);
             activeChannels.delete(channelName);
-            console.log('✅ Unsubscribed from channel:', channelName);
         }
     } catch (error) {
         console.error('❌ Error unsubscribing from channel:', error);
@@ -251,7 +218,6 @@ export async function unsubscribeFromChannel(channelName: string): Promise<void>
  */
 export async function unsubscribeFromAll(): Promise<void> {
     try {
-        console.log('🔌 Unsubscribing from all channels...');
         
         const promises = Array.from(activeChannels.keys()).map((channelName) =>
             unsubscribeFromChannel(channelName)
@@ -260,7 +226,6 @@ export async function unsubscribeFromAll(): Promise<void> {
         await Promise.all(promises);
         activeChannels.clear();
         
-        console.log('✅ Unsubscribed from all channels');
     } catch (error) {
         console.error('❌ Error unsubscribing from all channels:', error);
     }
@@ -301,7 +266,6 @@ export async function broadcastEvent(
             payload,
         });
 
-        console.log('✅ Event broadcasted:', eventName);
     } catch (error) {
         console.error('❌ Error broadcasting event:', error);
         throw error;
@@ -323,11 +287,9 @@ export function listenToBroadcast(
         }
 
         channel.on('broadcast', { event: eventName }, ({ payload }) => {
-            console.log('🔔 Broadcast received:', eventName, payload);
             callback(payload);
         });
 
-        console.log('✅ Listening to broadcast:', eventName);
     } catch (error) {
         console.error('❌ Error listening to broadcast:', error);
     }

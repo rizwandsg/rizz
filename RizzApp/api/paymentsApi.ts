@@ -85,7 +85,7 @@ export const getPaymentsByProject = async (projectId: string): Promise<Payment[]
         }
 
         const result = await database.loadData<Payment>(TABLES.PAYMENTS, {
-            filter: `user_id.eq.${user.id},project_id.eq.${projectId}`,
+            filter: `project_id.eq.${projectId}`,
             order: 'payment_date.desc',
         });
 
@@ -137,26 +137,15 @@ export const deletePayment = async (id: string): Promise<void> => {
 /**
  * Get payment summary for a project
  */
-export const getPaymentSummary = async (projectId: string, projectCost: number = 0, totalExpenses: number = 0): Promise<PaymentSummary> => {
-    try {
-        const payments = await getPaymentsByProject(projectId);
-        
-        const total_received = payments.reduce((sum, payment) => sum + payment.amount, 0);
-        const remaining_amount = projectCost - total_received;
-        const profit_loss = total_received - totalExpenses;
-        
-        return {
-            total_received,
-            total_expenses: totalExpenses,
-            project_cost: projectCost,
-            remaining_amount,
-            profit_loss,
-            payment_count: payments.length,
-        };
-    } catch (error) {
-        console.error('Get payment summary error:', error);
-        throw error;
-    }
+export const getPaymentSummary = async (projectId: string, _projectCost?: number, _totalExpenses?: number): Promise<PaymentSummary> => {
+    if (!await getCurrentUser()) throw new Error('User not authenticated');
+    const rows = await database.loadData<{ total_received: number; total_expenses: number; total_project_cost?: number; payment_count: number }>('project_payment_summary', { filter: 'project_id.eq.' + projectId });
+    const summary = rows[0];
+    if (!summary) throw new Error('Project not found or access denied');
+    const cost = Number(summary.total_project_cost || 0);
+    const received = Number(summary.total_received);
+    const expenses = Number(summary.total_expenses);
+    return { total_received: received, total_expenses: expenses, project_cost: cost, remaining_amount: cost - received, profit_loss: received - expenses, payment_count: Number(summary.payment_count) };
 };
 
 /**
@@ -170,7 +159,6 @@ export const getAllPayments = async (): Promise<Payment[]> => {
         }
 
         const result = await database.loadData<Payment>(TABLES.PAYMENTS, {
-            filter: `user_id.eq.${user.id}`,
             order: 'payment_date.desc',
         });
 

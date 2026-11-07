@@ -1,170 +1,92 @@
-import { createClient } from '@supabase/supabase-js';
-import Constants from 'expo-constants';
+﻿import { parseFilters } from './queryFilters';
+import { requireAccessToken, supabase } from './supabaseClient';
+import { validateWrite } from './validation';
 
-// Supabase configuration from environment variables
-const supabaseUrl = Constants.expoConfig?.extra?.supabaseUrl as string;
-const supabaseKey = Constants.expoConfig?.extra?.supabaseKey as string;
-
-console.log('Supabase URL:', supabaseUrl ? 'Configured' : 'Missing');
-console.log('Supabase Key:', supabaseKey ? 'Configured' : 'Missing');
-
-// Initialize Supabase client
-const supabase = createClient(supabaseUrl, supabaseKey);
-
-// Database table names
-const TABLES = {
-    PROJECTS: 'projects',
-    EXPENSES: 'expenses',
-    PAYMENTS: 'payments',
-};
-
-export interface QueryOptions {
-    filter?: string;
-    order?: string;
-    limit?: number;
+export const TABLES = { PROJECTS: 'projects', EXPENSES: 'expenses', PAYMENTS: 'payments' };
+export interface QueryOptions { filter?: string; order?: string; limit?: number }
+const PAGE_SIZE = 500;
+const USER_COLUMNS = 'id,clerk_user_id,email,full_name,phone,role,parent_user_id,is_active,created_at,updated_at,last_login';
+const readable = new Set(['users', 'projects', 'expenses', 'payments', 'customer_payments', 'vendor_payments', 'project_payment_summary', 'expense_payment_status']);
+function assertTable(table: string, write = false) {
+  if (!readable.has(table) || (write && (table === 'users' || table.endsWith('_summary') || table.endsWith('_status')))) throw new Error('Unsupported database operation');
 }
-
-export interface DatabaseService {
-    saveData: <T>(table: string, data: T) => Promise<T>;
-    loadData: <T>(table: string, options?: QueryOptions) => Promise<T[] | null>;
-    loadDataById: <T>(table: string, id: string) => Promise<T | null>;
-    upsertData: <T>(table: string, data: T) => Promise<T>;
-    updateData: <T>(table: string, id: string, data: Partial<T>) => Promise<T>;
-    deleteData: (table: string, id: string) => Promise<void>;
+function failure(error: { message: string; code?: string } | null) {
+  if (error) throw new Error(error.code === '42501' ? 'Access denied. Check your workspace permissions.' : error.message);
 }
-
-// Create and export instance of DatabaseService
-export const database: DatabaseService = {
-    saveData: async <T>(table: string, data: T): Promise<T> => {
-        try {
-            console.log(`Saving data to ${table}:`, data);
-            const { data: result, error } = await supabase
-                .from(table)
-                .insert(data)
-                .select()
-                .single();
-
-            if (error) {
-                console.error(`Supabase error saving to ${table}:`, error);
-                throw error;
-            }
-            
-            console.log(`Successfully saved to ${table}:`, result);
-            return result as T;
-        } catch (error: any) {
-            console.error(`Failed to save data to ${table}:`, error);
-            throw new Error(error.message || `Failed to save data to ${table}`);
+export const database = {
+  async loadData<T>(table: string, options?: QueryOptions): Promise<T[]> {
+    assertTable(table);
+    await requireAccessToken();
+    if (options?.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 1)) throw new Error('Invalid query limit');
+    const filters = options?.filter ? parseFilters(options.filter) : [];
+    const order = options?.order || (table === 'project_payment_summary' ? 'project_id.asc' : table === 'expense_payment_status' ? 'expense_id.asc' : 'id.asc');
+    const match = /^([a-z_][a-z0-9_]*)\.(asc|desc)$/.exec(order);
+    if (!match) throw new Error('Invalid query order');
+    const results: T[] = [];
+    while (true) {
+      let query = supabase.from(table).select(table === 'users' ? USER_COLUMNS : '*');
+      for (const f of filters) {
+        switch (f.operator) {
+          case 'eq': query = query.eq(f.column, f.value); break;
+          case 'neq': query = query.neq(f.column, f.value); break;
+          case 'gt': query = query.gt(f.column, f.value); break;
+          case 'gte': query = query.gte(f.column, f.value); break;
+          case 'lt': query = query.lt(f.column, f.value); break;
+          case 'lte': query = query.lte(f.column, f.value); break;
         }
-    },
-
-    loadData: async <T>(table: string, options?: QueryOptions): Promise<T[] | null> => {
-        try {
-            let query = supabase.from(table).select('*');
-
-            // Apply filter if provided
-            if (options?.filter) {
-                const filters = options.filter.split(',');
-                filters.forEach(f => {
-                    const [column, operator, value] = f.split('.');
-                    if (operator === 'eq') {
-                        query = query.eq(column, value);
-                    } else if (operator === 'neq') {
-                        query = query.neq(column, value);
-                    } else if (operator === 'gt') {
-                        query = query.gt(column, value);
-                    } else if (operator === 'lt') {
-                        query = query.lt(column, value);
-                    } else if (operator === 'gte') {
-                        query = query.gte(column, value);
-                    } else if (operator === 'lte') {
-                        query = query.lte(column, value);
-                    }
-                });
-            }
-
-            // Apply order if provided
-            if (options?.order) {
-                const [column, direction] = options.order.split('.');
-                query = query.order(column, { ascending: direction === 'asc' });
-            }
-
-            // Apply limit if provided
-            if (options?.limit) {
-                query = query.limit(options.limit);
-            }
-
-            const { data, error } = await query;
-
-            if (error) throw error;
-            return data as T[];
-        } catch (error) {
-            console.error(`Failed to load data from ${table}:`, error);
-            throw new Error(`Failed to load data from ${table}`);
-        }
-    },
-
-    loadDataById: async <T>(table: string, id: string): Promise<T | null> => {
-        try {
-            const { data, error } = await supabase
-                .from(table)
-                .select('*')
-                .eq('id', id)
-                .single();
-
-            if (error) throw error;
-            return data as T;
-        } catch (error) {
-            console.error(`Failed to load data from ${table}:`, error);
-            throw new Error(`Failed to load data from ${table}`);
-        }
-    },
-
-    upsertData: async <T>(table: string, data: T): Promise<T> => {
-        try {
-            const { data: result, error } = await supabase
-                .from(table)
-                .upsert(data)
-                .select()
-                .single();
-
-            if (error) throw error;
-            return result as T;
-        } catch (error) {
-            console.error(`Failed to upsert data in ${table}:`, error);
-            throw new Error(`Failed to upsert data in ${table}`);
-        }
-    },
-
-    updateData: async <T>(table: string, id: string, data: Partial<T>): Promise<T> => {
-        try {
-            const { data: result, error } = await supabase
-                .from(table)
-                .update(data)
-                .eq('id', id)
-                .select()
-                .single();
-
-            if (error) throw error;
-            return result as T;
-        } catch (error) {
-            console.error(`Failed to update data in ${table}:`, error);
-            throw new Error(`Failed to update data in ${table}`);
-        }
-    },
-
-    deleteData: async (table: string, id: string): Promise<void> => {
-        try {
-            const { error } = await supabase
-                .from(table)
-                .delete()
-                .eq('id', id);
-
-            if (error) throw error;
-        } catch (error) {
-            console.error(`Failed to delete data from ${table}:`, error);
-            throw new Error(`Failed to delete data from ${table}`);
-        }
-    },
+      }
+      query = query.order(match[1], { ascending: match[2] === 'asc' });
+      const id = table === 'project_payment_summary' ? 'project_id' : table === 'expense_payment_status' ? 'expense_id' : 'id';
+      if (match[1] !== id) query = query.order(id, { ascending: true });
+      const count = Math.min(PAGE_SIZE, (options?.limit ?? Infinity) - results.length);
+      const { data, error } = await query.range(results.length, results.length + count - 1);
+      failure(error);
+      const rows = (data ?? []) as T[];
+      results.push(...rows);
+      if (rows.length < count || results.length === options?.limit) return results;
+    }
+  },
+  async loadDataById<T>(table: string, id: string): Promise<T | null> {
+    assertTable(table);
+    await requireAccessToken();
+    const { data, error } = await supabase.from(table).select(table === 'users' ? USER_COLUMNS : '*').eq('id', id).maybeSingle();
+    failure(error);
+    return data as T | null;
+  },
+  async saveData<T>(table: string, data: T): Promise<T> {
+    assertTable(table, true);
+    await requireAccessToken();
+    validateWrite(table, data, false);
+    const { data: result, error } = await supabase.from(table).insert(data).select().single();
+    if (error?.code === '23505' && (data as { id?: string }).id) {
+      const existing = await database.loadDataById<Record<string, unknown>>(table, (data as { id: string }).id);
+      if (existing && Object.entries(data as Record<string, unknown>).every(([key, value]) => value === undefined || JSON.stringify(existing[key]) === JSON.stringify(value))) return existing as T;
+      throw new Error('This request was already saved with different values. Reload the record before editing.');
+    }
+    failure(error);
+    return result as T;
+  },
+  async updateData<T>(table: string, id: string, data: Partial<T>): Promise<T> {
+    assertTable(table, true);
+    await requireAccessToken();
+    validateWrite(table, data, true);
+    const { updated_at: expectedVersion, ...fields } = data as Record<string, unknown>;
+    let query = supabase.from(table).update(fields).eq('id', id);
+    if (expectedVersion) query = query.eq('updated_at', expectedVersion);
+    const { data: result, error } = await query.select().single();
+    if (error?.code === 'PGRST116') throw new Error('Record changed, was removed, or is inaccessible. Reload before editing.');
+    failure(error);
+    return result as T;
+  },
+  async upsertData<T>(table: string, data: T): Promise<T> {
+    const id = (data as { id?: string }).id;
+    return id ? database.updateData<T>(table, id, data) : database.saveData(table, data);
+  },
+  async deleteData(table: string, id: string): Promise<void> {
+    assertTable(table, true);
+    await requireAccessToken();
+    const { data, error } = await supabase.from(table).delete().eq('id', id).select('id').single();
+    failure(error);
+    if (!data) throw new Error('Record not found or access denied');
+  },
 };
-
-export { TABLES };

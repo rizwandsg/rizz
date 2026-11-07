@@ -72,7 +72,7 @@ export const getCustomerPaymentsByProject = async (projectId: string): Promise<C
         const result = await database.loadData<CustomerPayment>(
             'customer_payments',
             {
-                filter: `user_id.eq.${user.id},project_id.eq.${projectId}`,
+                filter: `project_id.eq.${projectId}`,
                 order: 'payment_date.desc'
             }
         );
@@ -97,9 +97,7 @@ export const getCustomerPaymentById = async (id: string): Promise<CustomerPaymen
         const result = await database.loadDataById<CustomerPayment>('customer_payments', id);
 
         // Verify the payment belongs to the current user
-        if (result && result.user_id !== user.id) {
-            throw new Error('Unauthorized access to payment');
-        }
+
 
         return result;
     } catch (error) {
@@ -120,18 +118,11 @@ export const updateCustomerPayment = async (id: string, payment: Partial<Custome
 
         // Verify the payment belongs to the current user
         const existingPayment = await database.loadDataById<CustomerPayment>('customer_payments', id);
-        if (!existingPayment || existingPayment.user_id !== user.id) {
+        if (!existingPayment) {
             throw new Error('Unauthorized access to payment');
         }
 
-        const updatedPayment = {
-            ...existingPayment,
-            ...payment,
-            id,
-            updated_at: new Date().toISOString(),
-        };
-
-        const result = await database.upsertData<CustomerPayment>('customer_payments', updatedPayment);
+        const result = await database.updateData<CustomerPayment>('customer_payments', id, { ...payment, updated_at: payment.updated_at || existingPayment.updated_at });
         return result;
     } catch (error) {
         console.error('Update customer payment error:', error);
@@ -189,7 +180,7 @@ export const calculateTotalReceived = async (projectId: string): Promise<number>
         return payments.reduce((total, payment) => total + payment.amount, 0);
     } catch (error) {
         console.error('Calculate total received error:', error);
-        return 0;
+        throw error;
     }
 };
 
