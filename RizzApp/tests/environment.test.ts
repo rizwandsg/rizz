@@ -2,7 +2,7 @@ import { createRequire } from 'node:module';
 import { expect, it } from 'vitest';
 import { firebasePublic } from './fixtures/public-config';
 const { validateEnvironment, configEnvironment } = createRequire(import.meta.url)('../config/runtime-config.cjs');
-const base = { ...firebasePublic, EXPO_PUBLIC_SUPABASE_URL: 'https://staging.example.com', EXPO_PUBLIC_SUPABASE_KEY: 'sb_publishable_test', EXPO_PUBLIC_APP_ENV: 'staging', EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '4', EXPO_PUBLIC_PRODUCTION_SUPABASE_URL: 'https://production.example.com' };
+const base = { ...firebasePublic, EXPO_PUBLIC_SUPABASE_URL: 'https://staging.example.com', EXPO_PUBLIC_SUPABASE_KEY: 'sb_publishable_test', EXPO_PUBLIC_APP_ENV: 'staging', EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '5', EXPO_PUBLIC_PRODUCTION_SUPABASE_URL: 'https://production.example.com' };
 it('allows EAS metadata discovery before remote settings are available without permitting a bundle', () => {
   expect(configEnvironment({ EAS_BUILD_PROFILE: 'production', EXPO_PUBLIC_APP_ENV: 'production' })).toEqual({ appEnv: 'production' });
   expect(() => validateEnvironment({ EAS_BUILD_PROFILE: 'production', EXPO_PUBLIC_APP_ENV: 'production' }, true)).toThrow('Configure Supabase');

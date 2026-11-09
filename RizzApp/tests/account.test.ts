@@ -1,5 +1,6 @@
 import { beforeEach, expect, it, vi } from 'vitest';
 import { AccountDependencies, createAccountHandler, Profile } from '../supabase/functions/account/handler';
+import {managedIdentityEmail} from '../supabase/functions/_shared/rizzId';
 const owner: Profile = { id: 'owner-a', firebase_user_id: 'user_owner_a', email: 'owner@example.com', full_name: 'Owner', role: 'owner', parent_user_id: null, is_active: true };
 let deps: AccountDependencies;
 beforeEach(() => {
@@ -72,7 +73,7 @@ it('provisions a normalized Rizz ID with server claims and compensates claim fai
   vi.mocked(deps.createIdentity).mockResolvedValue({uid:'managed-a'});vi.mocked(deps.insertProfile).mockResolvedValue(managed);
   const body={action:'createMember',member:{rizz_id:' Fuwad@Rizz.com ',password:'secure-password',full_name:'Fuwad'}};
   expect((await createAccountHandler(deps)(request(body))).status).toBe(201);
-  expect(deps.createIdentity).toHaveBeenCalledWith({email:'fuwad@rizz.com',password:'secure-password',displayName:'Fuwad'});
+  expect(deps.createIdentity).toHaveBeenCalledWith({email:await managedIdentityEmail('fuwad'),password:'secure-password',displayName:'Fuwad'});
   expect(deps.authorizeIdentity).toHaveBeenCalledWith('managed-a',1);
   expect(deps.insertProfile).toHaveBeenCalledWith(expect.objectContaining({managed_login:true,managed_auth_version:1,rizz_id:'fuwad@rizz.com',parent_user_id:owner.id,role:'member'}));
   vi.mocked(deps.authorizeIdentity).mockRejectedValueOnce(new Error('Claims failed'));
@@ -80,7 +81,7 @@ it('provisions a normalized Rizz ID with server claims and compensates claim fai
 });
 it('requires managed claims to match the provisioned profile and active workspace',async()=>{
   vi.mocked(deps.findProfile).mockResolvedValue(managed);vi.mocked(deps.getProfile).mockResolvedValue(owner);
-  vi.mocked(deps.identity).mockResolvedValue({uid:'managed-a',email:managed.email,emailVerified:false,managedVersion:1});
+  vi.mocked(deps.identity).mockResolvedValue({uid:'managed-a',email:await managedIdentityEmail(managed.email),emailVerified:false,managedVersion:1});
   expect((await createAccountHandler(deps)(request({action:'sync'}))).status).toBe(200);
   vi.mocked(deps.identity).mockResolvedValue({uid:'managed-a',email:managed.email,emailVerified:false,managedVersion:2});
   expect((await createAccountHandler(deps)(request({action:'sync'}))).status).toBe(401);

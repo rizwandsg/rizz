@@ -24,6 +24,7 @@ beforeAll(async () => {
   await db.exec(readFileSync(new URL('../supabase/migrations/202611070001_secure_workspaces.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../supabase/migrations/202611080001_firebase_identity.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../supabase/migrations/202611090001_managed_rizz_ids.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../supabase/migrations/202611090002_non_deliverable_rizz_logins.sql', import.meta.url), 'utf8'));
   await db.exec("INSERT INTO private.identity_configuration(firebase_project_id) VALUES ('rizz-simulation')");
   await db.exec(`INSERT INTO public.users(id,email,full_name,firebase_user_id,role,parent_user_id) VALUES
     ('${A}','a@example.com','A','user_a','owner',null),('${B}','b@example.com','B','user_b','owner',null),('${M}','member@example.com','Member','user_member','member','${A}');

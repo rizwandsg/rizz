@@ -4,7 +4,7 @@ import {
   updatePassword, updateProfile,
 } from 'firebase/auth';
 import { firebaseAuth } from './firebaseClient';
-import { isRizzId } from './rizzId';
+import { isRizzId,isManagedIdentityEmail,rizzIdLoginEmail } from './rizzId';
 
 export interface IdentityState {
   isLoaded: boolean; isSignedIn: boolean; emailVerified: boolean;
@@ -24,7 +24,7 @@ function observe() {
     void (async()=>{
       const {claims}=await user.getIdTokenResult();
       if(generation!==identityGeneration||firebaseAuth.currentUser!==user)return;
-      const managed=!!user.email&&isRizzId(user.email)&&claims.rizz_managed===true&&Number.isInteger(claims.rizz_auth_version)&&Number(claims.rizz_auth_version)>=1;
+      const managed=!!user.email&&isManagedIdentityEmail(user.email)&&claims.rizz_managed===true&&Number.isInteger(claims.rizz_auth_version)&&Number(claims.rizz_auth_version)>=1;
       state={isLoaded:true,isSignedIn:true,emailVerified:user.emailVerified,accessVerified:user.emailVerified||managed,isManagedMember:managed,sessionId:`${user.uid}:${user.metadata.lastSignInTime||''}`,email:user.email,error:null};publish();
     })().catch(()=>{
       if(generation!==identityGeneration)return;
@@ -63,14 +63,14 @@ export function identityError(error: unknown): string {
   return messages[code || ''] || (code ? 'Unable to complete authentication. Please try again.' : error instanceof Error ? error.message : 'Please try again.');
 }
 export async function signInIdentity(email: string, password: string) {
-  const result = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+  const result = await signInWithEmailAndPassword(firebaseAuth, isRizzId(email) ? await rizzIdLoginEmail(email) : email.trim(), password);
   const {claims}=await result.user.getIdTokenResult();
   if(firebaseAuth.currentUser !== result.user) throw new Error('Sign-in changed. Please try again.');
-  const managed=isRizzId(result.user.email||'')&&claims.rizz_managed===true&&Number.isInteger(claims.rizz_auth_version)&&Number(claims.rizz_auth_version)>=1;
+  const managed=isManagedIdentityEmail(result.user.email||'')&&claims.rizz_managed===true&&Number.isInteger(claims.rizz_auth_version)&&Number(claims.rizz_auth_version)>=1;
   return { emailVerified: result.user.emailVerified, accessVerified:result.user.emailVerified||managed };
 }
 export async function signUpIdentity(email: string, password: string, fullName: string) {
-  if(isRizzId(email))throw new Error('Rizz IDs are created by workspace owners. Use your real email to create an owner account.');
+  if(isRizzId(email)||isManagedIdentityEmail(email.trim().toLowerCase()))throw new Error('Rizz IDs are created by workspace owners. Use your real email to create an owner account.');
   const result = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
   // A profile-name failure must not strand a successfully created account on signup.
   // The verified account can edit its display name after signing in.
@@ -91,7 +91,7 @@ export async function refreshIdentity() {
   return user.emailVerified;
 }
 export async function resetIdentityPassword(email: string) {
-  if(isRizzId(email))throw new Error('Ask your workspace owner to reset your Rizz ID password.');
+  if(isRizzId(email)||isManagedIdentityEmail(email.trim().toLowerCase()))throw new Error('Ask your workspace owner to reset your Rizz ID password.');
   try { await sendPasswordResetEmail(firebaseAuth, email.trim()); }
   catch (error) {
     // Do not reveal whether an address is registered, even on older projects.
@@ -103,7 +103,7 @@ export async function changeIdentityPassword(currentPassword: string, newPasswor
   if (!user?.email) throw new Error('Sign in before changing your password.');
   if(!user.emailVerified){
     const {claims}=await user.getIdTokenResult();
-    if(!isRizzId(user.email)||claims.rizz_managed!==true)throw new Error('Sign in with a verified email before changing your password.');
+    if(!isManagedIdentityEmail(user.email)||claims.rizz_managed!==true)throw new Error('Sign in with a verified email before changing your password.');
   }
   await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword));
   if (firebaseAuth.currentUser?.uid !== user.uid) throw new Error('Sign-in changed. Please try again.');

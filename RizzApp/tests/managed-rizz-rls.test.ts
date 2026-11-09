@@ -1,13 +1,13 @@
 import {PGlite} from '@electric-sql/pglite';
 import {readFileSync} from 'node:fs';
 import {beforeAll,afterAll,it,expect} from 'vitest';
-import {normalizeRizzId} from '../services/rizzId';
-let db:PGlite;
+import {managedIdentityEmail,normalizeRizzId} from '../supabase/functions/_shared/rizzId';
+let db:PGlite;let managedEmail:string;
 const A='10000000-0000-4000-8000-000000000001',M='10000000-0000-4000-8000-000000000002';
 beforeAll(async()=>{
- db=new PGlite();await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;CREATE SCHEMA auth;
+ managedEmail=await managedIdentityEmail("fuwad"); db=new PGlite();await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role BYPASSRLS;CREATE SCHEMA auth;
  CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$SELECT coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb$$;`);
- for(const file of ['202611070001_secure_workspaces.sql','202611080001_firebase_identity.sql','202611090001_managed_rizz_ids.sql'])await db.exec(readFileSync('supabase/migrations/'+file,'utf8'));
+ for(const file of ['202611070001_secure_workspaces.sql','202611080001_firebase_identity.sql','202611090001_managed_rizz_ids.sql','202611090002_non_deliverable_rizz_logins.sql'])await db.exec(readFileSync('supabase/migrations/'+file,'utf8'));
  await db.exec(`INSERT INTO private.identity_configuration(firebase_project_id) VALUES ('rizz-simulation');
  INSERT INTO public.users(id,email,full_name,firebase_user_id,role,parent_user_id,rizz_id,managed_login,managed_auth_version) VALUES
  ('${A}','owner@example.test','Owner','owner','owner',NULL,NULL,false,0),
@@ -16,7 +16,7 @@ beforeAll(async()=>{
 });
 afterAll(async()=>{await db?.close();});
 async function visible(extra:Record<string,unknown>){
- await db.exec('RESET ROLE');await db.query("SELECT set_config('request.jwt.claims',$1,false)",[JSON.stringify({sub:'member',role:'authenticated',iss:'https://securetoken.google.com/rizz-simulation',aud:'rizz-simulation',email_verified:false,email:'fuwad@rizz.com',rizz_managed:true,rizz_auth_version:1,...extra})]);await db.exec('SET ROLE authenticated');
+ await db.exec('RESET ROLE');await db.query("SELECT set_config('request.jwt.claims',$1,false)",[JSON.stringify({sub:'member',role:'authenticated',iss:'https://securetoken.google.com/rizz-simulation',aud:'rizz-simulation',email_verified:false,email:managedEmail,rizz_managed:true,rizz_auth_version:1,...extra})]);await db.exec('SET ROLE authenticated');
  return (await db.query('SELECT id FROM public.projects')).rows.length;
 }
 it('allows an owner-provisioned Rizz ID without pretending its email is verified',async()=>{expect(await visible({})).toBe(1);});

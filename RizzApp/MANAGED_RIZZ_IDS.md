@@ -1,8 +1,10 @@
 # Team access
 
-Owners create team members from **Users → +** using a Rizz ID, name and password. The suffix is fixed to `@Rizz.com`; IDs contain 3–40 letters, numbers, dots, underscores or hyphens. IDs are unique across the app. A full ID can also be pasted into the form.
+Owners create team members from **Users → +** using a Rizz ID, name and password. Firebase uses a non-deliverable internal `.invalid` address for these IDs, so password recovery cannot send mail to a third-party domain. The suffix is fixed to `@Rizz.com`; IDs contain 3–40 letters, numbers, dots, underscores or hyphens. IDs are unique across the app. A full ID can also be pasted into the form.
 
 Members sign in from **Team Member Login**. These IDs are login aliases and do not receive email. Owners use their real, verified email addresses and retain Firebase email recovery.
+
+The internal address is the SHA-256 digest of the normalized ID at `rizz.invalid`. The `.invalid` top-level domain is [permanently reserved](https://www.rfc-editor.org/rfc/rfc2606.html). It prevents recovery mail from reaching the unrelated owner of `rizz.com`; the displayed Rizz ID stays unchanged.
 
 To reset a team password, the workspace owner opens **Users → Reset**, enters a new password and shares it securely with that member. Previous tokens lose database access immediately. A failed identity-service request leaves access locked; refresh and retry the reset. Deactivating an account retains its project and financial history.
 
@@ -10,7 +12,7 @@ Existing members with real email addresses keep their existing email recovery. N
 
 # Release validation
 
-Backend contract **4** requires `202611090001_managed_rizz_ids.sql` after the Firebase identity migration. Deploy the updated `account` function before releasing the client. The migration adds managed-account fields without altering existing financial records. Back up and rehearse against the current data before applying it; an existing hosted installation must not rerun the initial cutover.
+Backend contract **5** requires `202611090002_non_deliverable_rizz_logins.sql` after `202611090001_managed_rizz_ids.sql` after the Firebase identity migration. Deploy the updated `account` function before releasing the client. The migration adds managed-account fields without altering existing financial records. Back up and rehearse against the current data before applying it; an existing hosted installation must not rerun the initial cutover.
 
 `npm run verify` checks types, lint, account authorization, PostgreSQL policies, role and screen simulations, export behavior, secrets and Android bundling. `npm run build:production:apk` runs the production gates and creates a signed installable APK with production services. It uses the existing Android signing key and increments the version code.
 

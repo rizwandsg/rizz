@@ -5,9 +5,11 @@ const sdk=vi.hoisted(()=>({
   reload:vi.fn(),sendEmailVerification:vi.fn(),sendPasswordResetEmail:vi.fn(),signInWithEmailAndPassword:vi.fn(),
   signOut:vi.fn(),updatePassword:vi.fn(),updateProfile:vi.fn(), credential:vi.fn(),
 }));
+vi.mock('expo-crypto',async()=>({CryptoDigestAlgorithm:{SHA256:'SHA-256'},digestStringAsync:async(_algorithm:string,value:string)=>(await import('node:crypto')).createHash('sha256').update(value).digest('hex')}));
 vi.mock('../services/firebaseClient',()=>({firebaseAuth:sdk.auth}));
 vi.mock('firebase/auth',()=>({...sdk,EmailAuthProvider:{credential:sdk.credential}}));
 import { changeIdentityPassword,getIdentityState,getIdentityToken,identityError,refreshIdentity,resetIdentityPassword,sendVerificationEmail,signInIdentity,signOutIdentity,signUpIdentity,subscribeIdentity } from '../services/firebaseIdentity';
+import {managedIdentityEmail} from '../supabase/functions/_shared/rizzId';
 function user(uid='firebase-a'){return {uid,email:'a@example.test',emailVerified:true,metadata:{lastSignInTime:'today'},getIdTokenResult:vi.fn().mockResolvedValue({claims:{}}),getIdToken:vi.fn().mockResolvedValue('verified-token')};}
 beforeEach(()=>{
   vi.clearAllMocks(); sdk.auth.currentUser=user();
@@ -20,6 +22,14 @@ beforeEach(()=>{
 it('uses Firebase credentials and trims email without modifying passwords',async()=>{
   expect(await signInIdentity(' a@example.test ',' password ')).toEqual({emailVerified:true,accessVerified:true});
   expect(sdk.signInWithEmailAndPassword).toHaveBeenCalledWith(sdk.auth,'a@example.test',' password ');
+});
+it('maps visible Rizz IDs to non-deliverable Firebase logins and keeps email verification truthful',async()=>{
+  const email=await managedIdentityEmail('fuwad');sdk.auth.currentUser.email=email;sdk.auth.currentUser.emailVerified=false;
+  sdk.auth.currentUser.getIdTokenResult.mockResolvedValue({claims:{rizz_managed:true,rizz_auth_version:1}});
+  expect(await signInIdentity(' FuWad@Rizz.com ','password')).toEqual({emailVerified:false,accessVerified:true});
+  expect(sdk.signInWithEmailAndPassword).toHaveBeenCalledWith(sdk.auth,email,'password');expect(email.endsWith('@rizz.invalid')).toBe(true);
+  await expect(resetIdentityPassword('fuwad@rizz.com')).rejects.toThrow('workspace owner');expect(sdk.sendPasswordResetEmail).not.toHaveBeenCalled();
+  await expect(signUpIdentity('fuwad@rizz.com','password','Name')).rejects.toThrow('workspace owners');
 });
 it('does not strand a newly created account if its display-name update fails',async()=>{
   sdk.updateProfile.mockRejectedValue(new Error('Offline'));await expect(signUpIdentity(' a@example.test ','password',' A ')).resolves.toBeUndefined();

@@ -36,7 +36,7 @@ function prepareCutover(snapshot, mappings, firebaseProject) {
       END LOOP;
     END $$;`,
   ];
-  const migrations = ['202611070001_secure_workspaces.sql','202611080001_firebase_identity.sql','202611090001_managed_rizz_ids.sql'];
+  const migrations = ['202611070001_secure_workspaces.sql','202611080001_firebase_identity.sql','202611090001_managed_rizz_ids.sql','202611090002_non_deliverable_rizz_logins.sql'];
   for (const file of migrations) statements.push(fs.readFileSync(path.join(root,'supabase/migrations',file),'utf8').replace(/^\s*(?:BEGIN|COMMIT);\s*$/gm,''));
   statements.push('INSERT INTO private.identity_configuration(firebase_project_id) VALUES ('+literal(firebaseProject)+');');
   for (const mapping of mappings) {
@@ -54,7 +54,7 @@ function prepareCutover(snapshot, mappings, firebaseProject) {
       IF actual IS DISTINCT FROM item.records THEN RAISE EXCEPTION 'Unexpected record change in %. Cutover rolled back.',item.table_name; END IF;
     END LOOP;
     IF EXISTS (SELECT 1 FROM public.users WHERE is_active AND firebase_user_id IS NULL) THEN RAISE EXCEPTION 'Active identity is unmapped'; END IF;
-    IF public.backend_contract_version() <> 4 THEN RAISE EXCEPTION 'Backend contract is not ready'; END IF;
+    IF public.backend_contract_version() <> 5 THEN RAISE EXCEPTION 'Backend contract is not ready'; END IF;
   END $$;`);
   statements.push('CREATE SCHEMA IF NOT EXISTS supabase_migrations; CREATE TABLE IF NOT EXISTS supabase_migrations.schema_migrations (version text PRIMARY KEY, statements text[], name text);');
   for(const file of migrations) {

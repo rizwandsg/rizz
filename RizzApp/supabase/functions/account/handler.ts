@@ -1,5 +1,5 @@
 // Framework-independent handler, also executed by the local regression suite.
-import { isRizzId, normalizeRizzId } from '../_shared/rizzId.ts';
+import { isRizzId, normalizeRizzId, managedIdentityEmail,isManagedIdentityEmail } from '../_shared/rizzId.ts';
 export interface Profile {
   id: string; firebase_user_id: string | null; email: string; full_name: string;
   role: string; parent_user_id: string | null; is_active: boolean; phone?: string;
@@ -52,9 +52,9 @@ export function createAccountHandler(deps: AccountDependencies) {
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new HttpError(400, 'Invalid request');
       let caller = await deps.findProfile(identity.uid);
       if (caller?.managed_login) {
-        if (caller.role !== 'member' || !caller.parent_user_id || caller.rizz_id !== identity.email.toLowerCase() ||
+        if (caller.role !== 'member' || !caller.parent_user_id || !caller.rizz_id || await managedIdentityEmail(caller.rizz_id) !== identity.email.toLowerCase() ||
             identity.managedVersion !== caller.managed_auth_version) throw new HttpError(401, 'Your sign-in has expired. Please sign in again.');
-      } else if (!identity.emailVerified || isRizzId(identity.email)) {
+      } else if (!identity.emailVerified || isRizzId(identity.email) || isManagedIdentityEmail(identity.email)) {
         throw new HttpError(403, 'Rizz IDs must be created by a workspace owner');
       }
       if (input.action === 'sync') {
@@ -95,7 +95,7 @@ export function createAccountHandler(deps: AccountDependencies) {
         const password = input.member?.password;
         if (typeof password !== 'string' || password.length < 8 || password.length > 128) throw new HttpError(400, 'Password must contain 8 to 128 characters');
         if (!fields.full_name) throw new HttpError(400, 'Name is required');
-        const firebaseUser = await deps.createIdentity({ email, password, displayName: fields.full_name as string });
+        const firebaseUser = await deps.createIdentity({ email:managed ? await managedIdentityEmail(email) : email, password, displayName: fields.full_name as string });
         try {
           if (managed) await deps.authorizeIdentity(firebaseUser.uid,1);
           const member = await deps.insertProfile({ ...fields, email, firebase_user_id: firebaseUser.uid, role: 'member', parent_user_id: caller.id, is_active: true,
