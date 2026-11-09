@@ -14,6 +14,9 @@ export interface User {
     parent_user_id?: string | null;
     role?: 'owner' | 'member';
     is_active?: boolean;
+    rizz_id?: string | null;
+    managed_login?: boolean;
+    managed_auth_version?: number;
 }
 
 export interface SubUser {
@@ -26,10 +29,14 @@ export interface SubUser {
     parent_user_id: string;
     created_at: string;
     last_login?: string;
+    rizz_id?: string | null;
+    managed_login?: boolean;
+    managed_auth_version?: number;
 }
 
 export interface CreateSubUserData {
-    email: string;
+    email?: string;
+    rizz_id?: string;
     password: string;
     full_name: string;
     phone?: string;
@@ -68,7 +75,12 @@ export async function clearSessionUser() {
 async function account<T>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
     const token = await requireAccessToken();
     const { data, error } = await supabase.functions.invoke('account', { body: { action, ...payload }, headers: { Authorization: 'Bearer ' + token } });
-    if (error) throw new Error('Account service failed. Please retry or contact your workspace owner.');
+    if (error) {
+        let message='Account service failed. Please retry or contact your workspace owner.';
+        const response=(error as {context?:unknown}).context;
+        if(response instanceof Response){try{const body=await response.clone().json();if(typeof body?.error==='string'&&body.error.length<=250)message=body.error;}catch{ /* Keep the safe fallback. */ }}
+        throw new Error(message);
+    }
     if (data?.error) throw new Error(data.error);
     return data as T;
 }
@@ -124,7 +136,7 @@ export async function getSubUsers(): Promise<SubUser[]> {
 }
 export async function updateSubUser(id: string, data: { full_name?: string; phone?: string; is_active?: boolean }): Promise<SubUser> { return account('updateMember', { id, member: data }); }
 export async function deleteSubUser(id: string): Promise<void> { await account('deactivateMember', { id }); }
-export async function resetSubUserPassword(_id: string): Promise<void> { throw new Error('Team members must use Forgot password with their verified email address'); }
+export async function resetSubUserPassword(id: string, password: string, expectedVersion: number): Promise<void> { await account('resetMemberPassword',{id,password,expected_version:expectedVersion}); }
 export async function getSupabaseUserFromFirebase(firebaseUserId: string): Promise<User | null> {
     const users = await database.loadData<User>('users', { filter: 'firebase_user_id.eq.' + firebaseUserId });
     return users[0] ?? null;

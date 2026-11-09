@@ -6,12 +6,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // native lifecycle boundaries are mocked. API stale-commit protection is
 // independently covered by session.test.ts.
 const state = vi.hoisted(() => ({
-  isLoaded: true, isSignedIn: false, emailVerified: true, sessionId: null as string | null,
+  isLoaded: true, isSignedIn: false, accessVerified: true,emailVerified: true, sessionId: null as string | null,
   getToken: vi.fn(), clear: vi.fn(), refresh: vi.fn(), setTokenProvider: vi.fn(),
   profile: null as any, listeners: new Set<() => void>(),
   lifecycle: new Set<(state: string) => void>(),
 }));
-vi.mock('../context/IdentityContext', () => ({ useIdentity: () => ({isLoaded: state.isLoaded, isSignedIn: state.isSignedIn, sessionId: state.sessionId, getToken: state.getToken, emailVerified: state.emailVerified, error: null}) }));
+vi.mock('../context/IdentityContext', () => ({ useIdentity: () => ({isLoaded: state.isLoaded, isSignedIn: state.isSignedIn, sessionId: state.sessionId, getToken: state.getToken, accessVerified: state.emailVerified,emailVerified: state.emailVerified, error: null}) }));
 vi.mock('react-native', () => ({AppState: {addEventListener: (_event: string, callback: (state: string) => void) => {
   state.lifecycle.add(callback);
   return {remove: () => {state.lifecycle.delete(callback);}};

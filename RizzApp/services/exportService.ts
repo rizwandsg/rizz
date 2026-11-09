@@ -2,6 +2,8 @@ import { Platform } from 'react-native';
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import {File} from 'expo-file-system';
+import * as IntentLauncher from 'expo-intent-launcher';
 import { CategorySummary } from '../api/expensesApi';
 
 export function csvCell(value: string): string {
@@ -143,7 +145,7 @@ export const generateProjectCostCSV = (summary: ProjectCostSummary): string => {
         'Expense Breakdown by Category',
         'Category,Amount,Percentage',
         ...summary.expensesByCategory.map(cat =>
-            `"${cat.category}",₹${cat.amount.toFixed(2)},${cat.percentage.toFixed(2)}%`
+            `${csvCell(cat.category)},₹${cat.amount.toFixed(2)},${cat.percentage.toFixed(2)}%`
         )
     ];
     return lines.join('\n');
@@ -282,19 +284,71 @@ export const downloadProjectCostData = async (
  * React Native equivalent of Flutter's File handling
  */
 export function generateProjectCostHTML(summary: ProjectCostSummary): string {
-    return '<!doctype html><html><head><meta charset="utf-8"><style>body{font-family: sans-serif;padding:24px}pre{white-space:pre-wrap;font-size:12px}</style></head><body><pre>' + escapeHTML(generateProjectCostPDF(summary)) + '</pre></body></html>';
+    const money = (value: number) => '₹' + value.toLocaleString('en-IN', {minimumFractionDigits:2,maximumFractionDigits:2});
+    const rows = [['Total budget',summary.totalBudget],['Total expenses',summary.totalExpenses],['Total received',summary.totalReceived],['Remaining to receive',summary.remainingAmount],['Profit / loss',summary.profitLoss]] as const;
+    return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+      @page{size:A4;margin:18mm}*{box-sizing:border-box}body{font:12px Arial,sans-serif;color:#20283c;margin:0;line-height:1.5}
+      h1{font-size:25px;color:#4655ad;margin:0 0 6px}h2{font-size:15px;margin:24px 0 8px}p{margin:6px 0;overflow-wrap:anywhere}
+      .date{color:#667085}table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{padding:10px 8px;border-bottom:1px solid #dce1eb;text-align:left;overflow-wrap:anywhere}
+      th{background:#eef0fc}thead{display:table-header-group}tr{break-inside:avoid}th:first-child{width:52%}.number{text-align:right;font-variant-numeric:tabular-nums}
+      footer{margin-top:24px;color:#667085;font-size:10px}
+      </style></head><body><h1>Project Cost Summary</h1><p class="date">Generated ${escapeHTML(new Date().toLocaleDateString('en-IN'))}</p>
+      <h2>Project information</h2><p><b>Project:</b> ${escapeHTML(summary.projectName)}</p><p><b>Client:</b> ${escapeHTML(summary.clientName || '—')}</p>
+      <h2>Financial summary</h2><table><tbody>${rows.map(([label,value])=>`<tr><td>${label}</td><td class="number">${money(value)}</td></tr>`).join('')}</tbody></table>
+      <h2>Expense breakdown</h2><table><thead><tr><th>Category</th><th class="number">Amount</th><th class="number">% of expenses</th></tr></thead><tbody>
+      ${summary.expensesByCategory.length ? summary.expensesByCategory.map(cat=>`<tr><td>${escapeHTML(cat.category)}</td><td class="number">${money(cat.amount)}</td><td class="number">${cat.percentage.toFixed(2)}%</td></tr>`).join('') : '<tr><td colspan="3">No expenses recorded.</td></tr>'}
+      </tbody></table><footer>Rizz · Project analytics</footer></body></html>`;
+}
+// Android WebView print adapters must not render two files at the same time.
+let renderQueue: Promise<unknown> = Promise.resolve();
+function serializePrint<T>(render: () => Promise<T>): Promise<T> {
+    const result = renderQueue.then(render);
+    renderQueue = result.catch(() => {});
+    return result;
+}
+async function renderPDF(html: string): Promise<string> {
+    return serializePrint(async () => {
+        const result = await Print.printToFileAsync({html});
+        const info = await FileSystem.getInfoAsync(result.uri);
+        if (!info.exists || info.isDirectory || info.size === 0) {
+            await FileSystem.deleteAsync(result.uri, {idempotent:true});
+            throw new Error('The PDF could not be generated. Try Save as PDF from the print dialog.');
+        }
+        return result.uri;
+    });
+}
+export const printProjectCost = (summary: ProjectCostSummary) => serializePrint(() => Print.printAsync({html:generateProjectCostHTML(summary)}));
+export async function saveProjectCostPDFToDevice(summary: ProjectCostSummary): Promise<'saved'|'cancelled'|'print-dialog'|'shared'> {
+    if (Platform.OS === 'web') { await printProjectCost(summary); return 'print-dialog'; }
+    const uri = await renderPDF(generateProjectCostHTML(summary));
+    try {
+        if (Platform.OS !== 'android') {
+            if (!await Sharing.isAvailableAsync()) throw new Error('File sharing is unavailable on this device');
+            await Sharing.shareAsync(uri, {mimeType:'application/pdf',UTI:'.pdf'});
+            return 'shared';
+        }
+        const result = await IntentLauncher.startActivityAsync('android.intent.action.CREATE_DOCUMENT', {
+            category:'android.intent.category.OPENABLE',type:'application/pdf',
+            extra:{'android.intent.extra.TITLE':safeFilename('project_analytics_'+summary.projectName+'.pdf')},
+        });
+        if (result.resultCode !== -1) return 'cancelled';
+        if (!result.data?.startsWith('content://')) throw new Error('Choose a document location and try again.');
+        // The modern file API supports Downloads and cloud document providers.
+        await new File(result.data).write(await new File(uri).bytes());
+        return 'saved';
+    } finally { await FileSystem.deleteAsync(uri,{idempotent:true}).catch(()=>{}); }
 }
 export const savePDFToDevice = async (filename: string, content: string): Promise<string> => {
     const target = documentPath(filename);
-    const result = await Print.printToFileAsync({ html: '<html><body><pre>' + escapeHTML(content) + '</pre></body></html>' });
-    await FileSystem.moveAsync({ from: result.uri, to: target });
+    const uri = await renderPDF('<!doctype html><html><head><meta charset="utf-8"></head><body><pre style="white-space:pre-wrap">' + escapeHTML(content) + '</pre></body></html>');
+    await FileSystem.moveAsync({ from: uri, to: target });
     return target;
 };
 export const generateAndSavePDF = async (summary: ProjectCostSummary): Promise<string> => {
     const filename = safeFilename('project_analytics_' + summary.projectName + '_' + Date.now() + '.pdf');
     const target = documentPath(filename);
-    const result = await Print.printToFileAsync({ html: generateProjectCostHTML(summary) });
-    await FileSystem.moveAsync({ from: result.uri, to: target });
+    const uri = await renderPDF(generateProjectCostHTML(summary));
+    await FileSystem.moveAsync({ from: uri, to: target });
     return target;
 };
 export const getSavedPDFFiles = async (): Promise<string[]> => {

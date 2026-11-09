@@ -5,8 +5,8 @@ const { loadProductionEnvironment } = require('./production-env.cjs');
 
 const root = path.resolve(__dirname, '..');
 const action = process.argv[2] || 'check';
-if (!['check', 'android', 'ios'].includes(action)) {
-  console.error('Use: node scripts/production.cjs [check|android|ios]');
+if (!['check', 'android', 'android-apk', 'ios'].includes(action)) {
+  console.error('Use: node scripts/production.cjs [check|android|android-apk|ios]');
   process.exit(1);
 }
 
@@ -28,7 +28,7 @@ try {
     // worker. Validate the file alone before uploading it; never upload .env.
     loadProductionEnvironment(root, {});
     run('eas', ['env:push', 'production', '--path', '.env.production.local', '--force']);
-    run('eas', ['build', '--platform', action, '--profile', 'production']);
+    run('eas', ['build', '--platform', action === 'android-apk' ? 'android' : action, '--profile', action === 'android-apk' ? 'production-apk' : 'production']);
   } else {
     console.log('Production preflight passed. Store signing and device acceptance remain separate checks.');
   }

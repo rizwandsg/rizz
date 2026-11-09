@@ -4,5 +4,5 @@ function run(script) {
   if (result.status !== 0) process.exit(result.status ?? 1);
 }
 run('verify');
-if (['preview','production'].includes(process.env.EAS_BUILD_PROFILE)) run('check:release');
-if (process.env.EAS_BUILD_PROFILE === 'production') run('audit:release');
+if (['preview','production','production-apk'].includes(process.env.EAS_BUILD_PROFILE)) run('check:release');
+if (['production','production-apk'].includes(process.env.EAS_BUILD_PROFILE)) run('audit:release');

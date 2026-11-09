@@ -23,7 +23,7 @@ function validateEnvironment(env, release = false) {
   if (productionFirebase && ((appEnv === 'production') !== (firebaseProject === productionFirebase))) throw new Error('App environment and production Firebase project do not match');
   if (release) {
     if (appEnv === 'development') throw new Error('Release builds require staging or production');
-    if (env.EXPO_PUBLIC_BACKEND_CONTRACT_VERSION !== '3') throw new Error('Release requires the version 3 backend contract');
+    if (env.EXPO_PUBLIC_BACKEND_CONTRACT_VERSION !== '4') throw new Error('Release requires the version 4 backend contract');
     if (!productionFirebase) throw new Error('Set PRODUCTION_FIREBASE_PROJECT_ID to enforce identity isolation');
     const productionUrl = env.EXPO_PUBLIC_PRODUCTION_SUPABASE_URL;
     if (!productionUrl) throw new Error('Set PRODUCTION_SUPABASE_URL to enforce backend isolation');
@@ -37,7 +37,7 @@ function configEnvironment(env) {
   // metadata discovery with no runtime keys; Metro and release checks still
   // require the complete configuration before producing an application bundle.
   if (['EXPO_PUBLIC_SUPABASE_URL', 'EXPO_PUBLIC_SUPABASE_KEY', 'EXPO_PUBLIC_FIREBASE_PROJECT_ID'].some(name => env[name])) {
-    return validateEnvironment(env, ['preview', 'production'].includes(env.EAS_BUILD_PROFILE));
+    return validateEnvironment(env, ['preview', 'production', 'production-apk'].includes(env.EAS_BUILD_PROFILE));
   }
   const appEnv = env.EXPO_PUBLIC_APP_ENV || 'development';
   if (!['development', 'staging', 'production'].includes(appEnv)) throw new Error('APP_ENV must be development, staging, or production');

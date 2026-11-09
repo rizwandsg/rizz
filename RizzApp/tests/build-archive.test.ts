@@ -14,5 +14,6 @@ it.each([
 it.each([
  'RizzApp/app.config.js','RizzApp/config/runtime-config.cjs','RizzApp/package-lock.json',
  'RizzApp/services/firebaseIdentity.ts','RizzApp/tests/role-simulation.test.ts',
+ 'RizzApp/patches/expo-print+58.0.8.patch','RizzApp/supabase/functions/_shared/rizzId.ts',
  'RizzApp/tests/fixtures/hosted-legacy-schema.sql','RizzApp/assets/icon.png',
 ])('retains required build and verification input: %s',file=>{expect(rules.ignores(file)).toBe(false);});

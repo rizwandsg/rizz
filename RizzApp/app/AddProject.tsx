@@ -11,6 +11,7 @@ import React, { useEffect, useState } from "react";
 import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createProject, getProjectById, Project, ScopeOfWork, updateProject } from "../api/projectsApi";
+import { ProjectHeaderBack } from '../components/ProjectHeaderBack';
 
 interface ScopeOption {
   value: ScopeOfWork;
@@ -190,6 +191,7 @@ export default function AddProject() {
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
+        <View style={{position:'absolute',left:12,top:insets.top+12}}><ProjectHeaderBack /></View>
         <View style={styles.headerContentCentered}>
           <Text style={styles.headerTitle}>{id ? "Edit Project" : "New Project"}</Text>
           <Text style={styles.headerSubtitle}>Manage your project details</Text>

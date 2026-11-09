@@ -12,6 +12,6 @@ export default function Index() {
   if (error) return <View style={{ flex: 1, justifyContent: 'center', padding: 24 }}>
     <Text>{error}</Text><Button title="Retry" onPress={retry} /><SignOutButton />
   </View>;
-  if (identity.isSignedIn && !identity.emailVerified) return <Redirect href="/(auth)/verify-email" />;
+  if (identity.isSignedIn && !identity.accessVerified) return <Redirect href="/(auth)/verify-email" />;
   return <Redirect href={authDestination(!!user, !!user) || '/(auth)/login'} />;
 }

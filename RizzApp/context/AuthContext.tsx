@@ -7,9 +7,9 @@ import { setAccessTokenProvider } from '../services/supabaseClient';
 const AuthContext = createContext<{ user: User | null; loading: boolean; error: string | null; retry: () => void }>({ user: null, loading: true, error: null, retry: () => {} });
 export const useAccount = () => useContext(AuthContext);
 export function AuthProvider({ children }: { children?: React.ReactNode }) {
-  const { isLoaded, isSignedIn, emailVerified, getToken, sessionId, error: identityFailure } = useIdentity();
+  const { isLoaded, isSignedIn, accessVerified, getToken, sessionId, error: identityFailure } = useIdentity();
   const user = useSyncExternalStore(subscribeToSession, getSessionUser, getSessionUser);
-  const sessionKey = isSignedIn ? `${sessionId ?? 'pending-session'}:${emailVerified}` : 'signed-out';
+  const sessionKey = isSignedIn ? `${sessionId ?? 'pending-session'}:${accessVerified}` : 'signed-out';
   const [status, setStatus] = useState<{ loading: boolean; error: string | null; sessionKey: string | null }>({ loading: true, error: null, sessionKey: null });
   const [attempt, setAttempt] = useState(0);
   const sequence = useRef(0);
@@ -22,12 +22,12 @@ export function AuthProvider({ children }: { children?: React.ReactNode }) {
     // Revoke the previous external session's visible state before async synchronization.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setStatus({ loading: true, error: null, sessionKey: null });
-    setAccessTokenProvider(isLoaded && isSignedIn && emailVerified ? () => getToken() : null);
+    setAccessTokenProvider(isLoaded && isSignedIn && accessVerified ? () => getToken() : null);
     async function sync() {
       try {
         await clearSessionUser();
         if (cancelled || request !== sequence.current || !isLoaded) return;
-        if (isSignedIn && emailVerified) {
+        if (isSignedIn && accessVerified) {
           await refreshCurrentUser();
           if (cancelled || request !== sequence.current) return;
           // Sync installs the server-assigned authenticated claim for first sign-in.
@@ -43,7 +43,7 @@ export function AuthProvider({ children }: { children?: React.ReactNode }) {
     }
     void sync();
     return () => { cancelled = true; sequence.current++; setAccessTokenProvider(null); };
-  }, [isLoaded, isSignedIn, emailVerified, sessionKey, getToken, attempt]);
+  }, [isLoaded, isSignedIn, accessVerified, sessionKey, getToken, attempt]);
   // Returning from an email app preserves the verification flow. A valid
   // signed-in session keeps unsaved forms mounted during revalidation.
   useEffect(() => {
@@ -68,6 +68,6 @@ export function AuthProvider({ children }: { children?: React.ReactNode }) {
   }, [isLoaded, isSignedIn, sessionKey, status, user]);
   const loading = !isLoaded || status.loading || status.sessionKey !== sessionKey;
   const error = identityFailure || status.error;
-  const account = isLoaded && isSignedIn && emailVerified && !loading && !error ? user : null;
+  const account = isLoaded && isSignedIn && accessVerified && !loading && !error ? user : null;
   return <AuthContext.Provider value={{ user: account, loading, error, retry }}>{children}</AuthContext.Provider>;
 }

@@ -19,7 +19,7 @@ const sim = vi.hoisted(() => ({
     getPaymentsByProject: vi.fn(), getPaymentSummary: vi.fn(), getPaymentById: vi.fn(), createPayment: vi.fn(), updatePayment: vi.fn(), deletePayment: vi.fn(),
     getCustomerPaymentsByProject: vi.fn(), getCustomerPaymentById: vi.fn(), createCustomerPayment: vi.fn(), updateCustomerPayment: vi.fn(), deleteCustomerPayment: vi.fn(),
   },
-  exports: { downloadCategoriesData: vi.fn(), downloadProjectCostData: vi.fn(), generateAndSavePDF: vi.fn(), generateAndSharePDF: vi.fn() },
+  exports: { saveProjectCostPDFToDevice:vi.fn().mockResolvedValue("saved"), printProjectCost:vi.fn(), downloadCategoriesData: vi.fn(), downloadProjectCostData: vi.fn(), generateAndSavePDF: vi.fn(), generateAndSharePDF: vi.fn() },
   notifications: { checkNotificationPermissions: vi.fn(), forceEnableNotifications: vi.fn(), registerForPushNotificationsAsync: vi.fn(), sendAppNotification: vi.fn(), testNotificationSystem: vi.fn() },
   realtime: { subscribeToAll: vi.fn(), unsubscribeFromAll: vi.fn() },
 }));
@@ -56,7 +56,7 @@ vi.mock('expo-router', async () => {
   Navigator.Protected = function Protected({guard, children}: any) { return guard ? children : null; };
   return { router: sim.router, useRouter: () => sim.router, useNavigation: () => sim.navigation, useFocusEffect: (callback: () => any) => R.useEffect(() => sim.focused ? callback() : undefined, [callback, sim.focused, sim.focusVersion]), useLocalSearchParams: () => sim.params, Stack: Navigator, Tabs: Navigator, Link: 'Link', Redirect: ({href}: any) => { R.useEffect(() => {sim.router.replace(href);}, [href]); return R.createElement('Redirect', {href}); } };
 });
-vi.mock('../../context/IdentityContext', () => ({ useIdentity: () => ({isLoaded: sim.identityLoaded, isSignedIn: !!sim.user || sim.unverified, emailVerified: !!sim.user && !sim.unverified, email: 'account@example.test', signOut: sim.signOut}) }));
+vi.mock('../../context/IdentityContext', () => ({ useIdentity: () => ({isLoaded: sim.identityLoaded, isSignedIn: !!sim.user || sim.unverified, emailVerified: !!sim.user && !sim.unverified, accessVerified: !!sim.user && !sim.unverified, email: 'account@example.test', signOut: sim.signOut}) }));
 vi.mock('../../services/firebaseIdentity', () => ({
   signInIdentity: sim.signInIdentity, signUpIdentity: sim.signUpIdentity, resetIdentityPassword: sim.resetPassword,
   sendVerificationEmail: sim.sendVerification, refreshIdentity: sim.refreshIdentity, changeIdentityPassword: sim.updatePassword,
@@ -98,7 +98,7 @@ export function resetSimulation(role: 'owner' | 'member' | 'guest' = 'owner') {
   sim.api.getPaymentSummary.mockResolvedValue({total_received:500, total_expenses:125.50, project_cost:1000, remaining_amount:500, profit_loss:374.50, payment_count:2});
   sim.realtime.subscribeToAll.mockResolvedValue(undefined); sim.realtime.unsubscribeFromAll.mockResolvedValue(undefined);
   sim.notifications.registerForPushNotificationsAsync.mockResolvedValue(null);
-  sim.signInIdentity.mockReset().mockResolvedValue({emailVerified:true});
+  sim.signInIdentity.mockReset().mockResolvedValue({emailVerified:true,accessVerified:true});
   sim.signUpIdentity.mockReset().mockResolvedValue(undefined); sim.resetPassword.mockReset().mockResolvedValue(undefined);
   sim.sendVerification.mockReset().mockResolvedValue(undefined); sim.refreshIdentity.mockReset().mockResolvedValue(true);
   sim.signOut.mockReset().mockResolvedValue(undefined);

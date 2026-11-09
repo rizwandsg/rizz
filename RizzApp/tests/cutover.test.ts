@@ -17,12 +17,12 @@ async function fixture(){
   return {snapshot,mappings:[{profileId:A,email:'a@example.test',firebaseId:'firebase-owner',action:'map'},{profileId:M,action:'deactivate'}]};
 }
 afterEach(async()=>{await db?.close();});
-it('executes the exact generated cutover, preserves member records and records both migration versions',async()=>{
+it('executes the exact generated cutover, preserves member records and records all migration versions',async()=>{
   const {snapshot,mappings}=await fixture();await db.exec(prepareCutover(snapshot,mappings,'rizz-test-project'));
-  expect((await db.query<{version:number}>('SELECT public.backend_contract_version() AS version')).rows[0].version).toBe(3);
+  expect((await db.query<{version:number}>('SELECT public.backend_contract_version() AS version')).rows[0].version).toBe(4);
   expect((await db.query<{is_active:boolean}>('SELECT is_active FROM public.users WHERE id=$1',[M])).rows[0].is_active).toBe(false);
   expect((await db.query<{user_id:string}>('SELECT user_id FROM public.projects')).rows[0].user_id).toBe(M);
-  expect((await db.query('SELECT version FROM supabase_migrations.schema_migrations ORDER BY version')).rows).toEqual([{version:'202611070001'},{version:'202611080001'}]);
+  expect((await db.query('SELECT version FROM supabase_migrations.schema_migrations ORDER BY version')).rows).toEqual([{version:'202611070001'},{version:'202611080001'},{version:'202611090001'}]);
 });
 it('rolls back a stale snapshot before changing schema or access',async()=>{
   const {snapshot,mappings}=await fixture();await db.exec("UPDATE public.projects SET name='New live update'");

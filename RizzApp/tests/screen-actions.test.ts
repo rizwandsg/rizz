@@ -86,15 +86,40 @@ it('owner can create and edit a team member through the modal', async () => {
   const tree = await renderScreen((await import('../app/(tabs)/users')).default);
   await pressIcon(tree, 'plus');
   await pressText(tree, 'Create'); expect(sim.api.createSubUser).not.toHaveBeenCalled();
-  await fill(tree, 'name@example.com', 'new-member@example.test');
+  await fill(tree, 'Enter Rizz ID', 'new-member');
   await fill(tree, 'Minimum 8 characters', 'test-password');
   await fill(tree, 'John Doe', 'New Member');
   await pressText(tree, 'Create');
-  expect(sim.api.createSubUser).toHaveBeenCalledWith(expect.objectContaining({email:'new-member@example.test', full_name:'New Member'}));
+  expect(sim.api.createSubUser).toHaveBeenCalledWith(expect.objectContaining({rizz_id:'new-member@rizz.com', full_name:'New Member'}));
   await pressText(tree, 'Edit');
   await fill(tree, 'John Doe', 'Renamed Member');
   await pressText(tree, 'Update');
   expect(sim.api.updateSubUser).toHaveBeenCalledWith(member.id, {full_name:'Renamed Member', phone:'', is_active:true});
+});
+it('owner resets a managed Rizz ID password and clears the password input',async()=>{
+  sim.api.getSubUsers.mockResolvedValue([{...member,email:'member-a@rizz.com',rizz_id:'member-a@rizz.com',managed_login:true,managed_auth_version:1}]);
+  const tree=await renderScreen((await import('../app/(tabs)/users')).default);
+  await pressText(tree,'Reset');await fill(tree,'Enter a new password','replacement-password');
+  await pressText(tree,'Reset Password');
+  expect(sim.api.resetSubUserPassword).toHaveBeenCalledExactlyOnceWith(member.id,'replacement-password',1);
+  expect(screenText(tree)).not.toContain('replacement-password');
+});
+it('project forms keep their back navigation without a duplicate native header',async()=>{
+  const {nativeHeaderTitles}=await import('../services/routePolicy');
+  expect(nativeHeaderTitles.AddProject).toBeUndefined();expect(nativeHeaderTitles.IndividualProjectAnalytics).toBeUndefined();
+  const tree=await renderScreen((await import('../app/AddProject')).default);
+  const back=tree.root.findAll(node=>typeof node.type==='string'&&node.props.accessibilityLabel==='Back to projects')[0];
+  await act(async()=>back.props.onPress());expect(sim.router.back).toHaveBeenCalled();
+});
+it('analytics saves expense percentages, handles cancellation and offers a print fallback',async()=>{
+  sim.params={id:project.id};const tree=await renderScreen((await import('../app/IndividualProjectAnalytics')).default);
+  sim.exports.saveProjectCostPDFToDevice.mockResolvedValueOnce('cancelled');
+  await pressText(tree,'PDF');await chooseAlert('Save to Device');
+  expect(sim.exports.saveProjectCostPDFToDevice.mock.calls.at(-1)?.[0].expensesByCategory[0].percentage).toBe(100);
+  expect(sim.alert.mock.calls.at(-1)?.[0]).toBe('Export PDF');
+  sim.exports.saveProjectCostPDFToDevice.mockRejectedValueOnce(new Error('Native rendering failed'));
+  await pressText(tree,'PDF');await chooseAlert('Save to Device');expect(sim.alert.mock.calls.at(-1)?.[0]).toBe('Unable to export PDF');
+  await chooseAlert('Open Print Dialog');expect(sim.exports.printProjectCost).toHaveBeenCalledTimes(1);
 });
 for (const [label, load, recordId, destination, remove] of [
   ['Project', () => import('../app/ProjectDetails'), project.id, '/AddProject', 'deleteProject'],

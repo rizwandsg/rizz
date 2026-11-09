@@ -9,7 +9,7 @@ const directories: string[] = [];
 const production = {
   ...firebasePublic, EXPO_PUBLIC_APP_ENV: 'production', EXPO_PUBLIC_FIREBASE_PROJECT_ID:'rizz-production', EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN:'rizz-production.firebaseapp.com',
   EXPO_PUBLIC_SUPABASE_URL: 'https://production.example.com', EXPO_PUBLIC_SUPABASE_KEY: 'sb_publishable_example',
-  EXPO_PUBLIC_PRODUCTION_SUPABASE_URL: 'https://production.example.com', EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '3',
+  EXPO_PUBLIC_PRODUCTION_SUPABASE_URL: 'https://production.example.com', EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '4',
 };
 function fixture(values?: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), 'rizz-production-'));

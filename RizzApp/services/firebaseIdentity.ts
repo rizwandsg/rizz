@@ -4,26 +4,35 @@ import {
   updatePassword, updateProfile,
 } from 'firebase/auth';
 import { firebaseAuth } from './firebaseClient';
+import { isRizzId } from './rizzId';
 
 export interface IdentityState {
   isLoaded: boolean; isSignedIn: boolean; emailVerified: boolean;
+  accessVerified: boolean; isManagedMember: boolean;
   sessionId: string | null; email: string | null; error: string | null;
 }
-let state: IdentityState = { isLoaded: false, isSignedIn: false, emailVerified: false, sessionId: null, email: null, error: null };
+let state: IdentityState = { isLoaded: false, isSignedIn: false, emailVerified: false, accessVerified:false, isManagedMember:false, sessionId: null, email: null, error: null };
+let identityGeneration=0;
 const listeners = new Set<() => void>();
 let unsubscribe: (() => void) | null = null;
 function publish() { listeners.forEach(listener => listener()); }
 function observe() {
   if (unsubscribe) return;
   unsubscribe = onIdTokenChanged(firebaseAuth, user => {
-    state = {
-      isLoaded: true, isSignedIn: !!user, emailVerified: user?.emailVerified ?? false,
-      sessionId: user ? `${user.uid}:${user.metadata.lastSignInTime || ''}` : null,
-      email: user?.email ?? null, error: null,
-    };
-    publish();
+    const generation=++identityGeneration;
+    if(!user){state={isLoaded:true,isSignedIn:false,emailVerified:false,accessVerified:false,isManagedMember:false,sessionId:null,email:null,error:null};publish();return;}
+    void (async()=>{
+      const {claims}=await user.getIdTokenResult();
+      if(generation!==identityGeneration||firebaseAuth.currentUser!==user)return;
+      const managed=!!user.email&&isRizzId(user.email)&&claims.rizz_managed===true&&Number.isInteger(claims.rizz_auth_version)&&Number(claims.rizz_auth_version)>=1;
+      state={isLoaded:true,isSignedIn:true,emailVerified:user.emailVerified,accessVerified:user.emailVerified||managed,isManagedMember:managed,sessionId:`${user.uid}:${user.metadata.lastSignInTime||''}`,email:user.email,error:null};publish();
+    })().catch(()=>{
+      if(generation!==identityGeneration)return;
+      state={isLoaded:true,isSignedIn:false,emailVerified:false,accessVerified:false,isManagedMember:false,sessionId:null,email:null,error:'Unable to verify sign-in. Please sign in again.'};publish();
+    });
   }, () => {
-    state = { isLoaded: true, isSignedIn: false, emailVerified: false, sessionId: null, email: null, error: 'Unable to restore sign-in. Please try again.' };
+    identityGeneration++;
+    state = { isLoaded: true, isSignedIn: false, emailVerified: false, accessVerified:false,isManagedMember:false, sessionId: null, email: null, error: 'Unable to restore sign-in. Please try again.' };
     publish();
   });
 }
@@ -55,9 +64,13 @@ export function identityError(error: unknown): string {
 }
 export async function signInIdentity(email: string, password: string) {
   const result = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
-  return { emailVerified: result.user.emailVerified };
+  const {claims}=await result.user.getIdTokenResult();
+  if(firebaseAuth.currentUser !== result.user) throw new Error('Sign-in changed. Please try again.');
+  const managed=isRizzId(result.user.email||'')&&claims.rizz_managed===true&&Number.isInteger(claims.rizz_auth_version)&&Number(claims.rizz_auth_version)>=1;
+  return { emailVerified: result.user.emailVerified, accessVerified:result.user.emailVerified||managed };
 }
 export async function signUpIdentity(email: string, password: string, fullName: string) {
+  if(isRizzId(email))throw new Error('Rizz IDs are created by workspace owners. Use your real email to create an owner account.');
   const result = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
   // A profile-name failure must not strand a successfully created account on signup.
   // The verified account can edit its display name after signing in.
@@ -78,6 +91,7 @@ export async function refreshIdentity() {
   return user.emailVerified;
 }
 export async function resetIdentityPassword(email: string) {
+  if(isRizzId(email))throw new Error('Ask your workspace owner to reset your Rizz ID password.');
   try { await sendPasswordResetEmail(firebaseAuth, email.trim()); }
   catch (error) {
     // Do not reveal whether an address is registered, even on older projects.
@@ -86,7 +100,11 @@ export async function resetIdentityPassword(email: string) {
 }
 export async function changeIdentityPassword(currentPassword: string, newPassword: string) {
   const user = firebaseAuth.currentUser;
-  if (!user?.email || !user.emailVerified) throw new Error('Sign in with a verified email before changing your password.');
+  if (!user?.email) throw new Error('Sign in before changing your password.');
+  if(!user.emailVerified){
+    const {claims}=await user.getIdTokenResult();
+    if(!isRizzId(user.email)||claims.rizz_managed!==true)throw new Error('Sign in with a verified email before changing your password.');
+  }
   await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, currentPassword));
   if (firebaseAuth.currentUser?.uid !== user.uid) throw new Error('Sign-in changed. Please try again.');
   await updatePassword(user, newPassword);

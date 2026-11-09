@@ -1,9 +1,10 @@
 import { useRequestGuard } from '../hooks/useRequestGuard';
+import { ProjectHeaderBack } from '../components/ProjectHeaderBack';
 import { useFocusEffect } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams } from 'expo-router';
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
     ActivityIndicator,
     Alert,
@@ -20,7 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Expense, getExpensesByProject } from '../api/expensesApi';
 import { getPaymentSummary, PaymentSummary } from '../api/paymentsApi';
 import { getProjectById, Project } from '../api/projectsApi';
-import { downloadProjectCostData, ProjectCostSummary, generateAndSavePDF, generateAndSharePDF } from '../services/exportService';
+import { ProjectCostSummary, saveProjectCostPDFToDevice, generateAndSharePDF, printProjectCost } from '../services/exportService';
 
 const { width } = Dimensions.get('window');
 
@@ -41,6 +42,15 @@ const chartConfig = {
   },
 };
 
+function AnalyticsHeader() {
+  return <LinearGradient colors={['#667eea','#764ba2']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.headerGradient}>
+    <View style={styles.header}>
+      <View style={{position:'absolute',left:12,top:8}}><ProjectHeaderBack /></View>
+      <Text style={styles.headerTitle}>Project Analytics</Text>
+    </View>
+  </LinearGradient>;
+}
+
 export default function IndividualProjectAnalytics() {
   const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
@@ -53,6 +63,7 @@ export default function IndividualProjectAnalytics() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
+  const exporting = useRef(false);
 
   const loadProjectAnalytics = async () => {
     const isCurrent = startRequest();
@@ -109,102 +120,42 @@ export default function IndividualProjectAnalytics() {
     setRefreshing(false);
   };
 
-  const handleDownloadProjectCost = async () => {
-    if (!project || !paymentSummary) return;
-
-    // Show options for PDF export
-    Alert.alert(
-      'Export PDF',
-      'Choose how to export the project cost summary:',
-      [
-        {
-          text: 'Share',
-          onPress: async () => {
-            setIsDownloading(true);
-            try {
-              // Group expenses by category
-              const categoryMap = new Map<string, number>();
-              expenses.forEach((expense) => {
-                const category = expense.category || 'Other';
-                categoryMap.set(category, (categoryMap.get(category) || 0) + expense.amount);
-              });
-
-              const expensesByCategory = Array.from(categoryMap.entries())
-                .map(([category, amount]) => ({
-                  category,
-                  amount,
-                  percentage: paymentSummary.project_cost > 0 ? (amount / paymentSummary.project_cost) * 100 : 0
-                }))
-                .sort((a, b) => b.amount - a.amount);
-
-              const costSummary: ProjectCostSummary = {
-                projectName: project.name,
-                clientName: project.client_name || '',
-                totalBudget: paymentSummary.project_cost,
-                totalExpenses: paymentSummary.total_expenses,
-                totalReceived: paymentSummary.total_received,
-                remainingAmount: paymentSummary.remaining_amount,
-                profitLoss: paymentSummary.profit_loss,
-                expensesByCategory
-              };
-
-              await downloadProjectCostData(costSummary, 'pdf');
-              Alert.alert('Success', 'PDF ready to share');
-            } catch (err) {
-              console.error('Share error:', err);
-              Alert.alert('Error', 'Failed to share PDF');
-            } finally {
-              setIsDownloading(false);
-            }
-          },
-        },
-        {
-          text: 'Save to Device',
-          onPress: async () => {
-            setIsDownloading(true);
-            try {
-              // Group expenses by category
-              const categoryMap = new Map<string, number>();
-              expenses.forEach((expense) => {
-                const category = expense.category || 'Other';
-                categoryMap.set(category, (categoryMap.get(category) || 0) + expense.amount);
-              });
-
-              const expensesByCategory = Array.from(categoryMap.entries())
-                .map(([category, amount]) => ({
-                  category,
-                  amount,
-                  percentage: paymentSummary.project_cost > 0 ? (amount / paymentSummary.project_cost) * 100 : 0
-                }))
-                .sort((a, b) => b.amount - a.amount);
-
-              const costSummary: ProjectCostSummary = {
-                projectName: project.name,
-                clientName: project.client_name || '',
-                totalBudget: paymentSummary.project_cost,
-                totalExpenses: paymentSummary.total_expenses,
-                totalReceived: paymentSummary.total_received,
-                remainingAmount: paymentSummary.remaining_amount,
-                profitLoss: paymentSummary.profit_loss,
-                expensesByCategory
-              };
-
-              const filepath = await generateAndSavePDF(costSummary);
-              Alert.alert('Success', `PDF saved to device:\n${filepath}`);
-            } catch (err) {
-              console.error('Save error:', err);
-              Alert.alert('Error', `Failed to save PDF: ${err instanceof Error ? err.message : 'Unknown error'}`);
-            } finally {
-              setIsDownloading(false);
-            }
-          },
-        },
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-      ]
-    );
+  const handleDownloadProjectCost = () => {
+    if (!project || !paymentSummary || exporting.current) return;
+    const categoryMap = new Map<string, number>();
+    expenses.forEach(expense => {
+      const category = expense.category || 'Other';
+      categoryMap.set(category, (categoryMap.get(category) || 0) + expense.amount);
+    });
+    const costSummary: ProjectCostSummary = {
+      projectName: project.name, clientName: project.client_name || '',
+      totalBudget: paymentSummary.project_cost, totalExpenses: paymentSummary.total_expenses,
+      totalReceived: paymentSummary.total_received, remainingAmount: paymentSummary.remaining_amount,
+      profitLoss: paymentSummary.profit_loss,
+      expensesByCategory: Array.from(categoryMap, ([category, amount]) => ({category,amount,
+        percentage:paymentSummary.total_expenses > 0 ? amount / paymentSummary.total_expenses * 100 : 0,
+      })).sort((a,b)=>b.amount-a.amount),
+    };
+    const run = async (action: 'save'|'share'|'print') => {
+      if (exporting.current) return;
+      exporting.current = true; setIsDownloading(true);
+      try {
+        if (action === 'print') { await printProjectCost(costSummary); return; }
+        if (action === 'share') { await generateAndSharePDF(costSummary); return; }
+        const result = await saveProjectCostPDFToDevice(costSummary);
+        if (result === 'saved') Alert.alert('PDF saved', 'Saved to the location you selected.');
+      } catch {
+        Alert.alert('Unable to export PDF', 'Please try again, or open the print dialog and choose Save as PDF.', [
+          {text:'Cancel',style:'cancel'},
+          ...(action !== 'print' ? [{text:'Open Print Dialog',onPress:()=>run('print')}] : []),
+        ]);
+      } finally { exporting.current = false; setIsDownloading(false); }
+    };
+    Alert.alert('Export PDF','Choose how to export the project cost summary:',[
+      {text:'Share',onPress:()=>run('share')},
+      {text:'Save to Device',onPress:()=>run('save')},
+      {text:'Cancel',style:'cancel'},
+    ]);
   };
 
   // Prepare expense data by category
@@ -243,9 +194,7 @@ export default function IndividualProjectAnalytics() {
   if (loading) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Project Analytics</Text>
-        </View>
+        <AnalyticsHeader />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color="#667eea" />
           <Text style={styles.loadingText}>Loading analytics...</Text>
@@ -257,9 +206,7 @@ export default function IndividualProjectAnalytics() {
   if (error || !project) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Project Analytics</Text>
-        </View>
+        <AnalyticsHeader />
         <View style={styles.loadingContainer}>
           <MaterialCommunityIcons name="alert-circle" size={64} color="#FF3B30" />
           <Text style={styles.errorText}>{error || 'Project not found'}</Text>
@@ -274,9 +221,7 @@ export default function IndividualProjectAnalytics() {
   if (!project || !paymentSummary) {
     return (
       <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Project Analytics</Text>
-        </View>
+        <AnalyticsHeader />
         <View style={styles.loadingContainer}>
           <Text style={styles.errorText}>Project not found</Text>
         </View>
@@ -324,17 +269,7 @@ export default function IndividualProjectAnalytics() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      {/* Header with Gradient */}
-      <LinearGradient
-        colors={['#667eea', '#764ba2']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={styles.headerGradient}
-      >
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Project Analytics</Text>
-        </View>
-      </LinearGradient>
+      <AnalyticsHeader />
 
       <ScrollView 
         style={styles.scrollView} 

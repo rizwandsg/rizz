@@ -21,7 +21,9 @@
     "preview": {
       "node": "22.20.0",
       "environment": "preview",
-      "env": { "EXPO_PUBLIC_APP_ENV": "staging" },
+      "env": {
+        "EXPO_PUBLIC_APP_ENV": "staging"
+      },
       "distribution": "internal",
       "android": {
         "buildType": "apk"
@@ -40,6 +42,13 @@
         "EXPO_USE_FAST_RESOLVER": "1"
       },
       "resourceClass": "medium"
+    },
+    "production-apk": {
+      "extends": "production",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      }
     }
   },
   "submit": {

@@ -19,7 +19,7 @@ export default function VerifyEmailScreen() {
     finally { submitting.current = false; setLoading(false); }
   }
   if (identity.isLoaded && !identity.isSignedIn) return <Redirect href="/(auth)/clerk-signin" />;
-  if (identity.emailVerified) return <Redirect href="/" />;
+  if (identity.accessVerified) return <Redirect href="/" />;
   return <AuthForm title="Verify Email" subtitle="Send a verification email, open its link, then return here to continue." error={error}>
     <Text>{identity.email}</Text>
     {message ? <Text accessibilityRole="alert">{message}</Text> : null}

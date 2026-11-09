@@ -1,5 +1,6 @@
 import { identityError, signInIdentity } from '../../services/firebaseIdentity';
 import { useIdentity } from '../../context/IdentityContext';
+import { normalizeRizzId } from '../../services/rizzId';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -29,17 +30,17 @@ export default function TeamLoginScreen() {
     const submitting = useRef(false);
 
     const handleEmailChange = (text: string) => setEmail(text);
-    const getFullEmail = () => email.trim();
+    const getFullEmail = () => normalizeRizzId(email);
 
 
     const handleLogin = async () => {
         if (!isLoaded || submitting.current) return;
-        if (!email.trim() || !password) { setErrorMessage('Enter your email and password'); Alert.alert('Error', 'Enter your email and password'); return; }
+        if (!email.trim() || !password) { setErrorMessage('Enter your Rizz ID and password'); Alert.alert('Error', 'Enter your Rizz ID and password'); return; }
         submitting.current = true;
         setLoading(true); setErrorMessage(null);
         try {
             const result = await signInIdentity(getFullEmail(), password);
-            router.replace(result.emailVerified ? '/' : '/(auth)/verify-email');
+            router.replace(result.accessVerified ? '/' : '/(auth)/verify-email');
         } catch (error: any) {
             setErrorMessage(identityError(error)); Alert.alert('Sign In Failed', identityError(error));
         } finally { submitting.current = false; setLoading(false); }
@@ -79,19 +80,19 @@ export default function TeamLoginScreen() {
                     {errorMessage ? <Text accessibilityRole="alert" style={{color:"#a02020", marginBottom:16}}>{errorMessage}</Text> : null}
                     {/* Email Input */}
                     <View style={styles.inputGroup}>
-                        <Text style={styles.label}>Email Address</Text>
+                        <Text style={styles.label}>Rizz ID</Text>
                         <View style={styles.emailInputWrapper}>
                             <MaterialCommunityIcons name="email" size={20} color="#999" style={styles.emailIcon} />
                             <TextInput
                                 style={styles.emailUsernameInput}
                                 value={email}
                                 onChangeText={handleEmailChange}
-                                placeholder="name@example.com"
+                                placeholder="Enter Rizz ID"
                                 placeholderTextColor="#999"
-                                keyboardType="email-address"
                                 autoCapitalize="none"
-                                autoComplete="email"
+                                autoComplete="username"
                             />
+                            <Text style={styles.emailDomain}>@Rizz.com</Text>
                         </View>
                     </View>
 
@@ -119,8 +120,8 @@ export default function TeamLoginScreen() {
                         </View>
                     </View>
 
-                    <TouchableOpacity onPress={() => router.push('/(auth)/forgot-password')}>
-                        <Text style={styles.backText}>Forgot Password?</Text>
+                    <TouchableOpacity onPress={() => Alert.alert('Password reset','Ask your workspace owner to reset your Rizz ID password.')}>
+                        <Text style={styles.backText}>Ask owner to reset password</Text>
                     </TouchableOpacity>
 
                     {/* Login Button */}

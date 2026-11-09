@@ -35,7 +35,7 @@ export default function ClerkSignInScreen() {
         setLoading(true); setErrorMessage(null);
         try {
             const result = await signInIdentity(email.trim(), password);
-            router.replace(result.emailVerified ? '/' : '/(auth)/verify-email');
+            router.replace(result.accessVerified ? '/' : '/(auth)/verify-email');
         } catch (error: any) {
             setErrorMessage(identityError(error)); Alert.alert('Sign In Failed', identityError(error));
         } finally { submitting.current = false; setLoading(false); }

@@ -1,9 +1,9 @@
 export const protectedScreens = ['(tabs)', 'About', 'AddCustomerPayment', 'AddExpense', 'AddPayment', 'AddProject', 'ChangePassword', 'ClerkConditionalExample', 'EditProfile', 'ExpenseDetails', 'HelpSupport', 'IndividualProjectAnalytics', 'Notifications', 'ProjectAnalytics', 'ProjectDetails', 'Theme'] as const;
 // These screens rely on the navigator for back/edit/delete controls.
 export const nativeHeaderTitles: Partial<Record<typeof protectedScreens[number], string>> = {
-  AddProject: 'Project', AddExpense: 'Expense', AddPayment: 'Payment',
+  AddExpense: 'Expense', AddPayment: 'Payment',
   ProjectDetails: 'Project Details', ExpenseDetails: 'Expense Details',
-  IndividualProjectAnalytics: 'Project Analytics', ClerkConditionalExample: 'Account',
+  ClerkConditionalExample: 'Account',
 };
 export function routeAccess(authenticated: boolean, loading: boolean, failed: boolean) {
   // Public deep links must survive asynchronous session restoration. Keeping

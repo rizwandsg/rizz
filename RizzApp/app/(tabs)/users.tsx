@@ -2,6 +2,7 @@ import { Redirect } from 'expo-router';
 import { useAccount } from '../../context/AuthContext';
 import { LoadFailure } from '../../components/LoadFailure';
 import { canManageMembers } from '../../services/routePolicy';
+import { normalizeRizzId } from '../../services/rizzId';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useFocusEffect } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -26,7 +27,8 @@ import {
     deleteSubUser,
     getSubUsers,
     SubUser,
-    updateSubUser
+    updateSubUser,
+    resetSubUserPassword
 } from '../../api/authApi';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -49,9 +51,11 @@ export default function UsersScreen() {
     const [phone, setPhone] = useState('');
     const [isActive, setIsActive] = useState(true);
     const [saving, setSaving] = useState(false);
+    const [resetTarget,setResetTarget]=useState<SubUser|null>(null);
+    const [resetPassword,setResetPassword]=useState('');
 
     const handleEmailChange = (text: string) => setEmail(text);
-    const getFullEmail = () => email.trim();
+    const getFullEmail = () => normalizeRizzId(email);
 
 
     // Load sub-users
@@ -110,7 +114,7 @@ export default function UsersScreen() {
         if (!editingUser) {
             // Creating new user - validate email and password
             if (!email.trim()) {
-                Alert.alert('Validation Error', 'Please enter email');
+                Alert.alert('Validation Error', 'Please enter a Rizz ID');
                 return;
             }
             if (!password.trim() || password.length < 8) {
@@ -135,7 +139,7 @@ export default function UsersScreen() {
                 // Create new user
                 const fullEmail = getFullEmail();
                 const newUserData: CreateSubUserData = {
-                    email: fullEmail.toLowerCase(),
+                    rizz_id: fullEmail,
                     password: password,
                     full_name: fullName.trim(),
                     phone: phone.trim() || undefined
@@ -178,8 +182,23 @@ export default function UsersScreen() {
         );
     };
 
-    const handleResetPassword = (_user: SubUser) => {
-        Alert.alert('Password Reset', 'The team member must use Forgot password and verify their email address. Passwords cannot be retrieved or displayed.');
+    const handleResetPassword = (member: SubUser) => {
+        if(!member.managed_login){Alert.alert('Password Reset','This account uses email recovery. The team member must use Forgot password and verify their email address.');return;}
+        setResetPassword('');setResetTarget(member);
+    };
+    const submitPasswordReset=async()=>{
+        if(!resetTarget||savingRef.current||!isOwner)return;
+        if(resetPassword.length<8||resetPassword.length>128){Alert.alert('Validation Error','Password must contain 8 to 128 characters');return;}
+        savingRef.current=true;setSaving(true);
+        try{
+            await resetSubUserPassword(resetTarget.id,resetPassword,resetTarget.managed_auth_version!);
+            setResetTarget(null);setResetPassword('');await loadUsers();
+            Alert.alert('Password Reset','Password changed. Share the new password securely with the team member. Previous sign-ins no longer have data access.');
+        }catch(error){
+            const latest=await getSubUsers().catch(()=>null);
+            if(latest){setUsers(latest);setResetTarget(latest.find(member=>member.id===resetTarget.id)||null);}
+            Alert.alert('Reset Failed',error instanceof Error?error.message:'Unable to reset this password. Please retry.');
+        }finally{savingRef.current=false;setSaving(false);}
     };
 
     // Toggle active status
@@ -205,7 +224,7 @@ export default function UsersScreen() {
                 </View>
                 <View style={styles.userInfo}>
                     <Text style={styles.userName}>{item.full_name}</Text>
-                    <Text style={styles.userEmail}>{item.email}</Text>
+                    <Text style={styles.userEmail}>{item.rizz_id||item.email}</Text>
                     {item.phone && (
                         <Text style={styles.userPhone}>📱 {item.phone}</Text>
                     )}
@@ -346,6 +365,18 @@ export default function UsersScreen() {
                 />
             )}
 
+            <Modal visible={!!resetTarget} transparent animationType="slide" onRequestClose={()=>{if(!saving){setResetTarget(null);setResetPassword('');}}}>
+                <View style={styles.modalOverlay}><View style={[styles.modalContent,{paddingBottom:Math.max(insets.bottom,24)}]}>
+                    <Text style={styles.modalTitle}>Reset Password</Text>
+                    <Text style={styles.helpText}>{resetTarget?.rizz_id}</Text>
+                    <Text style={styles.inputLabel}>New Password *</Text>
+                    <TextInput accessibilityLabel="New team password" placeholder="Enter a new password" placeholderTextColor="#7b8497" value={resetPassword} onChangeText={setResetPassword} secureTextEntry style={styles.input} editable={!saving} autoCapitalize="none" />
+                    <View style={styles.modalButtons}>
+                        <TouchableOpacity disabled={saving} style={[styles.modalButton,styles.cancelButton]} onPress={()=>{setResetTarget(null);setResetPassword('');}}><Text style={styles.cancelButtonText}>Cancel</Text></TouchableOpacity>
+                        <TouchableOpacity disabled={saving} style={[styles.modalButton,styles.saveButton]} onPress={submitPasswordReset}>{saving?<ActivityIndicator color="#fff"/>:<Text style={styles.saveButtonText}>Reset Password</Text>}</TouchableOpacity>
+                    </View>
+                </View></View>
+            </Modal>
             {/* Add/Edit User Modal */}
             <Modal
                 visible={modalVisible}
@@ -368,16 +399,18 @@ export default function UsersScreen() {
                             {/* Email (only for new users) */}
                             {!editingUser && (
                                 <View style={styles.inputGroup}>
-                                    <Text style={styles.inputLabel}>Email *</Text>
+                                    <Text style={styles.inputLabel}>Rizz ID *</Text>
                                     <View style={styles.emailInputWrapper}>
                                         <TextInput
                                             style={styles.emailUsernameInput}
                                             value={email}
                                             onChangeText={handleEmailChange}
-                                            placeholder="name@example.com"
-                                            keyboardType="email-address"
+                                            placeholder="Enter Rizz ID"
+                                            placeholderTextColor="#7b8497"
+                                            accessibilityLabel="Rizz ID"
                                             autoCapitalize="none"
                                         />
+                                        <Text style={styles.emailDomain}>@Rizz.com</Text>
                                     </View>
                                 </View>
                             )}
@@ -391,6 +424,7 @@ export default function UsersScreen() {
                                         value={password}
                                         onChangeText={setPassword}
                                         placeholder="Minimum 8 characters"
+                                        placeholderTextColor="#7b8497"
                                         secureTextEntry
                                     />
                                 </View>
@@ -404,6 +438,7 @@ export default function UsersScreen() {
                                     value={fullName}
                                     onChangeText={setFullName}
                                     placeholder="John Doe"
+                                    placeholderTextColor="#7b8497"
                                 />
                             </View>
 
@@ -415,6 +450,7 @@ export default function UsersScreen() {
                                     value={phone}
                                     onChangeText={setPhone}
                                     placeholder="+1234567890"
+                                    placeholderTextColor="#7b8497"
                                     keyboardType="phone-pad"
                                 />
                             </View>

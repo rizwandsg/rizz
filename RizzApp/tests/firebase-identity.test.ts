@@ -8,7 +8,7 @@ const sdk=vi.hoisted(()=>({
 vi.mock('../services/firebaseClient',()=>({firebaseAuth:sdk.auth}));
 vi.mock('firebase/auth',()=>({...sdk,EmailAuthProvider:{credential:sdk.credential}}));
 import { changeIdentityPassword,getIdentityState,getIdentityToken,identityError,refreshIdentity,resetIdentityPassword,sendVerificationEmail,signInIdentity,signOutIdentity,signUpIdentity,subscribeIdentity } from '../services/firebaseIdentity';
-function user(uid='firebase-a'){return {uid,email:'a@example.test',emailVerified:true,metadata:{lastSignInTime:'today'},getIdToken:vi.fn().mockResolvedValue('verified-token')};}
+function user(uid='firebase-a'){return {uid,email:'a@example.test',emailVerified:true,metadata:{lastSignInTime:'today'},getIdTokenResult:vi.fn().mockResolvedValue({claims:{}}),getIdToken:vi.fn().mockResolvedValue('verified-token')};}
 beforeEach(()=>{
   vi.clearAllMocks(); sdk.auth.currentUser=user();
   sdk.createUserWithEmailAndPassword.mockResolvedValue({user:sdk.auth.currentUser});
@@ -18,7 +18,7 @@ beforeEach(()=>{
   sdk.onIdTokenChanged.mockImplementation((_auth,observer)=>{sdk.observer=observer;return ()=>{};});
 });
 it('uses Firebase credentials and trims email without modifying passwords',async()=>{
-  expect(await signInIdentity(' a@example.test ',' password ')).toEqual({emailVerified:true});
+  expect(await signInIdentity(' a@example.test ',' password ')).toEqual({emailVerified:true,accessVerified:true});
   expect(sdk.signInWithEmailAndPassword).toHaveBeenCalledWith(sdk.auth,'a@example.test',' password ');
 });
 it('does not strand a newly created account if its display-name update fails',async()=>{
@@ -48,8 +48,8 @@ it('refuses unverified password changes and signs out through Firebase',async()=
   sdk.auth.currentUser.emailVerified=false;await expect(changeIdentityPassword('current','newpassword')).rejects.toThrow('verified email');
   await signOutIdentity();expect(sdk.signOut).toHaveBeenCalledWith(sdk.auth);
 });
-it('publishes stable session identity across token refreshes and clears it on sign-out',()=>{
-  const listener=vi.fn();const unsubscribe=subscribeIdentity(listener);sdk.observer(sdk.auth.currentUser);const session=getIdentityState().sessionId;
+it('publishes stable session identity across token refreshes and clears it on sign-out',async()=>{
+  const listener=vi.fn();const unsubscribe=subscribeIdentity(listener);sdk.observer(sdk.auth.currentUser);await Promise.resolve();const session=getIdentityState().sessionId;
   sdk.observer(sdk.auth.currentUser);expect(getIdentityState().sessionId).toBe(session);expect(getIdentityState().emailVerified).toBe(true);
   sdk.observer(null);expect(getIdentityState().isSignedIn).toBe(false);expect(getIdentityState().sessionId).toBeNull();unsubscribe();
 });

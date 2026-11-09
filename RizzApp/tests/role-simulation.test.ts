@@ -64,6 +64,7 @@ beforeAll(async () => {
     GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated;`);
   await db.exec(readFileSync(new URL('../supabase/migrations/202611070001_secure_workspaces.sql', import.meta.url), 'utf8'));
   await db.exec(readFileSync(new URL('../supabase/migrations/202611080001_firebase_identity.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../supabase/migrations/202611090001_managed_rizz_ids.sql', import.meta.url), 'utf8'));
   await db.exec("INSERT INTO private.identity_configuration(firebase_project_id) VALUES ('rizz-simulation')");
 });
 
@@ -167,7 +168,7 @@ describe('role and data visibility matrix', () => {
       await expect(db.query(`DELETE FROM public.${table}`)).rejects.toThrow('permission denied');
     }
     await expect(db.query('SELECT public.request_identity()')).rejects.toThrow('permission denied');
-    expect((await db.query<{ version: number }>('SELECT public.backend_contract_version() AS version')).rows[0].version).toBe(3);
+    expect((await db.query<{ version: number }>('SELECT public.backend_contract_version() AS version')).rows[0].version).toBe(4);
   });
 
   it.each(active)('$sub cannot inspect or mutate another workspace using known record IDs', async (user) => {

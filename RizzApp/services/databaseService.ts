@@ -5,7 +5,7 @@ import { validateWrite } from './validation';
 export const TABLES = { PROJECTS: 'projects', EXPENSES: 'expenses', PAYMENTS: 'payments' };
 export interface QueryOptions { filter?: string; order?: string; limit?: number }
 const PAGE_SIZE = 500;
-const USER_COLUMNS = 'id,firebase_user_id,email,full_name,phone,role,parent_user_id,is_active,created_at,updated_at,last_login';
+const USER_COLUMNS = 'id,firebase_user_id,email,rizz_id,managed_login,managed_auth_version,full_name,phone,role,parent_user_id,is_active,created_at,updated_at,last_login';
 const readable = new Set(['users', 'projects', 'expenses', 'payments', 'customer_payments', 'vendor_payments', 'project_payment_summary', 'expense_payment_status']);
 function assertTable(table: string, write = false) {
   if (!readable.has(table) || (write && (table === 'users' || table.endsWith('_summary') || table.endsWith('_status')))) throw new Error('Unsupported database operation');

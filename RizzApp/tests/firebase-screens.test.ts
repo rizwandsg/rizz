@@ -19,29 +19,29 @@ beforeEach(() => resetSimulation('guest'));
 afterEach(cleanupScreens);
 describe.each([
   {role:'owner', Component:OwnerSignIn, email:'Enter your email', button:'Sign In'},
-  {role:'member', Component:TeamSignIn, email:'name@example.com', button:'Sign In as Team Member'},
-])('$role Firebase sign-in', ({Component,email,button}) => {
+  {role:'member', Component:TeamSignIn, email:'Enter Rizz ID', button:'Sign In as Team Member'},
+])('$role Firebase sign-in', ({role,Component,email,button}) => {
   it('validates fields and exposes the error on web', async () => {
     const tree = await renderScreen(Component); await pressText(tree,button);
-    expect(sim.signInIdentity).not.toHaveBeenCalled(); expect(screenText(tree)).toContain('Enter your email and password');
+    expect(sim.signInIdentity).not.toHaveBeenCalled(); expect(screenText(tree)).toContain(role==='member'?'Enter your Rizz ID and password':'Enter your email and password');
   });
   it.each([true,false])('routes verified=%s through the correct guard', async verified => {
-    sim.signInIdentity.mockResolvedValue({emailVerified:verified});
-    const tree=await renderScreen(Component); await fill(tree,email,'  user@example.test  '); await fill(tree,'Enter your password','password123');
+    sim.signInIdentity.mockResolvedValue({emailVerified:verified,accessVerified:verified});
+    const tree=await renderScreen(Component); await fill(tree,email,role==='member'?'  user  ':'  user@example.test  '); await fill(tree,'Enter your password','password123');
     await pressText(tree,button);
-    expect(sim.signInIdentity).toHaveBeenCalledWith('user@example.test','password123');
+    expect(sim.signInIdentity).toHaveBeenCalledWith(role==='member'?'user@rizz.com':'user@example.test','password123');
     expect(sim.router.replace).toHaveBeenCalledWith(verified ? '/' : '/(auth)/verify-email');
   });
   it('prevents duplicate sign-ins and permits retry after failure', async () => {
     sim.signInIdentity.mockRejectedValueOnce(new Error('Network unavailable'));
-    const tree=await renderScreen(Component); await fill(tree,email,'user@example.test'); await fill(tree,'Enter your password','password123');
+    const tree=await renderScreen(Component); await fill(tree,email,role==='member'?'user':'user@example.test'); await fill(tree,'Enter your password','password123');
     await doublePress(tree,button); expect(sim.signInIdentity).toHaveBeenCalledTimes(1);
     expect(screenText(tree)).toContain('Network unavailable'); expect(sim.router.replace).not.toHaveBeenCalled();
     await pressText(tree,button); expect(sim.router.replace).toHaveBeenCalledWith('/');
   });
   it('waits for persisted identity initialization', async () => {
     sim.identityLoaded=false; const tree=await renderScreen(Component);
-    await fill(tree,email,'user@example.test'); await fill(tree,'Enter your password','password123'); await pressText(tree,button);
+    await fill(tree,email,role==='member'?'user':'user@example.test'); await fill(tree,'Enter your password','password123'); await pressText(tree,button);
     expect(sim.signInIdentity).not.toHaveBeenCalled();
   });
 });
