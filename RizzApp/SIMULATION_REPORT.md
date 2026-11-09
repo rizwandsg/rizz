@@ -1,6 +1,6 @@
 # Simulation and hosted verification
 
-358 automated tests pass in 30 files. Run `npm run simulate` to produce `test-results/simulation.json` and a manifest with a source checksum. These files and all private hosted evidence are excluded from Git, EAS and Vercel uploads.
+398 automated tests pass in 32 files. Run `npm run simulate` to produce `test-results/simulation.json` and a manifest with a source checksum. These files and all private hosted evidence are excluded from Git, EAS and Vercel uploads.
 
 ## Coverage
 
@@ -18,12 +18,15 @@
 | Screens and data | Project/expense/payment forms, summaries, analytics, profile/team actions, loading/error states, stale requests, navigation and CSV/PDF generation boundaries |
 | Release/archive | Public environment allowlist, staging/production isolation, server credential rejection and Git-root archive exclusions while retaining build inputs |
 | Browser dialogs | Destructive cancellation/confirmation, acknowledgement callbacks, queued messages, escaped record text, Escape handling and clearing private dialogs on account changes |
+| Received amounts | Both roles save numbered stages, reject invalid installment numbers, preserve later-stage edits and reconcile totals with existing customer receipts |
+| Header and Profile layout | Project Details has inline back/edit/delete controls; Profile omits ledger summaries and their data requests; long project names fit phone screens |
+| Build configuration | Different public environments use different Metro caches; a mixed production/verification web export is rejected before deployment |
 
 Screen simulations execute actual React components with mocked native controls, Firebase SDK boundaries and API responses. SQL tests execute real PostgreSQL policies through PGlite with synthetic JWT claims. These do not verify native rendering or Firebase signatures.
 
 ## Hosted checks
 
-A separate live test exercised Firebase password sign-in, account synchronization, the deployed account function, Supabase token verification, SQL policies and authenticated browser flows. It passed 23 assertions, including non-deliverable Rizz ID logins, owner-only password reset, old-token revocation, stale-reset rejection, and: unverified denial, verified member synchronization, restricted team management, shared owner/member data, other-owner read/write denial, receipt/expense totals, report isolation, anonymous denial, owner/member browser workflows, owner deactivation, immediate revocation of data access and preservation of original table counts after cleanup.
+A separate live test exercised Firebase password sign-in, account synchronization, the deployed account function, Supabase token verification, SQL policies and authenticated browser flows. It passed 25 assertions, including non-deliverable Rizz ID logins, owner-only password reset, old-token revocation, stale-reset rejection, and: unverified denial, verified member synchronization, restricted team management, shared owner/member data, other-owner read/write denial, receipt/expense totals, report isolation, anonymous denial, owner/member browser workflows, owner deactivation, immediate revocation of data access and preservation of original table counts after cleanup.
 
 Three temporary identities/profiles and their synthetic ledger records were removed. All pre-existing application rows were preserved. The test fixtures and their Firebase identities were removed.
 
@@ -33,8 +36,10 @@ Eight browser checks passed on https://rizzapp-sage.vercel.app: owner login, mem
 
 Authenticated browser checks also passed for both roles: actual sign-in, owner-created projects and member-created expenses, project details, analytics navigation, profiles, owner-only team visibility, logout cancellation and confirmed logout. There were no uncaught page errors. React Native Web's default Alert was replaced with accessible dialogs so confirmation-based actions execute on the website. Temporary browser-test identities and records were cleaned up.
 
+The received-amount changes were exercised in a local production preview before publication, then repeated on the deployed website at phone width. Both roles recorded numbered receipts; the resulting total and payment count matched the hosted summary. Project edit/back, delete cancellation and Profile card removal passed. Preview testing also found and fixed an overlapping back-button hit area and cached verification settings leaking into a web export.
+
 ## Build evidence and limits
 
-Android/iOS Hermes bundles and the web export passed. Linux CI passed native configuration generation and Deno checking. The Android release compiled and signed successfully; its AAB passed bundletool and signature validation. Actual extracted EAS archives and final bundle entries were inspected after fixing Windows monorepo exclusions; environment files, private evidence, credentials and Git history are excluded.
+Android/iOS Hermes bundles and the web export passed. Linux CI passed native configuration generation and Deno checking. Android releases compiled and signed successfully: the AAB passed bundletool validation, and the latest APK passed signature/certificate, package/version and production-setting checks. Actual extracted EAS archives and final artifact entries were inspected after fixing Windows monorepo exclusions; environment files, private evidence, credentials and Git history are excluded.
 
 Native PDF sharing/printing, push delivery, physical-device session persistence, accessibility and final signed binaries still require device acceptance. A cloud build is not a store publication. See [PRODUCTION_READINESS.md](PRODUCTION_READINESS.md) for remaining work.

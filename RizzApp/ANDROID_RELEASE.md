@@ -1,23 +1,23 @@
 # Android installable release
 
-Version **1.0.0**, version code **5**, package **com.rizz.app**.
+Version **1.0.0**, version code **6**, package **com.rizz.app**.
 
-- [Download the signed APK](https://expo.dev/artifacts/eas/6V1wH6lqHDHCpKXaqqZnBlMBZ7X3wXyz-2hIEJIuEM4.apk)
-- [EAS build and logs](https://expo.dev/accounts/rizwan-portfolio-07/projects/RizzApp/builds/4bbd3559-b606-4a09-907c-a2b3a207bf85)
-- Build source: `58913de500b685dcfff1d1e8dbb605ca1053393c`.
+- [Download the signed APK](https://expo.dev/artifacts/eas/4SGGVhSvUPA4O8rW_VE_4hl6DKW1DM_qGA7KQkX_0Do.apk)
+- [EAS build and logs](https://expo.dev/accounts/rizwan-portfolio-07/projects/RizzApp/builds/c805f66e-58c1-4f38-9bb6-e540baa06dfa)
+- Build source: `a35d587ff22bf10ce298e006264e520483924ce2`.
 - Website: https://rizzapp-sage.vercel.app
 
-This release removes the duplicate project edit/analytics headers, uses Rizz IDs with a fixed `@Rizz.com` suffix for owner-managed team accounts, and fixes the Android print adapter layout/write ordering. Saving a PDF opens the Android document picker; cancellation does not report success. Failed rendering offers the system print dialog.
+This release removes the native Project Details header, keeps its back/edit/delete controls inside the project card, adds a prominent received-amount action with Advance and numbered payment stages, and removes the Profile summary cards. It also removes the duplicate project edit/analytics headers, uses Rizz IDs with a fixed `@Rizz.com` suffix for owner-managed team accounts, and fixes the Android print adapter layout/write ordering. Saving a PDF opens the Android document picker; cancellation does not report success. Failed rendering offers the system print dialog.
 
 The APK was downloaded and its package, version, signature and certificate checked. The signing certificate matches the previous release, so it can update the existing app. Private environment files, service-account keys, credentials, test evidence and Git history are absent from the artifact.
 
-Size: **108,554,332 bytes**. SHA-256:
+Size: **108,555,820 bytes**. SHA-256:
 
 ```text
-7778e5fa6ac238f3f7184dd90c0cbe2b1973a174f99b5ed47721a75d62f02379
+f661592484d53166baeb3769544798c81464be00607c90ec7ffdd7c4a53d1593
 ```
 
-Validation: **358 automated tests**, successful GitHub CI, **23 live backend/browser checks**, public login screens at phone and desktop widths, and a visually checked three-page PDF fixture. Both workspace owners and managed members signed in and saw their workspace data; password resets revoked old access and all temporary records were cleaned up. Both managed-login migrations and the account function are deployed, using backend contract **5**.
+Validation: **398 automated tests**, successful GitHub CI, **25 live backend/browser checks**, public login screens at phone and desktop widths, and a visually checked three-page PDF fixture. Both workspace owners and managed members signed in and saw their workspace data; password resets revoked old access and all temporary records were cleaned up. Both managed-login migrations and the account function are deployed, using backend contract **5**.
 
 Native compilation and signature checks passed. A physical Android device was unavailable: installation, PDF save/share/reopen and the system document picker still need device acceptance. The local emulator could not start without working acceleration. These checks do not certify device behavior.
 
