@@ -21,7 +21,8 @@
     "eas-build-post-install": "node scripts/check-build.cjs",
     "production:check": "node scripts/production.cjs check",
     "build:production:android": "node scripts/production.cjs android",
-    "build:production:ios": "node scripts/production.cjs ios"
+    "build:production:ios": "node scripts/production.cjs ios",
+    "configure:production:ios": "node scripts/configure-ios-signing.cjs"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.2",
@@ -74,6 +75,7 @@
     "dotenv": "^18.0.9",
     "eslint": "^9.25.0",
     "eslint-config-expo": "~58.0.4",
+    "ignore": "7.0.5",
     "react-test-renderer": "19.3.0",
     "typescript": "~6.0.3",
     "vite": "^8.3.6",

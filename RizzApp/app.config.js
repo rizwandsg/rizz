@@ -20,6 +20,7 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: `com.rizz.app${suffix}`,
+      config: { usesNonExemptEncryption: false },
     },
     android: {
       adaptiveIcon: {

@@ -1,0 +1,30 @@
+# EAS archives this Git repository from its root. Keep local settings and
+# private evidence out of the archive, including on Windows monorepo builds.
+.git
+node_modules/
+**/node_modules/
+**/.env
+**/.env.*
+**/.expo/
+**/.vercel/
+**/.firebase/
+**/test-results/
+**/coverage/
+**/dist/
+**/web-build/
+**/supabase/.temp/
+**/firebase-debug*.log
+**/*service-account*.json
+**/credentials.json
+**/*.jks
+**/*.p8
+**/*.p12
+**/*.key
+**/*.pem
+**/*.mobileprovision
+**/*.tsbuildinfo
+RizzApp/myClerkApp/
+RizzApp/android/
+RizzApp/ios/
+RizzApp/app.config.js.bak
+/package-lock.json

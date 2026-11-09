@@ -8,6 +8,9 @@ Rizz uses Firebase Authentication, Supabase data, Vercel web hosting and EAS nat
 - Supabase: `brakxnutybnobmbdssqt`. Firebase third-party integration is configured for `https://securetoken.google.com/rizz-app-e4ec4`.
 - Firebase runtime service account has the `roles/firebaseauth.admin` role. Its credential is a Supabase function secret, excluded from Git, EAS and Vercel uploads.
 - EAS: [@rizwan-portfolio-07/RizzApp](https://expo.dev/accounts/rizwan-portfolio-07/projects/RizzApp), ID `70871b7d-8e41-4657-901c-9c10f01e259e`. First release, package/bundle ID `com.rizz.app`.
+- Website: https://rizzapp-sage.vercel.app. Public production configuration is installed in Vercel, and the hostname is authorized in Firebase. Deployment currently uses the CLI; the Vercel GitHub integration has not connected to this repository.
+
+Both database migrations and reviewed account mappings have been applied. Hosted tests passed for both workspace roles, cross-workspace isolation, financial totals, anonymous denial and immediate deactivation. All temporary hosted test records were cleaned up. The original 3 projects, 52 expenses and 7 payments remain. Fuwad is inactive, with his financial history retained. Existing owners must use Forgot password, then verify their email.
 
 ## Rehearse before cutover
 
@@ -48,6 +51,10 @@ npm run build:production:ios
 ```
 
 EAS runs verification again before native compilation. Android signing is configured; Apple signing still needs the appropriate developer account. An AAB/IPA build is not an app-store publication. Listing metadata, privacy/support details, screenshots, signing and store review are additional requirements. Native PDF/sharing and push delivery need physical-device acceptance. The Firebase JS authentication SDK does not require placeholder native Google service files; push configuration is separate.
+
+EAS archives this monorepo from the Git root. The authoritative exclusions are `../.easignore`; the app-level file alone does not protect a Windows monorepo archive. The extracted archive has been checked to exclude `.env` files, private test evidence, credentials and Git history. Archive regression tests preserve required source files and the app lockfile. The initial failed build was deleted after diagnosing the development-env override.
+
+For a later iOS release, run `npm run configure:production:ios` in a local interactive terminal to configure Apple signing without sharing account credentials in chat. Android is the current release priority.
 
 ## Evidence and current limitations
 

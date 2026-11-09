@@ -1,4 +1,4 @@
-# Only application source and verification inputs belong in a build archive.
+# Standalone-app exclusions. Monorepo EAS builds use ../.easignore.
 node_modules/
 .git/
 .expo/

@@ -12,10 +12,10 @@ const result = spawnSync(process.execPath, [path.join(path.dirname(require.resol
     EXPO_PUBLIC_SUPABASE_URL: 'https://simulation.invalid', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'sb_publishable_simulation',
     EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'rizz-simulation' },
 });
-const files = ['app','api','components','context','hooks','services','supabase','tests','config','scripts'].flatMap(directory =>
+const files = ['app','api','components','context','hooks','services','supabase','tests','config','scripts','types'].flatMap(directory =>
   readdirSync(path.join(root,directory), { recursive: true }).map(String)
     .filter(file => /\.(tsx?|sql|cjs)$/.test(file)).map(file => path.join(directory,file))
-).concat(['package.json','package-lock.json','vitest.config.mts','app.config.js','metro.config.js','eas.json','.easignore']).sort();
+).concat(['package.json','package-lock.json','vitest.config.mts','app.config.js','metro.config.js','eas.json','.easignore','../.easignore','.vercelignore','vercel.json']).sort();
 const hash = createHash('sha256');
 for (const file of files) { hash.update(file.replaceAll('\\','/')); hash.update('\0'); hash.update(readFileSync(path.join(root,file))); }
 writeFileSync(path.join(output,'simulation-manifest.json'), JSON.stringify({
