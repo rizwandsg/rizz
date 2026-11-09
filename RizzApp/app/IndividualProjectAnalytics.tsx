@@ -45,7 +45,7 @@ const chartConfig = {
 function AnalyticsHeader() {
   return <LinearGradient colors={['#667eea','#764ba2']} start={{x:0,y:0}} end={{x:1,y:1}} style={styles.headerGradient}>
     <View style={styles.header}>
-      <View style={{position:'absolute',left:12,top:8}}><ProjectHeaderBack /></View>
+      <View style={{position:'absolute',left:12,top:8,zIndex:2}}><ProjectHeaderBack /></View>
       <Text style={styles.headerTitle}>Project Analytics</Text>
     </View>
   </LinearGradient>;

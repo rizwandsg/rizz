@@ -47,6 +47,10 @@ npm run build:production:ios
 
 Release checks verify backend contract version 5 and the configured Firebase project before a production bundle/build. Vercel uses the checked-in SPA rewrites and build configuration. EAS uploads only the public production settings. A successful native build still requires device acceptance and store submission/review. See [Rizz ID setup and owner-managed recovery](MANAGED_RIZZ_IDS.md).
 
+To record project receipts, open a project and choose **Add Received Amount**. Select Advance, a numbered payment, or another existing stage. **Another Payment Number** accepts later installments such as 12th or 21st Payment. Received totals include these entries and existing customer receipts. Profile contains account/app settings; project and expense summaries stay on their respective screens.
+
+Metro caches are separated by public runtime configuration. The web build verifies the exported server and identity settings before deployment, preventing verification fixtures from entering a production export.
+
 For an initial database cutover, preserve profile IDs and provision reviewed Firebase mappings. Apply all four versioned migrations in order. Already migrated installations apply only pending migrations. `scripts/prepare-cutover.cjs` generates an atomic initial-cutover SQL file that locks the affected tables, rejects a stale snapshot, checks record preservation, installs mappings and records migration history. Rehearse the exact file before applying it. It contains private snapshot data and belongs under ignored `test-results/`, never source control.
 
 `supabase/schema.sql` is a historical snapshot, not an executable migration. `scripts/cleanupClerkUsers.ts` is a legacy administration script and is not used by the app or release workflow.

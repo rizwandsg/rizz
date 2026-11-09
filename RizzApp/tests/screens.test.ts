@@ -53,7 +53,7 @@ for (const [name, load, params, method] of [
   ['Projects', () => import('../app/(tabs)/home'), {}, 'getProjects'],
   ['Expenses', () => import('../app/(tabs)/expense'), {}, 'getExpenses'],
   ['Analytics', () => import('../app/(tabs)/analytics'), {}, 'getExpenses'],
-  ['Profile', () => import('../app/(tabs)/profile'), {}, 'getExpenses'],
+  ['Profile', () => import('../app/(tabs)/profile'), {}, 'getCurrentUser'],
   ['Project details', () => import('../app/ProjectDetails'), {id: project.id}, 'getProjectById'],
   ['Expense details', () => import('../app/ExpenseDetails'), {id: expense.id}, 'getExpenseById'],
   ['Project analytics', () => import('../app/ProjectAnalytics'), {id: project.id}, 'getProjectById'],
@@ -96,7 +96,7 @@ for (const [label, load, visible] of [
   ['Projects', () => import('../app/(tabs)/home'), 'No projects yet'],
   ['Expenses', () => import('../app/(tabs)/expense'), 'No expenses'],
   ['Analytics', () => import('../app/(tabs)/analytics'), 'No data available yet'],
-  ['Profile', () => import('../app/(tabs)/profile'), '0.00'],
+  ['Profile', () => import('../app/(tabs)/profile'), 'Account Settings'],
   ['Users', () => import('../app/(tabs)/users'), 'No team members yet'],
 ] as const) it(label + ' handles a new empty workspace', async () => {
   sim.api.getProjects.mockResolvedValue([]); sim.api.getExpenses.mockResolvedValue([]);

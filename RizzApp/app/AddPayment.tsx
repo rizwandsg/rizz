@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { parseMoney, localDate } from '../services/validation';
 import { formError, parseCalendarDate } from '../services/formValues';
 import { FormLoadState } from '../components/FormLoadState';
+import {numberedPaymentLabel} from '../services/paymentStages';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -43,6 +44,8 @@ export default function AddPayment() {
   const [paymentDate, setPaymentDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [paymentType, setPaymentType] = useState<PaymentType>("Advance");
+  const [numberedPayment,setNumberedPayment]=useState(false);
+  const [paymentNumber,setPaymentNumber]=useState('');
   const [paymentMode, setPaymentMode] = useState<PaymentMode>("Cash");
   const [referenceNumber, setReferenceNumber] = useState("");
   const [notes, setNotes] = useState("");
@@ -77,6 +80,9 @@ export default function AddPayment() {
           setAmount(payment.amount.toString());
           setPaymentDate(parseCalendarDate(payment.payment_date));
           setPaymentType(payment.payment_type);
+          const number=/^(\d+)(?:st|nd|rd|th) Payment$/.exec(payment.payment_type)?.[1];
+          setNumberedPayment(!!number&&Number(number)>5);
+          setPaymentNumber(number||'');
           setPaymentMode(payment.payment_mode);
           setReferenceNumber(payment.reference_number || "");
           setNotes(payment.notes || "");
@@ -113,7 +119,7 @@ export default function AddPayment() {
         project_id: project.id,
         amount: amountValue,
         payment_date: localDate(paymentDate),
-        payment_type: paymentType,
+        payment_type: numberedPayment ? numberedPaymentLabel(paymentNumber) : paymentType,
         payment_mode: paymentMode,
         reference_number: referenceNumber.trim(),
         notes: notes.trim(),
@@ -161,7 +167,7 @@ export default function AddPayment() {
             end={{ x: 1, y: 0 }}
           >
             <Text style={styles.headerTitle}>
-              {id ? "Edit Payment" : "Record Payment"}
+              {id ? "Edit Received Amount" : "Add Received Amount"}
             </Text>
             {project && (
               <Text style={styles.headerSubtitle}>
@@ -249,6 +255,9 @@ export default function AddPayment() {
             <Text style={styles.label}>Payment Type *</Text>
             <TouchableOpacity
               style={styles.dropdownButton}
+              testID="payment-type"
+              accessibilityRole="button"
+              accessibilityLabel="Payment stage"
               onPress={() => setShowPaymentTypeDropdown(!showPaymentTypeDropdown)}
               disabled={loading}
             >
@@ -264,8 +273,7 @@ export default function AddPayment() {
                 }
               />
               <Text style={styles.dropdownText}>
-                {PAYMENT_TYPES.find((t) => t.value === paymentType)?.label ||
-                  paymentType}
+                {numberedPayment ? 'Numbered Payment' : PAYMENT_TYPES.find((t) => t.value === paymentType)?.label || paymentType}
               </Text>
               <MaterialCommunityIcons
                 name={showPaymentTypeDropdown ? "chevron-up" : "chevron-down"}
@@ -281,10 +289,11 @@ export default function AddPayment() {
                     key={type.value}
                     style={[
                       styles.dropdownItem,
-                      paymentType === type.value && styles.dropdownItemSelected,
+                      !numberedPayment && paymentType === type.value && styles.dropdownItemSelected,
                     ]}
                     onPress={() => {
                       setPaymentType(type.value);
+                      setNumberedPayment(false);
                       setShowPaymentTypeDropdown(false);
                     }}
                   >
@@ -296,13 +305,13 @@ export default function AddPayment() {
                     <Text
                       style={[
                         styles.dropdownItemText,
-                        paymentType === type.value &&
+                        !numberedPayment && paymentType === type.value &&
                           styles.dropdownItemTextSelected,
                       ]}
                     >
                       {type.label}
                     </Text>
-                    {paymentType === type.value && (
+                    {!numberedPayment && paymentType === type.value && (
                       <MaterialCommunityIcons
                         name="check"
                         size={20}
@@ -311,8 +320,19 @@ export default function AddPayment() {
                     )}
                   </TouchableOpacity>
                 ))}
+                <TouchableOpacity style={styles.dropdownItem} onPress={()=>{setNumberedPayment(true);setShowPaymentTypeDropdown(false);}}>
+                  <MaterialCommunityIcons name="counter" size={20} color="#2196F3" />
+                  <Text style={styles.dropdownItemText}>Another Payment Number</Text>
+                </TouchableOpacity>
               </View>
             )}
+            {numberedPayment && <View style={{marginTop:12}}>
+              <Text style={styles.label}>Payment Number *</Text>
+              <View style={styles.inputContainer}>
+                <TextInput style={styles.input} testID="payment-number" accessibilityLabel="Payment number" placeholder="e.g. 6" placeholderTextColor="#7b8497" keyboardType="number-pad" maxLength={4} value={paymentNumber} onChangeText={setPaymentNumber} />
+              </View>
+              <Text style={{marginTop:6,color:'#667085'}}>Use 6 for 6th Payment, 7 for 7th Payment, and so on.</Text>
+            </View>}
           </View>
 
           {/* Payment Mode */}

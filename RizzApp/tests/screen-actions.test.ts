@@ -124,10 +124,10 @@ it('analytics saves expense percentages, handles cancellation and offers a print
 for (const [label, load, recordId, destination, remove] of [
   ['Project', () => import('../app/ProjectDetails'), project.id, '/AddProject', 'deleteProject'],
   ['Expense', () => import('../app/ExpenseDetails'), expense.id, '/AddExpense', 'deleteExpense'],
-] as const) it(label + ' native header edit/delete handlers work and a rejected delete preserves the screen', async () => {
+] as const) it(label + ' edit/delete controls work and a rejected delete preserves the screen', async () => {
   sim.params = {id:recordId};
   const tree = await renderScreen((await load()).default);
-  const header = await renderScreen(sim.navigation.setOptions.mock.calls.at(-1)?.[0].headerRight);
+  const header = label === 'Project' ? tree : await renderScreen(sim.navigation.setOptions.mock.calls.at(-1)?.[0].headerRight);
   await pressIcon(header, 'pencil');
   expect(JSON.stringify(sim.router.push.mock.calls.at(-1))).toContain(destination);
   sim.api[remove].mockRejectedValueOnce(new Error('Dependent financial records'));
@@ -190,10 +190,24 @@ it('project and expense cards navigate with the visible record ID', async () => 
   await pressText(expenses, project.name);
   expect(sim.router.push).toHaveBeenLastCalledWith('/ProjectDetails?id=' + project.id);
 });
-it('profile totals preserve amounts smaller than one thousand', async () => {
+it('profile keeps settings without loading or displaying project and amount summaries', async () => {
   const tree = await renderScreen((await import('../app/(tabs)/profile')).default);
-  expect(screenText(tree)).toContain('125.50');
-  expect(screenText(tree)).not.toContain('0K');
+  expect(screenText(tree)).toContain('Account Settings');
+  expect(screenText(tree)).not.toContain('Total Spent');
+  expect(sim.api.getProjects).not.toHaveBeenCalled();expect(sim.api.getExpenses).not.toHaveBeenCalled();
+});
+it('project details hide the native header and keep received payments and project actions accessible',async()=>{
+  const {nativeHeaderTitles}=await import('../services/routePolicy');expect(nativeHeaderTitles.ProjectDetails).toBeUndefined();
+  sim.params={id:project.id};const tree=await renderScreen((await import('../app/ProjectDetails')).default);
+  expect(sim.navigation.setOptions).not.toHaveBeenCalled();expect(screenText(tree)).toContain('Received Payments');
+  await pressText(tree,'Add Received Amount');
+  expect(sim.router.push).toHaveBeenLastCalledWith({pathname:'/AddPayment',params:{projectId:project.id}});
+});
+it('an inaccessible project retains back navigation for a direct link',async()=>{
+  sim.params={id:project.id};sim.router.canGoBack.mockReturnValueOnce(false);sim.api.getProjectById.mockResolvedValue(null);
+  const tree=await renderScreen((await import('../app/ProjectDetails')).default);
+  const back=tree.root.findAll(node=>typeof node.type==='string'&&node.props.accessibilityLabel==='Back to projects')[0];
+  await act(async()=>back.props.onPress());expect(sim.router.replace).toHaveBeenCalledWith('/(tabs)/home');
 });
 it('help uses an explicit workspace support fallback and has no inert controls', async () => {
   const tree = await renderScreen((await import('../app/HelpSupport')).default);

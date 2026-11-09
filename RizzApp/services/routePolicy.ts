@@ -2,7 +2,7 @@ export const protectedScreens = ['(tabs)', 'About', 'AddCustomerPayment', 'AddEx
 // These screens rely on the navigator for back/edit/delete controls.
 export const nativeHeaderTitles: Partial<Record<typeof protectedScreens[number], string>> = {
   AddExpense: 'Expense', AddPayment: 'Payment',
-  ProjectDetails: 'Project Details', ExpenseDetails: 'Expense Details',
+  ExpenseDetails: 'Expense Details',
   ClerkConditionalExample: 'Account',
 };
 export function routeAccess(authenticated: boolean, loading: boolean, failed: boolean) {

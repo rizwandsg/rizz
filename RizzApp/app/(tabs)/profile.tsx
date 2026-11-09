@@ -1,3 +1,4 @@
+import {useRequestGuard} from '../../hooks/useRequestGuard';
 import { useFocusEffect } from 'expo-router';
 import { LoadFailure } from '../../components/LoadFailure';
 import { useIdentity } from '../../context/IdentityContext';
@@ -16,8 +17,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getCurrentUser, logout, User } from '../../api/authApi';
-import { getExpenses } from '../../api/expensesApi';
-import { getProjects } from '../../api/projectsApi';
 import { useTheme } from '../../context/ThemeContext';
 
 export default function ProfileScreen() {
@@ -26,44 +25,28 @@ export default function ProfileScreen() {
   const { theme } = useTheme();
   const { signOut } = useIdentity();
   const [user, setUser] = useState<User | null>(null);
-  const [stats, setStats] = useState({
-    projectCount: 0,
-    expenseCount: 0,
-    totalExpenses: 0,
-  });
+  const {start:startRequest,cancel:cancelRequest}=useRequestGuard();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadData = async () => {
+    const isCurrent=startRequest();
     try {
       setLoading(true);
       setError(null);
       const currentUser = await getCurrentUser();
       if (!currentUser) throw new Error('Please sign in again');
+      if(!isCurrent())return;
       setUser(currentUser);
 
-      if (currentUser) {
-        const [projects, expenses] = await Promise.all([
-          getProjects(),
-          getExpenses(),
-        ]);
-        
-        const total = expenses.reduce((sum, expense) => sum + (expense.amount || 0), 0);
-        
-        setStats({
-          projectCount: projects.length,
-          expenseCount: expenses.length,
-          totalExpenses: total,
-        });
-      }
     } catch (error) {
-      setError('Failed to load profile and totals. Please retry.');
+      if(isCurrent())setError('Failed to load profile. Please retry.');
     } finally {
-      setLoading(false);
+      if(isCurrent())setLoading(false);
     }
   };
 
-  useFocusEffect(useCallback(() => { void loadData(); }, []));
+  useFocusEffect(useCallback(() => { void loadData(); return cancelRequest; }, [cancelRequest]));
 
   const handleLogout = async () => {
     Alert.alert('Logout', 'Are you sure you want to logout?', [
@@ -111,33 +94,8 @@ export default function ProfileScreen() {
       <ScrollView 
         style={styles.content} 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 20 }}
+        contentContainerStyle={{ paddingTop:16,paddingBottom: 20 }}
       >
-        {/* Stats Cards */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statCard}>
-            <View style={[styles.iconCircle, { backgroundColor: '#E3F2FD' }]}>
-              <MaterialCommunityIcons name="briefcase" size={24} color="#2196F3" />
-            </View>
-            <Text style={styles.statValue}>{stats.projectCount}</Text>
-            <Text style={styles.statLabel}>Projects</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={[styles.iconCircle, { backgroundColor: '#E8F5E9' }]}>
-              <MaterialCommunityIcons name="receipt" size={24} color="#4CAF50" />
-            </View>
-            <Text style={styles.statValue}>{stats.expenseCount}</Text>
-            <Text style={styles.statLabel}>Expenses</Text>
-          </View>
-          <View style={styles.statCard}>
-            <View style={[styles.iconCircle, { backgroundColor: '#FFF3E0' }]}>
-              <MaterialCommunityIcons name="currency-inr" size={24} color="#FF9800" />
-            </View>
-            <Text style={styles.statValue}>₹{stats.totalExpenses.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</Text>
-            <Text style={styles.statLabel}>Total Spent</Text>
-          </View>
-        </View>
-
         {/* Account Section */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Settings</Text>
@@ -277,46 +235,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    marginTop: 15,
-    marginBottom: 20,
-    gap: 10,
-  },
-  statCard: {
-    flex: 1,
-    backgroundColor: '#fff',
-    paddingVertical: 18,
-    paddingHorizontal: 8,
-    borderRadius: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  iconCircle: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  statValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-    marginTop: 2,
-  },
-  statLabel: {
-    fontSize: 11,
-    color: '#999',
-    marginTop: 4,
-    textAlign: 'center',
   },
   section: {
     backgroundColor: '#fff',

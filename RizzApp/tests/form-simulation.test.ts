@@ -27,6 +27,25 @@ async function save(tree: ReactTestRenderer, id: string) {
 
 describe.each(['owner', 'member'] as const)('%s financial forms', role => {
   beforeEach(() => resetSimulation(role));
+  it.each(['1st Payment','2nd Payment','3rd Payment'])('records a received amount at stage %s',async stage=>{
+    sim.params={projectId:project.id};const tree=await renderScreen(AddPayment);
+    await change(tree,'payment-amount','125.50');
+    await act(async()=>byTestId(tree,'payment-type').props.onPress());await pressText(tree,stage);
+    await save(tree,'payment-save');
+    expect(sim.api.createPayment).toHaveBeenCalledWith(expect.objectContaining({project_id:project.id,amount:125.50,payment_type:stage,received_from:project.client_name}));
+  });
+  it('validates an arbitrary payment number before saving and supports later stages',async()=>{
+    sim.params={projectId:project.id};const tree=await renderScreen(AddPayment);
+    await change(tree,'payment-amount','125.50');await act(async()=>byTestId(tree,'payment-type').props.onPress());await pressText(tree,'Another Payment Number');
+    await change(tree,'payment-number','0');await save(tree,'payment-save');expect(sim.api.createPayment).not.toHaveBeenCalled();
+    await change(tree,'payment-number','21');await save(tree,'payment-save');
+    expect(sim.api.createPayment).toHaveBeenCalledWith(expect.objectContaining({amount:125.50,payment_type:'21st Payment'}));
+  });
+  it('edits a saved later-stage receipt without changing its stage or amount',async()=>{
+    sim.params={id:payment.id};sim.api.getPaymentById.mockResolvedValue({...payment,payment_type:'12th Payment'});
+    const tree=await renderScreen(AddPayment);expect(byTestId(tree,'payment-number').props.value).toBe('12');
+    await save(tree,'payment-save');expect(sim.api.updatePayment).toHaveBeenCalledWith(payment.id,expect.objectContaining({payment_type:'12th Payment',amount:payment.amount,updated_at:payment.updated_at}));
+  });
   it('creates a project and prevents a second submit before leaving success', async () => {
     const tree = await renderScreen(AddProject);
     await change(tree, 'project-name', 'Test project');

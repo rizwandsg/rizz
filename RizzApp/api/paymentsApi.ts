@@ -1,7 +1,8 @@
 import { database, TABLES } from '../services/databaseService';
 import { getCurrentUser } from './authApi';
+import {numberedPaymentLabel,type NumberedPaymentType} from '../services/paymentStages';
 
-export type PaymentType = 'Advance' | 'Milestone' | 'Final' | 'Partial' | 'Other';
+export type PaymentType = 'Advance' | 'Milestone' | 'Final' | 'Partial' | 'Other' | NumberedPaymentType;
 export type PaymentMode = 'Cash' | 'UPI' | 'Bank Transfer' | 'Check' | 'Card' | 'Online';
 
 export interface Payment {
@@ -33,6 +34,7 @@ export interface PaymentSummary {
  */
 export const PAYMENT_TYPES = [
     { value: 'Advance' as PaymentType, label: 'Advance Payment', icon: 'cash-fast', color: '#4CAF50' },
+    ...[1,2,3,4,5].map(number=>({value:numberedPaymentLabel(number) as PaymentType,label:numberedPaymentLabel(number),icon:'cash-multiple',color:'#2196F3'})),
     { value: 'Milestone' as PaymentType, label: 'Milestone Payment', icon: 'flag-checkered', color: '#2196F3' },
     { value: 'Final' as PaymentType, label: 'Final Payment', icon: 'cash-check', color: '#FF9800' },
     { value: 'Partial' as PaymentType, label: 'Partial Payment', icon: 'cash-multiple', color: '#9C27B0' },

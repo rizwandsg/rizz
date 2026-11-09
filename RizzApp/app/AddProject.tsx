@@ -191,7 +191,7 @@ export default function AddProject() {
         end={{ x: 1, y: 1 }}
         style={[styles.headerGradient, { paddingTop: insets.top + 8 }]}
       >
-        <View style={{position:'absolute',left:12,top:insets.top+12}}><ProjectHeaderBack /></View>
+        <View style={{position:'absolute',left:12,top:insets.top+12,zIndex:2}}><ProjectHeaderBack /></View>
         <View style={styles.headerContentCentered}>
           <Text style={styles.headerTitle}>{id ? "Edit Project" : "New Project"}</Text>
           <Text style={styles.headerSubtitle}>Manage your project details</Text>

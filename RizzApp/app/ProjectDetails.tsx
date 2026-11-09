@@ -1,9 +1,11 @@
+import {ProjectHeaderBack} from '../components/ProjectHeaderBack';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import { useRequestGuard } from '../hooks/useRequestGuard';
 import { LoadFailure } from '../components/LoadFailure';
 import { getCustomerPaymentsByProject } from '../api/customerPaymentsApi';
 import { receiptRows, ReceiptRow } from '../services/screenData';
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import { useFocusEffect, useNavigation } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useCallback, useState } from "react";
@@ -36,7 +38,7 @@ import {
 
 export default function ProjectDetails() {
   const router = useRouter();
-  const navigation = useNavigation();
+  const insets = useSafeAreaInsets();
   const { id } = useLocalSearchParams();
   const { start: startRequest, cancel: cancelRequest } = useRequestGuard();
   const [project, setProject] = useState<Project | null>(null);
@@ -168,26 +170,6 @@ export default function ProjectDetails() {
     router.push({ pathname: "/AddExpense", params: { projectId: id } });
   };
 
-  // Set header buttons
-  React.useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => project && !loading && !error ? (
-        <View style={{ flexDirection: 'row', marginRight: 8 }}>
-          <TouchableOpacity onPress={handleEdit} style={{ padding: 8, marginRight: 8 }}>
-            <MaterialCommunityIcons name="pencil" size={22} color="#667eea" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={handleDelete} disabled={deleting} style={{ padding: 8 }}>
-            {deleting ? (
-              <ActivityIndicator size="small" color="#667eea" />
-            ) : (
-              <MaterialCommunityIcons name="delete" size={22} color="#FF3B30" />
-            )}
-          </TouchableOpacity>
-        </View>
-      ) : null,
-    });
-  }, [navigation, deleting, handleEdit, handleDelete, project, loading, error]);
-
   const getStatusColor = (status?: string) => {
     switch (status) {
       case "site visitted":
@@ -243,35 +225,20 @@ export default function ProjectDetails() {
 
   const totalExpenses = expenses.reduce((sum, exp) => sum + exp.amount, 0);
 
-  if (loading) {
-    return (
-      <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#667eea" />
-        <Text style={styles.loadingText}>Loading project...</Text>
-      </View>
-    );
-  }
-
-  if (error) return <LoadFailure message={error} retry={loadProjectData} />;
-
-  if (!project) {
-    return (
-      <View style={styles.loadingContainer}>
-        <MaterialCommunityIcons
-          name="folder-open-outline"
-          size={80}
-          color="#ccc"
-        />
-        <Text style={styles.emptyText}>Project not found</Text>
-      </View>
-    );
-  }
+  if (loading || error || !project) return (
+    <View style={[styles.container,{paddingTop:insets.top}]}>
+      <View style={{alignSelf:'flex-start',margin:16,borderRadius:24,backgroundColor:'#667eea'}}><ProjectHeaderBack /></View>
+      {loading ? <View style={styles.loadingContainer}><ActivityIndicator size="large" color="#667eea" /><Text style={styles.loadingText}>Loading project...</Text></View>
+        : error ? <LoadFailure message={error} retry={loadProjectData} />
+        : <View style={styles.loadingContainer}><Text style={styles.emptyText}>Project not found</Text></View>}
+    </View>
+  );
 
   const statusColor = getStatusColor(project.status);
   const statusIcon = getStatusIcon(project.status);
 
   return (
-    <>
+    <View style={[styles.container,{paddingTop:insets.top}]}>
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Project Info Card */}
       <LinearGradient
@@ -280,6 +247,13 @@ export default function ProjectDetails() {
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
       >
+        <View style={styles.projectToolbar}>
+          <ProjectHeaderBack />
+          <View style={{flexDirection:'row',gap:8}}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Edit project" testID="project-edit" onPress={handleEdit} style={styles.projectAction}><MaterialCommunityIcons name="pencil" size={22} color="#fff" /></TouchableOpacity>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Delete project" testID="project-delete" onPress={handleDelete} disabled={deleting} style={styles.projectAction}>{deleting?<ActivityIndicator size="small" color="#fff"/>:<MaterialCommunityIcons name="delete" size={22} color="#fff"/>}</TouchableOpacity>
+          </View>
+        </View>
         <View style={styles.projectIcon}>
           <MaterialCommunityIcons name="briefcase" size={32} color="#fff" />
         </View>
@@ -300,6 +274,7 @@ export default function ProjectDetails() {
             </Text>
           </View>
           <TouchableOpacity 
+            accessibilityLabel="Change project status"
             style={styles.editStatusButton}
             onPress={() => setStatusModalVisible(true)}
           >
@@ -307,6 +282,11 @@ export default function ProjectDetails() {
           </TouchableOpacity>
         </View>
       </LinearGradient>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Add received amount" testID="project-add-received" style={styles.receivedAction} onPress={()=>router.push({pathname:'/AddPayment',params:{projectId:id}})}>
+        <MaterialCommunityIcons name="cash-plus" size={24} color="#fff" />
+        <View style={{flex:1}}><Text style={styles.receivedActionTitle}>Add Received Amount</Text><Text style={styles.receivedActionHint}>Advance, 1st payment, 2nd payment and more</Text></View>
+        <MaterialCommunityIcons name="chevron-right" size={24} color="#fff" />
+      </TouchableOpacity>
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Project Information</Text>
           
@@ -509,7 +489,7 @@ export default function ProjectDetails() {
                     size={16}
                     color="#2196F3"
                   />
-                  <Text style={styles.summaryLabel}>Payments</Text>
+                  <Text style={styles.summaryLabel}>Received Payments</Text>
                 </View>
                 <Text style={styles.summaryValue}>
                   {paymentSummary.payment_count}
@@ -534,7 +514,7 @@ export default function ProjectDetails() {
             style={[styles.addExpenseButton, styles.recordPaymentButton]}
           >
             <MaterialCommunityIcons name="plus" size={20} color="#fff" />
-            <Text style={styles.addExpenseText}>Record</Text>
+            <Text style={styles.addExpenseText}>Add</Text>
           </TouchableOpacity>
         </View>
         
@@ -846,16 +826,21 @@ export default function ProjectDetails() {
 
       {/* Analytics FAB */}
       <TouchableOpacity
-        style={styles.analyticsFAB}
+        style={[styles.analyticsFAB,{bottom:insets.bottom+20}]}
         onPress={() => router.push(`/ProjectAnalytics?id=${project.id}`)}
       >
         <MaterialCommunityIcons name="chart-box" size={28} color="#fff" />
       </TouchableOpacity>
-    </>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  projectToolbar:{position:'absolute',left:10,right:10,top:10,zIndex:2,flexDirection:'row',alignItems:'center',justifyContent:'space-between'},
+  projectAction:{width:44,height:44,borderRadius:22,backgroundColor:'rgba(0,0,0,0.14)',alignItems:'center',justifyContent:'center'},
+  receivedAction:{marginHorizontal:16,marginBottom:16,padding:16,borderRadius:16,backgroundColor:'#24864b',flexDirection:'row',alignItems:'center',gap:10},
+  receivedActionTitle:{fontSize:17,fontWeight:'700',color:'#fff'},
+  receivedActionHint:{fontSize:12,color:'#fff',marginTop:4},
   container: {
     flex: 1,
     backgroundColor: "#f5f5f5",
@@ -929,6 +914,8 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   projectName: {
+    width:'100%',
+    flexShrink:1,
     fontSize: 24,
     fontWeight: "bold",
     color: "#fff",
