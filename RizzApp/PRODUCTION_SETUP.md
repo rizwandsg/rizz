@@ -44,6 +44,8 @@ npm run production:check
 
 For Vercel, configure the repository root directory as `RizzApp`, upload only the public production settings, and deploy using the checked-in `vercel.json`. `npm run build:web` verifies the backend before exporting `dist`. SPA rewrites preserve direct links. Add the deployed hostname to Firebase authorized domains; retain Firebase's default action-link domain.
 
+The explicit static builder uses `vercel-build` to run that same gate. This prevents Vercel from interpreting the app's client-side `api/*.ts` modules as serverless endpoints. Account operations remain in the authenticated Supabase Edge Function.
+
 ```powershell
 npm run build:production:android
 # Requires Apple Developer access and signing:

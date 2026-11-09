@@ -7,16 +7,18 @@ The website is deployed at https://rizzapp-sage.vercel.app with Firebase Authent
 - Both SQL migrations were rehearsed against a restored application snapshot, then applied in one transaction with exact record-preservation checks and migration history.
 - Existing owner mappings preserve profile IDs. Owners need a password reset and fresh Firebase email verification. Fuwad's access is disabled; his transaction history remains.
 - Anonymous table/report reads are denied. Active owners and members share their workspace; other workspaces are isolated. Tokens from an incorrect Firebase project and unverified identities fail closed.
-- Hosted smoke tests passed 13 checks covering real password login, verified/unverified accounts, owner/member data visibility, team permissions, ledger totals, report isolation and immediate deactivation. All temporary identities and records were removed, restoring original table counts.
-- 319 local tests pass across 28 files. The suite covers SQL constraints and permissions, authentication/session races, screen handlers and navigation, secure persistence, data validation, exports and build-archive exclusions.
+- Hosted smoke tests passed 14 checks covering real password login, verified/unverified accounts, owner/member data visibility, team permissions, ledger totals, report isolation, immediate deactivation and authenticated browser workflows. All temporary identities and records were removed, restoring original table counts.
+- 324 local tests pass across 29 files. The suite covers SQL constraints and permissions, authentication/session races, screen handlers and navigation, secure persistence, data validation, exports, build-archive exclusions and browser confirmation dialogs.
 - Browser checks passed on the deployed authentication forms at phone and desktop sizes, with visible validation and no horizontal overflow or uncaught page errors.
 - Android, iOS and web bundle exports passed. GitHub Actions also passed Linux native configuration generation and Deno function checking for the Firebase migration commit.
 - Dependency audit has no high/critical production findings. Five moderate Expo tooling findings remain; forcing the suggested SDK downgrade would be incompatible.
 - The actual EAS archive excludes private environment/evidence/credential files and Git history. A root-level ignore file fixes Windows monorepo archive handling; required source and lockfiles are retained.
+- The Android production AAB finished successfully. Google bundletool validation, JAR signature verification, package/version checks and private-file exclusion checks passed. See [ANDROID_RELEASE.md](ANDROID_RELEASE.md) for the artifact and checksum.
+- Both roles passed live browser sign-in, project/expense/profile visibility, team restrictions and logout cancellation/confirmation. Vercel now publishes only static output; the client API modules are not deployed as serverless endpoints.
 
 ## Remaining acceptance and distribution work
 
-Complete signed Android compilation and install the resulting build on a device. Verify native session persistence across restart/sign-out, email verification/recovery, PDF sharing/printing and push delivery on actual hardware. Bundle exports and mocked native controls do not certify those behaviors.
+Install and test the signed Android release on a device through a Play testing track. Verify native session persistence across restart/sign-out, email verification/recovery, PDF sharing/printing and push delivery on actual hardware. Bundle validation and mocked native controls do not certify those behaviors.
 
 Google Play publication needs the developer account, listing, privacy/support information, screenshots and store review. A production AAB build is separate from publication. iOS additionally needs Apple signing; `npm run configure:production:ios` loads the correct public production settings for an interactive local setup.
 
