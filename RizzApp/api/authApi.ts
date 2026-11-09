@@ -4,7 +4,7 @@ import { requireAccessToken, supabase } from '../services/supabaseClient';
 
 export interface User {
     id: string;
-    clerk_user_id?: string; // Clerk user ID for users authenticated via Clerk
+    firebase_user_id?: string; // Firebase user ID for users authenticated via Firebase
     email: string;
     full_name: string;
     phone?: string;
@@ -76,7 +76,7 @@ export async function refreshCurrentUser(): Promise<User> {
     const started = revision;
     const user = await account<User>('sync');
     if (started !== revision) throw new Error('Session changed while loading the account');
-    if (!user.id || !user.clerk_user_id || !user.is_active || !['owner', 'member'].includes(user.role || '')) throw new Error('This account is inactive or has not been migrated');
+    if (!user.id || !user.firebase_user_id || !user.is_active || !['owner', 'member'].includes(user.role || '')) throw new Error('This account is inactive or has not been migrated');
     currentUser = user;
     changed();
     const committed = revision;
@@ -92,14 +92,14 @@ export async function refreshCurrentUser(): Promise<User> {
 export async function getCurrentUser(): Promise<User | null> {
     try { await requireAccessToken(); return currentUser; } catch { return null; }
 }
-export const getCurrentUserWithClerk = getCurrentUser;
+export const getCurrentUserWithFirebase = getCurrentUser;
 export async function isAuthenticated() { return !!(await getCurrentUser()); }
 export const logout = clearSessionUser;
 
-// Legacy local-password entry points fail closed; all sign-in uses Clerk.
+// Legacy local-password entry points fail closed; all sign-in uses Firebase.
 export async function login(_credentials: LoginCredentials): Promise<User> { throw new Error('Sign in through the secure sign-in screen'); }
 export async function signup(_data: SignupData): Promise<User> { throw new Error('Create your account through the verified sign-up screen'); }
-export async function changePassword(_email: string, _currentPassword: string, _newPassword: string): Promise<void> { throw new Error('Change your password through your signed-in Clerk account'); }
+export async function changePassword(_email: string, _currentPassword: string, _newPassword: string): Promise<void> { throw new Error('Change your password through your signed-in Firebase account'); }
 export async function resetPassword(_email: string): Promise<string> { throw new Error('Use Forgot password to verify your email and reset your password'); }
 export async function updateProfile(data: { full_name?: string; phone?: string }): Promise<User> {
     const started = revision;
@@ -107,7 +107,7 @@ export async function updateProfile(data: { full_name?: string; phone?: string }
     if (!identity) throw new Error('Please sign in again');
     const result = await account<User>('updateProfile', { profile: data });
     if (started !== revision) throw new Error('Session changed while updating the profile');
-    if (!result || result.id !== identity.id || result.clerk_user_id !== identity.clerk_user_id || !result.is_active || result.role !== identity.role || result.parent_user_id !== identity.parent_user_id) throw new Error('Profile identity changed. Please sign in again');
+    if (!result || result.id !== identity.id || result.firebase_user_id !== identity.firebase_user_id || !result.is_active || result.role !== identity.role || result.parent_user_id !== identity.parent_user_id) throw new Error('Profile identity changed. Please sign in again');
     currentUser = result; changed();
     const committed = revision;
     await queueCache(async () => {
@@ -125,9 +125,9 @@ export async function getSubUsers(): Promise<SubUser[]> {
 export async function updateSubUser(id: string, data: { full_name?: string; phone?: string; is_active?: boolean }): Promise<SubUser> { return account('updateMember', { id, member: data }); }
 export async function deleteSubUser(id: string): Promise<void> { await account('deactivateMember', { id }); }
 export async function resetSubUserPassword(_id: string): Promise<void> { throw new Error('Team members must use Forgot password with their verified email address'); }
-export async function getSupabaseUserFromClerk(clerkUserId: string): Promise<User | null> {
-    const users = await database.loadData<User>('users', { filter: 'clerk_user_id.eq.' + clerkUserId });
+export async function getSupabaseUserFromFirebase(firebaseUserId: string): Promise<User | null> {
+    const users = await database.loadData<User>('users', { filter: 'firebase_user_id.eq.' + firebaseUserId });
     return users[0] ?? null;
 }
-export async function syncClerkUserToSupabase(_clerkUserId: string, _email: string, _fullName: string): Promise<User> { return refreshCurrentUser(); }
-export async function updateClerkUserLastLogin(_clerkUserId: string): Promise<void> { await refreshCurrentUser(); }
+export async function syncFirebaseUserToSupabase(_firebaseUserId: string, _email: string, _fullName: string): Promise<User> { return refreshCurrentUser(); }
+export async function updateFirebaseUserLastLogin(_firebaseUserId: string): Promise<void> { await refreshCurrentUser(); }

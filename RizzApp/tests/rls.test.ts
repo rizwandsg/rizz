@@ -12,7 +12,7 @@ const EA = '30000000-0000-4000-8000-000000000001';
 const EB = '30000000-0000-4000-8000-000000000002';
 async function asUser(sub: string, role = 'authenticated') {
   await db.exec('RESET ROLE');
-  await db.query("SELECT set_config('request.jwt.claims',$1,false)", [JSON.stringify({ sub, role })]);
+  await db.query("SELECT set_config('request.jwt.claims',$1,false)", [JSON.stringify({ sub, role, iss:'https://securetoken.google.com/rizz-simulation', aud:'rizz-simulation', email_verified:true })]);
   await db.exec('SET ROLE ' + role);
 }
 beforeAll(async () => {
@@ -22,7 +22,9 @@ beforeAll(async () => {
     CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
     GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated;`);
   await db.exec(readFileSync(new URL('../supabase/migrations/202611070001_secure_workspaces.sql', import.meta.url), 'utf8'));
-  await db.exec(`INSERT INTO public.users(id,email,full_name,clerk_user_id,role,parent_user_id) VALUES
+  await db.exec(readFileSync(new URL('../supabase/migrations/202611080001_firebase_identity.sql', import.meta.url), 'utf8'));
+  await db.exec("INSERT INTO private.identity_configuration(firebase_project_id) VALUES ('rizz-simulation')");
+  await db.exec(`INSERT INTO public.users(id,email,full_name,firebase_user_id,role,parent_user_id) VALUES
     ('${A}','a@example.com','A','user_a','owner',null),('${B}','b@example.com','B','user_b','owner',null),('${M}','member@example.com','Member','user_member','member','${A}');
     INSERT INTO public.projects(id,user_id,name,start_date,total_project_cost) VALUES ('${PA}','${A}','A project','2026-11-07',1000),('${PB}','${B}','B project','2026-11-07',1000);
     INSERT INTO public.expenses(id,user_id,project_id,amount,description,expense_date) VALUES ('${EA}','${A}','${PA}',100,'A expense','2026-11-07'),('${EB}','${B}','${PB}',100,'B expense','2026-11-07');`);

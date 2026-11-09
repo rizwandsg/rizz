@@ -1,3 +1,5 @@
+> Authentication now uses Firebase. See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for the current configuration, migration and release procedure. Earlier Clerk-specific findings below describe the previous implementation.
+
 # Role and screen simulation — 7 November 2026
 
 **269 tests passed in 23 test files; zero failures or skipped tests.** All 28 screen routes and three navigators are included. This is local simulation evidence, not approval to deploy or a guarantee against every possible failure.

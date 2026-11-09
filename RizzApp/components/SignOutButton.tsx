@@ -1,11 +1,11 @@
 import { logout } from '../api/authApi';
-import { useClerk } from '@clerk/clerk-expo';
+import { useIdentity } from '../context/IdentityContext';
 import { useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, TouchableOpacity } from 'react-native';
 
 export const SignOutButton = () => {
-  const { signOut } = useClerk();
+  const { signOut } = useIdentity();
   const router = useRouter();
   const submitting = useRef(false);
   const [loading, setLoading] = useState(false);

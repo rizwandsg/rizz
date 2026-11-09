@@ -3,12 +3,13 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createRequire } from 'node:module';
 import { afterEach, expect, it } from 'vitest';
+import { firebasePublic } from './fixtures/public-config';
 const { loadProductionEnvironment } = createRequire(import.meta.url)('../scripts/production-env.cjs');
 const directories: string[] = [];
 const production = {
-  EXPO_PUBLIC_APP_ENV: 'production', EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_live_example',
+  ...firebasePublic, EXPO_PUBLIC_APP_ENV: 'production', EXPO_PUBLIC_FIREBASE_PROJECT_ID:'rizz-production', EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN:'rizz-production.firebaseapp.com',
   EXPO_PUBLIC_SUPABASE_URL: 'https://production.example.com', EXPO_PUBLIC_SUPABASE_KEY: 'sb_publishable_example',
-  EXPO_PUBLIC_PRODUCTION_SUPABASE_URL: 'https://production.example.com', EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '2',
+  EXPO_PUBLIC_PRODUCTION_SUPABASE_URL: 'https://production.example.com', EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '3',
 };
 function fixture(values?: Record<string, string>) {
   const root = mkdtempSync(join(tmpdir(), 'rizz-production-'));
@@ -25,7 +26,8 @@ it('ignores legacy .env and reports missing configuration before a build', () =>
 it('uses the explicit production file over an inherited development shell', () => {
   const env = loadProductionEnvironment(fixture(production), { EXPO_PUBLIC_APP_ENV: 'development', EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_example' });
   expect(env.EXPO_PUBLIC_APP_ENV).toBe('production');
-  expect(env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY).toBe('pk_live_example');
+  expect(env.EXPO_PUBLIC_FIREBASE_PROJECT_ID).toBe('rizz-production');
+  expect(env.EXPO_NO_DOTENV).toBe('1');
   expect(env.EAS_BUILD_PROFILE).toBe('production');
 });
 it('refuses server credentials in the client configuration without printing their value', () => {
@@ -33,6 +35,6 @@ it('refuses server credentials in the client configuration without printing thei
     .toThrow('Remove: CLERK_SECRET_KEY');
 });
 it('rejects staging credentials and placeholder production values', () => {
-  expect(() => loadProductionEnvironment(fixture({ ...production, EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: 'pk_test_example' }), {})).toThrow('live Clerk key');
+  expect(() => loadProductionEnvironment(fixture({ ...production, EXPO_PUBLIC_FIREBASE_PROJECT_ID: 'rizz-staging', EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN:'rizz-staging.firebaseapp.com' }), {})).toThrow('production Firebase');
   expect(() => loadProductionEnvironment(fixture({ ...production, EXPO_PUBLIC_SUPABASE_KEY: 'sb_publishable_replace_with_key' }), {})).toThrow('Replace the production example');
 });

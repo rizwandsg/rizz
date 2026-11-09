@@ -50,3 +50,9 @@ coverage/
 test-results/
 supabase/.temp/
 credentials.json
+firebase-debug*.log
+.firebase/
+.vercel/
+*service-account*.json
+.vercel
+.env*

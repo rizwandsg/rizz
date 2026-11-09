@@ -1,38 +1,54 @@
 # Production setup
 
-The application is linked to [@rizwan-portfolio-07/RizzApp](https://expo.dev/accounts/rizwan-portfolio-07/projects/RizzApp), project ID `70871b7d-8e41-4657-901c-9c10f01e259e`. The previous project belonged to an account that the current Expo login could not access. This is a first store release; no old signing credential was replaced.
+Rizz uses Firebase Authentication, Supabase data, Vercel web hosting and EAS native builds. No purchased domain is required for Firebase's hosted email verification and password-reset links.
 
-## Required hosted services
+## Configured services
 
-The existing local `.env` was checked against the providers: Clerk reports a **development** instance, and the configured Supabase backend returns `PGRST202` for `backend_contract_version`. Its public client key cannot apply database migrations. These values cannot be promoted to production by renaming the build profile.
+- Firebase project: `rizz-app-e4ec4`. Email/password and email enumeration protection are enabled. Web SDK app: `1:859116047631:web:327d31473e95f34055027a`.
+- Supabase: `brakxnutybnobmbdssqt`. Firebase third-party integration is configured for `https://securetoken.google.com/rizz-app-e4ec4`.
+- Firebase runtime service account has the `roles/firebaseauth.admin` role. Its credential is a Supabase function secret, excluded from Git, EAS and Vercel uploads.
+- EAS: [@rizwan-portfolio-07/RizzApp](https://expo.dev/accounts/rizwan-portfolio-07/projects/RizzApp), ID `70871b7d-8e41-4657-901c-9c10f01e259e`. First release, package/bundle ID `com.rizz.app`.
 
-1. Supabase CLI login and linking to the backend configured in `.env` are complete. Keep a separate staging backend and rehearse the migration there using the existing README and acceptance matrix before applying it to production. Existing databases require a full backup, `supabase/preflight.sql`, and reconciliation of account mappings and financial data. The local application snapshot described below does not replace a complete hosted recovery procedure.
-2. Create the Clerk production instance using a domain you control and complete its DNS setup. Enable email/password authentication and verified email recovery. Register the Android package and iOS bundle identifier `com.rizz.app` and the application's redirect URLs. See [Clerk's production instructions](https://clerk.com/docs/guides/development/deployment/production).
-3. Configure Clerk third-party authentication in Supabase. Apply `supabase/migrations/202611070001_secure_workspaces.sql` to the explicitly selected, rehearsed backend. Store the production `CLERK_SECRET_KEY` in Supabase function secrets and deploy `supabase/functions/account` with the explicit project reference. Never store this secret in EAS, the app bundle, or a tracked file.
-4. Copy `.env.production.example` to `.env.production.local` and fill in **public** production values. Use the live Clerk publishable key and the production Supabase publishable/anon key. The production URL fields must point to the same backend. `EXPO_PUBLIC_BACKEND_CONTRACT_VERSION=2` is checked against the server; setting the variable does not install the migration.
-5. Rotate any real server secrets previously committed in Git history. Complete the device acceptance matrix in `PRODUCTION_READINESS.md`, including two workspace owners and a member, authentication, exports, and financial updates.
+## Rehearse before cutover
 
-## Hosted inspection and migration rehearsal
+1. Back up the affected schema and application tables. Restore into an isolated database and execute both migrations in order: `202611070001_secure_workspaces.sql`, then `202611080001_firebase_identity.sql`. Run the existing schema/data preflight and resolve violations. `supabase/schema.sql` is historical context, not an executable migration.
+2. Prepare explicit mappings between existing `public.users.id` and Firebase UIDs. Never attach a legacy account using an email supplied by a client. Preserve user IDs and financial relationships. Existing owners need a password reset and fresh Firebase email verification. The user requested removal of Fuwad's access; deactivate his profile while retaining his financial records.
+3. Install the migrations, reviewed mappings, and `private.identity_configuration` project pin in one controlled cutover. The new policies fail closed until the project is configured and identities are mapped. Record both migration versions in migration history. Verify row preservation, anonymous denial, workspace isolation and balances before completing cutover.
+4. Deploy `supabase/functions/account`. `verify_jwt = false` is deliberate: Firebase Admin verifies issuer, audience, signature, revocation, disabled state and email verification before privileged access. Supabase independently verifies Firebase tokens for direct data requests. Workspace roles and active status are authoritative in PostgreSQL.
+5. Store `FIREBASE_PROJECT_ID` and `FIREBASE_SERVICE_ACCOUNT_JSON` only in Supabase function secrets. Never upload a service account or Supabase service-role key to the browser, EAS or Vercel.
 
-Read-only inspection of the configured backend found disabled table RLS, permissive policies, legacy reports running with their owner's permissions, cascading financial relationships, an existing role constraint, and a missing payment creator foreign key. The revised migration preserves the role-enum constraint, adds the workspace relationship check separately, converts only the reviewed relationships to non-cascading deletion, validates existing links, and installs missing links. Unexpected references, unreviewed cascades, invalid records, and materialized reports stop the transaction. Reports depending on the application tables, including nested reports in other schemas, now execute with the caller's permissions and lose anonymous grants.
+The baseline migration replaces permissive policies, disables anonymous access to tables/reports, normalizes only reviewed cascade relationships, protects creator IDs and validates ledger constraints. Unexpected relationships or invalid records abort migration. The Firebase migration pins issuer/audience and requires verified email. The account function installs only the `authenticated` custom claim; it does not grant an owner role through a token.
 
-The schema-only fixture in `tests/fixtures/hosted-legacy-schema.sql` contains no customer records. Regression tests use synthetic identities and verify record preservation, legacy report visibility/isolation, anonymous denial, delete protection, and rollback. A separate local application-data snapshot was restored into an isolated database, sanitized, and migrated successfully with every stored record preserved. Sensitive snapshots and local evidence remain under ignored `test-results/hosted-audit/`, excluded from Git and EAS uploads.
+The ignored application snapshot has been restored locally. It covers application tables, not Supabase Auth, Storage or a complete cluster backup. Direct CLI database login currently encounters a hosted login-role permission error; the authenticated Management API is available. Use transactionally verified migration operations and preserve recovery evidence. Physical device acceptance remains separate from SQL and screen simulation.
 
-No hosted migration or Edge Function deployment has been applied. Remaining cutover work includes production Clerk setup (no owned domain is available yet), reviewed mappings for existing account IDs and placeholder email addresses, secret rotation, a complete hosted backup/recovery path, and staging/device acceptance. The CLI's direct database login-role initialization currently fails with a role-permission error; read-only Management API queries work. Resolve that hosted role issue before using CLI commands requiring a direct database connection. The local snapshot covers application tables only, not Auth, Storage, secrets, or cluster configuration.
+## Public runtime configuration
 
-## Build and distribution
+Copy `.env.production.example` to `.env.production.local` and populate its public settings. Firebase project and auth domain must match. The production Firebase project and Supabase URL pins prevent staging builds from connecting to production. Contract version `3` and the configured server Firebase project are checked remotely before release; setting an environment variable does not migrate a database.
 
-Use Node 22.20 and EAS CLI 27.5 or newer. From this directory:
+Local development uses `.env.local` with a separate Firebase/Supabase staging pair. Keep legacy `.env` credentials out of release commands. Release scripts set `EXPO_NO_DOTENV=1` and accept only the public allowlist from the production file.
+
+## Validate, build and deploy
 
 ```powershell
+npm ci
+npm run simulate
+npm run verify
+npm run bundle:check -- ios
+npm run bundle:check -- web
+npx deno@2 check --node-modules-dir=none supabase/functions/account/index.ts
 npm run production:check
+```
+
+For Vercel, configure the repository root directory as `RizzApp`, upload only the public production settings, and deploy using the checked-in `vercel.json`. `npm run build:web` verifies the backend before exporting `dist`. SPA rewrites preserve direct links. Add the deployed hostname to Firebase authorized domains; retain Firebase's default action-link domain.
+
+```powershell
 npm run build:production:android
-# For the Apple App Store, with an Apple Developer membership:
+# Requires Apple Developer access and signing:
 npm run build:production:ios
 ```
 
-The build commands require a complete `.env.production.local`, validate the backend contract and dependency audit, run the tests and Android/iOS bundle exports, then upload only the approved public settings to EAS's production environment. Only after these checks pass do they request an EAS build. Each platform's first build will require signing credentials. EAS manages version increments remotely. The local `.env` and server secrets are excluded from build archives.
+EAS runs verification again before native compilation. Android signing is configured; Apple signing still needs the appropriate developer account. An AAB/IPA build is not an app-store publication. Listing metadata, privacy/support details, screenshots, signing and store review are additional requirements. Native PDF/sharing and push delivery need physical-device acceptance. The Firebase JS authentication SDK does not require placeholder native Google service files; push configuration is separate.
 
-An Android store build creates an AAB; an iOS store build creates an IPA. A successful build does not mean the app is listed publicly. Store submission still requires the appropriate developer accounts, app records, signing, privacy/support information, screenshots, and store review. Verify the exact build before submitting it. Firebase/APNs push credentials and actual delivery need separate verification.
+## Evidence and current limitations
 
-SDK 58 requires iOS 16.4 or later for this app. Use the EAS cloud build commands above on Windows: local native generation encountered an upstream Windows path-globbing stall. CI checks native configuration generation on Linux; signed compilation and device testing are still required.
+Local regression tests cover both workspace roles, disabled accounts, wrong Firebase issuer/audience, unverified identities, financial operations, profile/session races, email-link flows and secure native persistence. Bundle checks use synthetic public settings and do not certify hosted behavior. See `SIMULATION_REPORT.md`, `PRODUCTION_READINESS.md` and the ignored test results for the precise boundaries. Final deployment status should be recorded after the hosted checks and build complete.

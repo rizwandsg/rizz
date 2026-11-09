@@ -20,6 +20,7 @@ jobs:
       - run: npm ci
       - run: npm run verify
       - run: npm run bundle:check -- ios
+      - run: npm run bundle:check -- web
       - run: npm run audit:release
   native-config:
     runs-on: ubuntu-latest
@@ -31,11 +32,15 @@ jobs:
       EXPO_NO_DOTENV: '1'
       EAS_BUILD_PROFILE: production
       EXPO_PUBLIC_APP_ENV: production
-      EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: pk_live_Y2xlcmsuZXhhbXBsZS5jb20k
+      EXPO_PUBLIC_FIREBASE_API_KEY: AIzaxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: rizz-native-check
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: rizz-native-check.firebaseapp.com
+      EXPO_PUBLIC_FIREBASE_APP_ID: '1:123456789:web:abcdef'
+      EXPO_PUBLIC_PRODUCTION_FIREBASE_PROJECT_ID: rizz-native-check
       EXPO_PUBLIC_SUPABASE_URL: https://native-check.example.com
       EXPO_PUBLIC_SUPABASE_KEY: sb_publishable_native_check
       EXPO_PUBLIC_PRODUCTION_SUPABASE_URL: https://native-check.example.com
-      EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '2'
+      EXPO_PUBLIC_BACKEND_CONTRACT_VERSION: '3'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -53,4 +58,6 @@ jobs:
       - uses: denoland/setup-deno@v2
         with:
           deno-version: v2.x
-      - run: deno check RizzApp/supabase/functions/account/index.ts
+      - run: deno check --config RizzApp/supabase/functions/account/deno.json RizzApp/supabase/functions/account/index.ts
+        env:
+          DENO_NO_PACKAGE_JSON: '1'

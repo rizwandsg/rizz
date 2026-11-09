@@ -20,7 +20,6 @@ module.exports = {
     ios: {
       supportsTablet: true,
       bundleIdentifier: `com.rizz.app${suffix}`,
-      ...(runtime.appEnv === 'production' ? { googleServicesFile: './GoogleService-Info.plist' } : {}),
     },
     android: {
       adaptiveIcon: {
@@ -28,7 +27,6 @@ module.exports = {
         backgroundColor: '#ffffff'
       },
       package: `com.rizz.app${suffix}`,
-      ...(runtime.appEnv === 'production' ? { googleServicesFile: './google-services.json' } : {}),
       permissions: [
         "INTERNET",
         "RECEIVE_BOOT_COMPLETED",

@@ -3,7 +3,7 @@ const mocks = vi.hoisted(() => ({ token: vi.fn(), invoke: vi.fn(), setItem: vi.f
 vi.mock('@react-native-async-storage/async-storage', () => ({ default: { setItem: mocks.setItem, removeItem: mocks.removeItem, multiRemove: mocks.multiRemove } }));
 vi.mock('../services/supabaseClient', () => ({ requireAccessToken: mocks.token, supabase: { functions: { invoke: mocks.invoke } } }));
 import { clearSessionUser, getCurrentUser, isAuthenticated, refreshCurrentUser, resetPassword, updateProfile } from '../api/authApi';
-const user = { id: 'profile', clerk_user_id: 'user_verified', role: 'owner', is_active: true, email: 'user@example.com' };
+const user = { id: 'profile', firebase_user_id: 'user_verified', role: 'owner', is_active: true, email: 'user@example.com' };
 beforeEach(async () => { vi.resetAllMocks(); mocks.token.mockResolvedValue('signed-token'); await clearSessionUser(); });
 it('does not trust local cached identity or a profile without an active token', async () => {
   expect(await isAuthenticated()).toBe(false);
@@ -20,7 +20,7 @@ it('discards an in-flight profile edit after logout or an account switch', async
   const pending=updateProfile({full_name:'Edited old user'});
   await Promise.resolve();
   await clearSessionUser();
-  const next={...user,id:'another-profile',clerk_user_id:'user_other'};
+  const next={...user,id:'another-profile',firebase_user_id:'user_other'};
   mocks.invoke.mockResolvedValue({data:next,error:null});
   await refreshCurrentUser();
   resolve({data:{...user,full_name:'Edited old user'},error:null});
@@ -31,7 +31,7 @@ it('discards an in-flight profile edit after logout or an account switch', async
 it('rejects profile responses that change the signed-in identity or role', async () => {
   mocks.invoke.mockResolvedValue({data:user,error:null});
   await refreshCurrentUser();
-  for (const changed of [{...user,id:'other'},{...user,clerk_user_id:'user_other'},{...user,role:'member'},{...user,is_active:false}]) {
+  for (const changed of [{...user,id:'other'},{...user,firebase_user_id:'user_other'},{...user,role:'member'},{...user,is_active:false}]) {
     mocks.invoke.mockResolvedValueOnce({data:changed,error:null});
     await expect(updateProfile({full_name:'Changed'})).rejects.toThrow('Profile identity changed');
     expect(await getCurrentUser()).toEqual(user);

@@ -4,7 +4,7 @@ import { URL } from 'node:url';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 // This runs the actual migration and PostgreSQL policies. Claims are simulated;
-// Clerk signatures and hosted Supabase transport require staging acceptance.
+// Firebase signatures and hosted Supabase transport require staging acceptance.
 let db: PGlite;
 const uuid = (kind: number, value: number) => `${kind}0000000-0000-4000-8000-${String(value).padStart(12, '0')}`;
 const users = {
@@ -30,9 +30,9 @@ const surfaces = [
   { table: 'expense_payment_status', key: 'expense_id', kind: 3 },
 ] as const;
 
-async function asIdentity(sub: string, role: 'anon' | 'authenticated' = 'authenticated', extraClaims: Record<string, string> = {}) {
+async function asIdentity(sub: string, role: 'anon' | 'authenticated' = 'authenticated', extraClaims: Record<string, unknown> = {}) {
   await db.exec('RESET ROLE');
-  await db.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ ...extraClaims, sub, role })]);
+  await db.query("SELECT set_config('request.jwt.claims', $1, false)", [JSON.stringify({ iss:'https://securetoken.google.com/rizz-simulation', aud:'rizz-simulation', email_verified:true, ...extraClaims, sub, role })]);
   await db.exec(`SET ROLE ${role}`);
 }
 
@@ -63,6 +63,8 @@ beforeAll(async () => {
     CREATE FUNCTION auth.jwt() RETURNS jsonb LANGUAGE sql STABLE AS $$ SELECT coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
     GRANT EXECUTE ON FUNCTION auth.jwt() TO authenticated;`);
   await db.exec(readFileSync(new URL('../supabase/migrations/202611070001_secure_workspaces.sql', import.meta.url), 'utf8'));
+  await db.exec(readFileSync(new URL('../supabase/migrations/202611080001_firebase_identity.sql', import.meta.url), 'utf8'));
+  await db.exec("INSERT INTO private.identity_configuration(firebase_project_id) VALUES ('rizz-simulation')");
 });
 
 beforeEach(async () => {
@@ -70,7 +72,7 @@ beforeEach(async () => {
   for (const [key, user] of Object.entries(users)) {
     const owner = key === 'ownerA' || key === 'ownerB' || key === 'inactiveOwner';
     const parent = owner ? null : user.workspace === 'A' ? users.ownerA.id : user.workspace === 'B' ? users.ownerB.id : users.inactiveOwner.id;
-    await db.query('INSERT INTO public.users(id,email,full_name,clerk_user_id,role,parent_user_id,is_active) VALUES ($1,$2,$3,$4,$5,$6,$7)', [user.id, `${key}@example.invalid`, key, user.sub, owner ? 'owner' : 'member', parent, key !== 'inactiveMember' && key !== 'inactiveOwner']);
+    await db.query('INSERT INTO public.users(id,email,full_name,firebase_user_id,role,parent_user_id,is_active) VALUES ($1,$2,$3,$4,$5,$6,$7)', [user.id, `${key}@example.invalid`, key, user.sub, owner ? 'owner' : 'member', parent, key !== 'inactiveMember' && key !== 'inactiveOwner']);
   }
   // Each workspace has both owner- and member-created projects and entries.
   // Crossed creators prove filtering by the current user would lose real data.
@@ -86,6 +88,30 @@ beforeEach(async () => {
 });
 
 afterAll(async () => { await db?.close(); });
+
+it.each([
+  {iss:'https://regular-gnu-87.clerk.accounts.dev'},
+  {iss:'https://securetoken.google.com/foreign-project'},
+  {aud:'foreign-project'},
+  {email_verified:false},
+  {email_verified:'true'},
+  {email_verified:null},
+])('denies mismatched issuer, audience or unverified email: %j', async claims => {
+  await asIdentity(users.ownerA.sub,'authenticated',claims);
+  expect(await visible(surfaces[1])).toEqual([]);
+  expect(await visible(surfaces[6])).toEqual([]);
+});
+it('fails closed until the Firebase project is configured', async () => {
+  await db.exec('RESET ROLE; DELETE FROM private.identity_configuration');
+  try {
+    await asIdentity(users.ownerA.sub);
+    expect(await visible(surfaces[1])).toEqual([]);
+    expect((await db.query<{version:number}>('SELECT public.backend_contract_version() AS version')).rows[0].version).toBe(0);
+    await expect(db.exec("INSERT INTO private.identity_configuration(firebase_project_id) VALUES ('foreign-project')")).rejects.toThrow();
+  } finally {
+    await db.exec("RESET ROLE; INSERT INTO private.identity_configuration(firebase_project_id) VALUES ('rizz-simulation')");
+  }
+});
 
 describe('role and data visibility matrix', () => {
   it.each(active)('$sub sees every workspace table and view, including teammates’ entries', async (user) => {
@@ -141,7 +167,7 @@ describe('role and data visibility matrix', () => {
       await expect(db.query(`DELETE FROM public.${table}`)).rejects.toThrow('permission denied');
     }
     await expect(db.query('SELECT public.request_identity()')).rejects.toThrow('permission denied');
-    expect((await db.query<{ version: number }>('SELECT public.backend_contract_version() AS version')).rows[0].version).toBe(2);
+    expect((await db.query<{ version: number }>('SELECT public.backend_contract_version() AS version')).rows[0].version).toBe(3);
   });
 
   it.each(active)('$sub cannot inspect or mutate another workspace using known record IDs', async (user) => {

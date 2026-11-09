@@ -8,6 +8,7 @@ it('keeps every business route behind a guard and makes new unclassified routes 
 it('keeps private screens unmounted during loading, failure, and logout', () => {
   expect(routeAccess(true, false, false)).toEqual({ public: false, private: true });
   expect(routeAccess(false, false, false)).toEqual({ public: true, private: false });
+  expect(routeAccess(false, true, false)).toEqual({ public: true, private: false });
   expect(routeAccess(true, true, false)).toEqual({ public: false, private: false });
   expect(routeAccess(true, false, true)).toEqual({ public: false, private: false });
 });

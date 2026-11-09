@@ -1,26 +1,35 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.75.1';
+import { cert, initializeApp } from 'npm:firebase-admin@13.10.0/app';
+import { getAuth } from 'npm:firebase-admin@13.10.0/auth';
 import { createAccountHandler } from './handler.ts';
 
-const url = Deno.env.get('SUPABASE_URL')!;
-const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
-const admin = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
-const columns = 'id,clerk_user_id,email,full_name,phone,role,parent_user_id,is_active,created_at,updated_at,last_login';
+const projectId = Deno.env.get('FIREBASE_PROJECT_ID');
+const credential = JSON.parse(Deno.env.get('FIREBASE_SERVICE_ACCOUNT_JSON') || '{}');
+if (!projectId || credential.project_id !== projectId) throw new Error('Firebase server project is not configured');
+const identity = getAuth(initializeApp({ projectId, credential: cert(credential) }));
+const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, { auth: { persistSession: false } });
+const columns = 'id,firebase_user_id,email,full_name,phone,role,parent_user_id,is_active,created_at,updated_at,last_login';
 async function result(query: any) { const { data, error } = await query; if (error) throw new Error('Database operation failed'); return data; }
 const handler = createAccountHandler({
   async identity(token) {
-    // The Supabase gateway verifies issuer/signature using the configured Clerk integration.
-    const caller = createClient(url, anonKey, { accessToken: async () => token });
-    const { data, error } = await caller.rpc('request_identity');
-    return error ? null : data;
+    try {
+      // Firebase Admin pins signature, issuer, audience and checks revoked/disabled accounts.
+      const claims = await identity.verifyIdToken(token, true);
+      const user = await identity.getUser(claims.uid);
+      return { uid: claims.uid, email: user.email || '', emailVerified: claims.email_verified === true && user.emailVerified && claims.email === user.email, name: user.displayName };
+    } catch { return null; }
   },
-  findProfile: id => result(admin.from('users').select(columns).eq('clerk_user_id', id).maybeSingle()),
+  findProfile: id => result(admin.from('users').select(columns).eq('firebase_user_id', id).maybeSingle()),
   getProfile: id => result(admin.from('users').select(columns).eq('id', id).maybeSingle()),
   insertProfile: data => result(admin.from('users').insert(data).select(columns).single()),
   updateProfile: (id, data) => result(admin.from('users').update({ ...data, updated_at: new Date().toISOString() }).eq('id', id).select(columns).single()),
-  async clerk(path, method = 'GET', body) {
-    const response = await fetch('https://api.clerk.com/v1' + path, { method, headers: { Authorization: 'Bearer ' + Deno.env.get('CLERK_SECRET_KEY'), 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
-    if (!response.ok) throw new Error('Identity operation failed');
-    return response.status === 204 ? null : response.json();
+  createIdentity: data => identity.createUser({ ...data, emailVerified: false }),
+  deleteIdentity: uid => identity.deleteUser(uid),
+  async authorizeIdentity(uid) {
+    const user = await identity.getUser(uid);
+    if (user.customClaims?.role !== 'authenticated') {
+      await identity.setCustomUserClaims(uid, { ...user.customClaims, role: 'authenticated' });
+    }
   },
 });
 Deno.serve(handler);

@@ -6,7 +6,9 @@ export const nativeHeaderTitles: Partial<Record<typeof protectedScreens[number],
   IndividualProjectAnalytics: 'Project Analytics', ClerkConditionalExample: 'Account',
 };
 export function routeAccess(authenticated: boolean, loading: boolean, failed: boolean) {
-  return { public: !authenticated && !loading && !failed, private: authenticated && !loading && !failed };
+  // Public deep links must survive asynchronous session restoration. Keeping
+  // their navigator mounted never grants access to protected workspace screens.
+  return { public: !authenticated && !failed, private: authenticated && !loading && !failed };
 }
 export function authDestination(signedIn: boolean, inAuthGroup: boolean): '/(auth)/login' | '/(tabs)/home' | null {
   if (!signedIn && !inAuthGroup) return '/(auth)/login';

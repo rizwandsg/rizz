@@ -1,6 +1,6 @@
 import { useFocusEffect } from 'expo-router';
 import { LoadFailure } from '../../components/LoadFailure';
-import { useAuth } from '@clerk/clerk-expo';
+import { useIdentity } from '../../context/IdentityContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -24,7 +24,7 @@ export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { theme } = useTheme();
-  const { signOut } = useAuth(); // Get Clerk signOut function
+  const { signOut } = useIdentity();
   const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState({
     projectCount: 0,

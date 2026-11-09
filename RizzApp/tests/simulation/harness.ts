@@ -6,12 +6,11 @@ import { vi } from 'vitest';
 
 const sim = vi.hoisted(() => ({
   params: {} as Record<string, string>, user: null as any, loading: false, error: null as string | null,
-  focused: true, focusVersion: 0,
+  focused: true, focusVersion: 0, identityLoaded: true, unverified: false,
+  signInIdentity: vi.fn(), signUpIdentity: vi.fn(), resetPassword: vi.fn(), sendVerification: vi.fn(), refreshIdentity: vi.fn(),
   router: { push: vi.fn(), replace: vi.fn(), back: vi.fn(), canGoBack: vi.fn(() => true) },
   navigation: { setOptions: vi.fn() }, alert: vi.fn(),
-  signIn: { create: vi.fn(), attemptFirstFactor: vi.fn(), resetPassword: vi.fn() },
-  signUp: { create: vi.fn(), prepareEmailAddressVerification: vi.fn(), attemptEmailAddressVerification: vi.fn() },
-  setActive: vi.fn(), signOut: vi.fn(), updatePassword: vi.fn(), retry: vi.fn(),
+  signOut: vi.fn(), updatePassword: vi.fn(), retry: vi.fn(),
   storage: { getItem: vi.fn(), setItem: vi.fn(), removeItem: vi.fn(), multiRemove: vi.fn() },
   api: {
     getCurrentUser: vi.fn(), getSubUsers: vi.fn(), createSubUser: vi.fn(), updateSubUser: vi.fn(), deleteSubUser: vi.fn(), resetSubUserPassword: vi.fn(), updateProfile: vi.fn(), logout: vi.fn(), changePassword: vi.fn(),
@@ -57,16 +56,12 @@ vi.mock('expo-router', async () => {
   Navigator.Protected = function Protected({guard, children}: any) { return guard ? children : null; };
   return { router: sim.router, useRouter: () => sim.router, useNavigation: () => sim.navigation, useFocusEffect: (callback: () => any) => R.useEffect(() => sim.focused ? callback() : undefined, [callback, sim.focused, sim.focusVersion]), useLocalSearchParams: () => sim.params, Stack: Navigator, Tabs: Navigator, Link: 'Link', Redirect: ({href}: any) => { R.useEffect(() => {sim.router.replace(href);}, [href]); return R.createElement('Redirect', {href}); } };
 });
-vi.mock('@clerk/clerk-expo', () => ({
-  useSignIn: () => ({isLoaded: true, signIn: sim.signIn, setActive: sim.setActive}),
-  useSignUp: () => ({isLoaded: true, signUp: sim.signUp, setActive: sim.setActive}),
-  useAuth: () => ({isLoaded: true, isSignedIn: !!sim.user, signOut: sim.signOut}),
-  useClerk: () => ({signOut: sim.signOut}), useUser: () => ({user: sim.user ? {...sim.user, updatePassword: sim.updatePassword} : null}),
-  SignedIn: ({children}: any) => sim.user ? children : null,
-  SignedOut: ({children}: any) => sim.user ? null : children,
-  ClerkLoaded: ({children}: any) => children, ClerkProvider: ({children}: any) => children,
+vi.mock('../../context/IdentityContext', () => ({ useIdentity: () => ({isLoaded: sim.identityLoaded, isSignedIn: !!sim.user || sim.unverified, emailVerified: !!sim.user && !sim.unverified, email: 'account@example.test', signOut: sim.signOut}) }));
+vi.mock('../../services/firebaseIdentity', () => ({
+  signInIdentity: sim.signInIdentity, signUpIdentity: sim.signUpIdentity, resetIdentityPassword: sim.resetPassword,
+  sendVerificationEmail: sim.sendVerification, refreshIdentity: sim.refreshIdentity, changeIdentityPassword: sim.updatePassword,
+  identityError: (error: any) => error.message || 'Unable to authenticate. Please try again.',
 }));
-vi.mock('@clerk/clerk-expo/token-cache', () => ({tokenCache: {}}));
 vi.mock('../../context/AuthContext', () => ({ useAccount: () => ({user: sim.user, loading: sim.loading, error: sim.error, retry: sim.retry}), AuthProvider: ({children}: any) => children }));
 vi.mock('../../api/authApi', () => ({...sim.api}));
 vi.mock('../../api/projectsApi', async (original) => ({...await original<any>(), ...sim.api}));
@@ -79,8 +74,8 @@ vi.mock('../../services/exportService', () => sim.exports);
 vi.mock('../../services/notificationService', () => ({...sim.notifications, NotificationType: {PROJECT_CREATED: 'project_created', EXPENSE_ADDED: 'expense_added'}, areNotificationsEnabled: vi.fn().mockResolvedValue(false)}));
 vi.mock('../../services/websocketService', () => sim.realtime);
 
-export const owner = { id: 'owner-a', clerk_user_id: 'user_a', role: 'owner', parent_user_id: null, is_active: true, email: 'owner-a@example.test', full_name: 'Owner A', created_at: '2026-11-01T00:00:00Z' };
-export const member = { ...owner, id: 'member-a', clerk_user_id: 'user_member_a', role: 'member', parent_user_id: owner.id, email: 'member-a@example.test', full_name: 'Member A' };
+export const owner = { id: 'owner-a', firebase_user_id: 'user_a', role: 'owner', parent_user_id: null, is_active: true, email: 'owner-a@example.test', full_name: 'Owner A', created_at: '2026-11-01T00:00:00Z' };
+export const member = { ...owner, id: 'member-a', firebase_user_id: 'user_member_a', role: 'member', parent_user_id: owner.id, email: 'member-a@example.test', full_name: 'Member A' };
 export const project = { id: 'project-a', user_id: owner.id, name: 'Workspace A Renovation', client_name: 'Client A', location: 'Site A', start_date: '2026-11-01', status: 'active', total_project_cost: 1000, created_at: '2026-11-01T00:00:00Z', updated_at: '2026-11-07T00:00:00Z', scope_of_work: ['Electrical'] };
 export const expense = { id: 'expense-a', user_id: member.id, project_id: project.id, description: 'Copper wiring', amount: 125.50, expense_date: '2026-11-06', category: 'materials', scope_of_work: 'Electrical', vendor_name: 'Vendor A', payment_method: 'Cash', payment_status: 'Unpaid', updated_at: '2026-11-07T00:00:00Z' };
 export const payment = { id: 'payment-a', user_id: owner.id, project_id: project.id, amount: 300, payment_date: '2026-11-05', payment_type: 'Advance', payment_mode: 'Cash', received_from: 'Original payer', notes: 'Legacy receipt', updated_at: '2026-11-07T00:00:00Z' };
@@ -90,6 +85,7 @@ export function resetSimulation(role: 'owner' | 'member' | 'guest' = 'owner') {
   vi.clearAllMocks();
   Object.values(sim.api).forEach(fn => fn.mockReset());
   sim.user = role === 'guest' ? null : {...(role === 'owner' ? owner : member)};
+  sim.identityLoaded = true; sim.unverified = false;
   sim.params = {}; sim.loading = false; sim.error = null; sim.focused = true; sim.focusVersion = 0;
   sim.storage.getItem.mockResolvedValue(null); sim.storage.setItem.mockResolvedValue(undefined);
   sim.storage.removeItem.mockResolvedValue(undefined); sim.storage.multiRemove.mockResolvedValue(undefined);
@@ -102,10 +98,10 @@ export function resetSimulation(role: 'owner' | 'member' | 'guest' = 'owner') {
   sim.api.getPaymentSummary.mockResolvedValue({total_received:500, total_expenses:125.50, project_cost:1000, remaining_amount:500, profit_loss:374.50, payment_count:2});
   sim.realtime.subscribeToAll.mockResolvedValue(undefined); sim.realtime.unsubscribeFromAll.mockResolvedValue(undefined);
   sim.notifications.registerForPushNotificationsAsync.mockResolvedValue(null);
-  sim.signIn.create.mockReset().mockResolvedValue({status:'complete', createdSessionId:'simulation-session'});
-  sim.signIn.attemptFirstFactor.mockReset(); sim.signIn.resetPassword.mockReset();
-  Object.values(sim.signUp).forEach(fn => fn.mockReset());
-  sim.setActive.mockReset().mockResolvedValue(undefined); sim.signOut.mockReset().mockResolvedValue(undefined);
+  sim.signInIdentity.mockReset().mockResolvedValue({emailVerified:true});
+  sim.signUpIdentity.mockReset().mockResolvedValue(undefined); sim.resetPassword.mockReset().mockResolvedValue(undefined);
+  sim.sendVerification.mockReset().mockResolvedValue(undefined); sim.refreshIdentity.mockReset().mockResolvedValue(true);
+  sim.signOut.mockReset().mockResolvedValue(undefined);
   sim.updatePassword.mockReset().mockResolvedValue(undefined);
 }
 

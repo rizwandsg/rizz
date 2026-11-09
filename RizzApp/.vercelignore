@@ -1,0 +1,11 @@
+.env*
+test-results/
+supabase/.temp/
+firebase-debug*.log
+.firebase/
+*service-account*.json
+myClerkApp/
+android/
+ios/
+.expo/
+coverage/

@@ -57,7 +57,7 @@ for (const role of ['owner', 'member'] as const) {
     await pressText(tree, 'Change Password'); expect(sim.updatePassword).not.toHaveBeenCalled();
     await fill(tree, 'Confirm new password', 'newpassword');
     await pressText(tree, 'Change Password');
-    expect(sim.updatePassword).toHaveBeenCalledWith({currentPassword:'oldpassword', newPassword:'newpassword'});
+    expect(sim.updatePassword).toHaveBeenCalledWith('oldpassword', 'newpassword');
     expect(sim.api.changePassword).not.toHaveBeenCalled();
     expect(tree.root.findAll(node => String(node.type) === 'TextInput').every(node => node.props.value === '')).toBe(true);
   });

@@ -24,3 +24,7 @@ yarn-debug.*
 yarn-error.*
 *.tsbuildinfo
 app.config.js.bak
+firebase-debug*.log
+.firebase/
+.vercel/
+*service-account*.json

@@ -7,6 +7,7 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
+    "build:web": "node scripts/build-web.cjs",
     "lint": "eslint . --quiet",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -23,7 +24,6 @@
     "build:production:ios": "node scripts/production.cjs ios"
   },
   "dependencies": {
-    "@clerk/clerk-expo": "^2.17.1",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.2.1",
@@ -51,6 +51,7 @@
     "expo-symbols": "~58.0.4",
     "expo-system-ui": "~58.0.7",
     "expo-web-browser": "~58.0.7",
+    "firebase": "12.19.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-native": "0.88.1",
@@ -84,6 +85,7 @@
     "npm": ">=10"
   },
   "overrides": {
+    "@grpc/grpc-js": "^1.13.7",
     "brace-expansion@^1.1.7": "1.1.21",
     "postcss": "^8.5.32"
   }

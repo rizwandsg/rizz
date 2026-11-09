@@ -1,3 +1,5 @@
+> Authentication now uses Firebase. See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md) for the current configuration, migration and release procedure. Earlier Clerk-specific findings below describe the previous implementation.
+
 # Production readiness review — 7 November 2026
 
 The source is prepared for staging and production setup. A new EAS project was created and linked under `rizwan-portfolio-07`. Supabase login, read-only hosted inspection, and a local application-snapshot restore/migration rehearsal are complete. No hosted application schema, account mappings, Edge Functions, or app-store release has been deployed. This is not a production acceptance certificate. See [PRODUCTION_SETUP.md](PRODUCTION_SETUP.md).

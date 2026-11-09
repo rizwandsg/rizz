@@ -1,4 +1,5 @@
-import { useSignIn } from '@clerk/clerk-expo';
+import { identityError, signInIdentity } from '../../services/firebaseIdentity';
+import { useIdentity } from '../../context/IdentityContext';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -18,12 +19,13 @@ import {
 
 export default function TeamLoginScreen() {
     const router = useRouter();
-    const { signIn, setActive, isLoaded } = useSignIn();
+    const { isLoaded } = useIdentity();
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [loading, setLoading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
     const submitting = useRef(false);
 
     const handleEmailChange = (text: string) => setEmail(text);
@@ -32,16 +34,14 @@ export default function TeamLoginScreen() {
 
     const handleLogin = async () => {
         if (!isLoaded || submitting.current) return;
-        if (!email.trim() || !password) { Alert.alert('Error', 'Enter your email and password'); return; }
+        if (!email.trim() || !password) { setErrorMessage('Enter your email and password'); Alert.alert('Error', 'Enter your email and password'); return; }
         submitting.current = true;
-        setLoading(true);
+        setLoading(true); setErrorMessage(null);
         try {
-            const result = await signIn.create({ identifier: getFullEmail(), password });
-            if (result.status !== 'complete' || !result.createdSessionId) throw new Error('Additional verification is required. Complete your account verification before signing in.');
-            await setActive({ session: result.createdSessionId });
-            router.replace('/(tabs)/home');
+            const result = await signInIdentity(getFullEmail(), password);
+            router.replace(result.emailVerified ? '/' : '/(auth)/verify-email');
         } catch (error: any) {
-            Alert.alert('Sign In Failed', error.errors?.[0]?.message || error.message || 'Please try again');
+            setErrorMessage(identityError(error)); Alert.alert('Sign In Failed', identityError(error));
         } finally { submitting.current = false; setLoading(false); }
     };
 
@@ -76,6 +76,7 @@ export default function TeamLoginScreen() {
                         </Text>
                     </View>
 
+                    {errorMessage ? <Text accessibilityRole="alert" style={{color:"#a02020", marginBottom:16}}>{errorMessage}</Text> : null}
                     {/* Email Input */}
                     <View style={styles.inputGroup}>
                         <Text style={styles.label}>Email Address</Text>

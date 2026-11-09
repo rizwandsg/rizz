@@ -6,12 +6,12 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 // native lifecycle boundaries are mocked. API stale-commit protection is
 // independently covered by session.test.ts.
 const state = vi.hoisted(() => ({
-  isLoaded: true, isSignedIn: false, sessionId: null as string | null,
+  isLoaded: true, isSignedIn: false, emailVerified: true, sessionId: null as string | null,
   getToken: vi.fn(), clear: vi.fn(), refresh: vi.fn(), setTokenProvider: vi.fn(),
   profile: null as any, listeners: new Set<() => void>(),
   lifecycle: new Set<(state: string) => void>(),
 }));
-vi.mock('@clerk/clerk-expo', () => ({ useAuth: () => ({isLoaded: state.isLoaded, isSignedIn: state.isSignedIn, sessionId: state.sessionId, getToken: state.getToken}) }));
+vi.mock('../context/IdentityContext', () => ({ useIdentity: () => ({isLoaded: state.isLoaded, isSignedIn: state.isSignedIn, sessionId: state.sessionId, getToken: state.getToken, emailVerified: state.emailVerified, error: null}) }));
 vi.mock('react-native', () => ({AppState: {addEventListener: (_event: string, callback: (state: string) => void) => {
   state.lifecycle.add(callback);
   return {remove: () => {state.lifecycle.delete(callback);}};
@@ -26,8 +26,8 @@ vi.mock('../services/supabaseClient', () => ({setAccessTokenProvider: state.setT
 import { AuthProvider, useAccount } from '../context/AuthContext';
 import { routeAccess } from '../services/routePolicy';
 
-const ownerA = {id:'owner-a',clerk_user_id:'user_a',full_name:'Owner A',email:'a@example.invalid',role:'owner' as const,is_active:true,created_at:'2026-11-07'};
-const ownerB = {...ownerA,id:'owner-b',clerk_user_id:'user_b',full_name:'Owner B',email:'b@example.invalid'};
+const ownerA = {id:'owner-a',firebase_user_id:'user_a',full_name:'Owner A',email:'a@example.invalid',role:'owner' as const,is_active:true,created_at:'2026-11-07'};
+const ownerB = {...ownerA,id:'owner-b',firebase_user_id:'user_b',full_name:'Owner B',email:'b@example.invalid'};
 let observed: ReturnType<typeof useAccount>;
 let tree: ReactTestRenderer | undefined;
 const observations: {session: string | null; profile: string | null; private: boolean}[] = [];
@@ -67,7 +67,7 @@ function deferred<T>() {
 
 beforeEach(() => {
   Object.assign(globalThis, {IS_REACT_ACT_ENVIRONMENT:true});
-  state.isLoaded=true; state.isSignedIn=false; state.sessionId=null; state.profile=null;
+  state.emailVerified=true; state.isLoaded=true; state.isSignedIn=false; state.sessionId=null; state.profile=null;
   observations.length=0;
   state.listeners.clear(); state.lifecycle.clear();
   state.getToken.mockReset().mockResolvedValue('simulation-token');
@@ -84,6 +84,14 @@ it('preserves a signed-out verification form when returning from the email app',
   expect(input().props.name).toBe('verification-code');
   expect(input().props.value).toBe('123456');
   expect(state.refresh).not.toHaveBeenCalled();
+});
+it('never fetches or displays workspace data for an unverified Firebase session', async () => {
+  state.isSignedIn=true; state.emailVerified=false; state.sessionId='unverified';
+  state.profile=ownerA;
+  await mount();
+  expect(state.refresh).not.toHaveBeenCalled(); expect(observed.user).toBeNull();
+  expect(state.setTokenProvider).toHaveBeenLastCalledWith(null);
+  expect(observations.some(row=>row.private)).toBe(false);
 });
 
 it('keeps an unsaved private form mounted during and after successful foreground refresh', async () => {
@@ -104,7 +112,7 @@ it('revokes visible private content when foreground account validation fails', a
   await mount(); await typeDraft('Private draft');
   state.refresh.mockRejectedValueOnce(new Error('Account disabled'));
   await foreground();
-  expect(input()).toBeUndefined();
+  expect(input()?.props.name).not.toBe('expense-draft');
   expect(observed.user).toBeNull();
   expect(observed.error).toBe('Account disabled');
 });
@@ -180,7 +188,7 @@ it('does not expose the previous workspace even for one render while a new sessi
   state.sessionId='session-b';
   state.refresh.mockImplementationOnce(() => next.promise.then(profile => {commitProfile(profile); return profile;}));
   await rerender();
-  expect(input()).toBeUndefined();
+  expect(input()?.props.name).toBe('verification-code');
   expect(observations.filter(item=>item.session==='session-b' && item.private && item.profile==='owner-a')).toEqual([]);
   await act(async () => next.resolve(ownerB));
   expect(observed.user?.id).toBe('owner-b');
@@ -202,10 +210,10 @@ it('ignores a late foreground failure after switching to a different account', a
   expect(input().props.name).toBe('expense-draft');
 });
 
-it('keeps all content blocked while Clerk loads, then opens the guest flow', async () => {
+it('keeps private content blocked while Firebase loads and preserves public deep links', async () => {
   state.isLoaded=false;
   await mount();
-  expect(input()).toBeUndefined();
+  expect(input()?.props.name).toBe('verification-code');
   expect(state.refresh).not.toHaveBeenCalled();
   state.isLoaded=true;
   await rerender();

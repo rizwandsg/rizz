@@ -1,15 +1,17 @@
 // Framework-independent handler, also executed by the local regression suite.
 export interface Profile {
-  id: string; clerk_user_id: string | null; email: string; full_name: string;
+  id: string; firebase_user_id: string | null; email: string; full_name: string;
   role: string; parent_user_id: string | null; is_active: boolean; phone?: string;
 }
 export interface AccountDependencies {
-  identity(token: string): Promise<string | null>;
-  findProfile(clerkId: string): Promise<Profile | null>;
+  identity(token: string): Promise<{ uid: string; email: string; emailVerified: boolean; name?: string } | null>;
+  findProfile(firebaseId: string): Promise<Profile | null>;
   getProfile(id: string): Promise<Profile | null>;
   insertProfile(data: Record<string, unknown>): Promise<Profile>;
   updateProfile(id: string, data: Record<string, unknown>): Promise<Profile>;
-  clerk(path: string, method?: string, body?: Record<string, unknown>): Promise<any>;
+  createIdentity(data: { email: string; password: string; displayName: string }): Promise<{ uid: string }>;
+  deleteIdentity(uid: string): Promise<void>;
+  authorizeIdentity(uid: string): Promise<void>;
 }
 class HttpError extends Error { constructor(public status: number, message: string) { super(message); } }
 function text(value: unknown, name: string, max = 200): string {
@@ -36,32 +38,37 @@ export function createAccountHandler(deps: AccountDependencies) {
       const token = /^Bearer (\S+)$/i.exec(request.headers.get('authorization') || '')?.[1];
       if (!token) throw new HttpError(401, 'Authentication required');
       const identity = await deps.identity(token);
-      if (!identity?.startsWith('user_')) throw new HttpError(401, 'Invalid identity');
+      if (!identity?.uid || identity.uid.length > 128) throw new HttpError(401, 'Invalid identity');
+      if (!identity.emailVerified || !identity.email) throw new HttpError(403, 'Verify your email before continuing');
       const raw = await request.text();
       if (raw.length > 12000) throw new HttpError(413, 'Request too large');
       let input: Record<string, any>;
       try { input = JSON.parse(raw); } catch { throw new HttpError(400, 'Invalid JSON'); }
       if (!input || typeof input !== 'object' || Array.isArray(input)) throw new HttpError(400, 'Invalid request');
-      let caller = await deps.findProfile(identity);
+      let caller = await deps.findProfile(identity.uid);
       if (input.action === 'sync') {
         if (!caller) {
-          const clerkUser = await deps.clerk('/users/' + encodeURIComponent(identity));
-          const email = clerkUser.email_addresses?.find((entry: any) => entry.id === clerkUser.primary_email_address_id && entry.verification?.status === 'verified')?.email_address;
-          if (!email) throw new HttpError(403, 'Verify your primary email before continuing');
           // Never attach an existing legacy account by an email supplied by a client.
-          caller = await deps.insertProfile({ clerk_user_id: identity, email: email.toLowerCase(), full_name: [clerkUser.first_name, clerkUser.last_name].filter(Boolean).join(' ') || email, role: 'owner', parent_user_id: null, is_active: true });
+          try {
+            caller = await deps.insertProfile({ firebase_user_id: identity.uid, email: identity.email.toLowerCase(), full_name: identity.name?.trim() || identity.email, role: 'owner', parent_user_id: null, is_active: true });
+          } catch (error) {
+            // Concurrent first logins may insert the same verified UID once.
+            caller = await deps.findProfile(identity.uid);
+            if (!caller) throw error;
+          }
         }
         if (!caller.is_active) throw new HttpError(403, 'Account is inactive');
         if (caller.parent_user_id) {
           const owner = await deps.getProfile(caller.parent_user_id);
           if (!owner?.is_active || owner.role !== 'owner' || owner.parent_user_id) throw new HttpError(403, 'Workspace is inactive');
         }
+        await deps.authorizeIdentity(identity.uid);
         return Response.json(caller, { headers });
       }
       if (!caller?.is_active) throw new HttpError(403, 'Account is inactive');
       if (caller.parent_user_id) {
         const owner = await deps.getProfile(caller.parent_user_id);
-        if (!owner?.is_active) throw new HttpError(403, 'Workspace is inactive');
+        if (!owner?.is_active || owner.role !== 'owner' || owner.parent_user_id) throw new HttpError(403, 'Workspace is inactive');
       }
       if (input.action === 'updateProfile') return Response.json(await deps.updateProfile(caller.id, profileFields(input.profile)), { headers });
       if (caller.role !== 'owner' || caller.parent_user_id) throw new HttpError(403, 'Only owners can manage team members');
@@ -72,13 +79,13 @@ export function createAccountHandler(deps: AccountDependencies) {
         const password = input.member?.password;
         if (typeof password !== 'string' || password.length < 8 || password.length > 128) throw new HttpError(400, 'Password must contain 8 to 128 characters');
         if (!fields.full_name) throw new HttpError(400, 'Name is required');
-        const clerkUser = await deps.clerk('/users', 'POST', { email_address: [email], password, first_name: fields.full_name });
+        const firebaseUser = await deps.createIdentity({ email, password, displayName: fields.full_name as string });
         try {
-          const member = await deps.insertProfile({ ...fields, email, clerk_user_id: clerkUser.id, role: 'member', parent_user_id: caller.id, is_active: true });
+          const member = await deps.insertProfile({ ...fields, email, firebase_user_id: firebaseUser.uid, role: 'member', parent_user_id: caller.id, is_active: true });
           return Response.json(member, { headers, status: 201 });
         } catch (error) {
           // Compensate only the identity created by this request.
-          await deps.clerk('/users/' + encodeURIComponent(clerkUser.id), 'DELETE');
+          await deps.deleteIdentity(firebaseUser.uid);
           throw error;
         }
       }

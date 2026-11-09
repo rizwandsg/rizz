@@ -1,4 +1,5 @@
-import { useUser } from '@clerk/clerk-expo';
+import { useIdentity } from '../context/IdentityContext';
+import { changeIdentityPassword, identityError } from '../services/firebaseIdentity';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
@@ -21,7 +22,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 export default function ChangePasswordScreen() {
     const router = useRouter();
     const insets = useSafeAreaInsets();
-    const { user: clerkUser } = useUser();
+    const { isSignedIn } = useIdentity();
     const savingRef = useRef(false);
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
@@ -48,15 +49,15 @@ export default function ChangePasswordScreen() {
             return;
         }
 
-        if (!clerkUser) { Alert.alert('Error', 'Please sign in again'); return; }
+        if (!isSignedIn) { Alert.alert('Error', 'Please sign in again'); return; }
         savingRef.current = true;
         setSaving(true);
         try {
-            await clerkUser.updatePassword({ currentPassword, newPassword });
+            await changeIdentityPassword(currentPassword, newPassword);
             setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
             Alert.alert('Success', 'Password changed successfully', [{ text: 'OK', onPress: () => router.back() }]);
         } catch (failure: any) {
-            Alert.alert('Error', failure.errors?.[0]?.message || failure.message || 'Failed to change password');
+            Alert.alert('Error', identityError(failure));
         } finally {
             savingRef.current = false;
             setSaving(false);

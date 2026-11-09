@@ -1,20 +1,15 @@
-import { SignedIn, SignedOut } from '@clerk/clerk-expo';
+import { useAccount } from '../context/AuthContext';
 import { Link } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
 import { SignOutButton } from '../components/SignOutButton';
 
-/**
- * Example component showing how to use Clerk's conditional rendering
- * 
- * <SignedIn> - Only visible when user is logged in
- * <SignedOut> - Only visible when user is logged out
- */
 export default function ClerkConditionalExample() {
+  const { user } = useAccount();
   return (
     <View style={styles.container}>
       
       {/* Content for SIGNED IN users only */}
-      <SignedIn>
+      {user ? <>
         <View style={styles.section}>
           <Text style={styles.title}>✅ You are signed in!</Text>
           <Text style={styles.subtitle}>This content is only visible to authenticated users.</Text>
@@ -28,10 +23,9 @@ export default function ClerkConditionalExample() {
 
           <SignOutButton />
         </View>
-      </SignedIn>
+      </> : <>
 
       {/* Content for SIGNED OUT users only */}
-      <SignedOut>
         <View style={styles.section}>
           <Text style={styles.title}>🔒 You are signed out</Text>
           <Text style={styles.subtitle}>This content is only visible to guests.</Text>
@@ -47,7 +41,7 @@ export default function ClerkConditionalExample() {
             <Text style={styles.linkText}>Go to Sign In →</Text>
           </Link>
         </View>
-      </SignedOut>
+      </>}
 
     </View>
   );

@@ -1,14 +1,9 @@
-import { ClerkLoaded, ClerkProvider } from '@clerk/clerk-expo';
-import { tokenCache } from '@clerk/clerk-expo/token-cache';
 import { Stack, useRouter } from 'expo-router';
 import { Pressable, Text } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { AuthProvider, useAccount } from '../context/AuthContext';
 import { ThemeProvider } from '../context/ThemeContext';
 import { nativeHeaderTitles, protectedScreens, routeAccess } from '../services/routePolicy';
-
-const publishableKey = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
-if (!publishableKey) throw new Error('Configure EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY');
 
 function Navigator() {
   const router = useRouter();
@@ -29,9 +24,7 @@ function Navigator() {
 }
 
 export default function RootLayout() {
-  return <ClerkProvider tokenCache={tokenCache} publishableKey={publishableKey}>
-    <ClerkLoaded><SafeAreaProvider><ThemeProvider><AuthProvider>
+  return <SafeAreaProvider><ThemeProvider><AuthProvider>
       <Navigator />
-    </AuthProvider></ThemeProvider></SafeAreaProvider></ClerkLoaded>
-  </ClerkProvider>;
+    </AuthProvider></ThemeProvider></SafeAreaProvider>;
 }
