@@ -222,6 +222,9 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   userName: {
+    width:'100%',
+    textAlign:'center',
+    flexShrink:1,
     fontSize: 26,
     fontWeight: 'bold',
     color: '#fff',
@@ -229,6 +232,9 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   userEmail: {
+    width:'100%',
+    textAlign:'center',
+    flexShrink:1,
     fontSize: 14,
     color: 'rgba(255,255,255,0.95)',
     letterSpacing: 0.3,
