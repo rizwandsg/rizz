@@ -10,23 +10,23 @@ Rizz uses Firebase Authentication, Supabase data, Vercel web hosting and EAS nat
 - EAS: [@rizwan-portfolio-07/RizzApp](https://expo.dev/accounts/rizwan-portfolio-07/projects/RizzApp), ID `70871b7d-8e41-4657-901c-9c10f01e259e`. First release, package/bundle ID `com.rizz.app`.
 - Website: https://rizzapp-sage.vercel.app. Public production configuration is installed in Vercel, and the hostname is authorized in Firebase. Deployment currently uses the CLI; the Vercel GitHub integration has not connected to this repository.
 
-Both database migrations and reviewed account mappings have been applied. Hosted tests passed for both workspace roles, cross-workspace isolation, financial totals, anonymous denial and immediate deactivation. All temporary hosted test records were cleaned up. The original 3 projects, 52 expenses and 7 payments remain. Fuwad is inactive, with his financial history retained. Existing owners must use Forgot password, then verify their email.
+All four database migrations and reviewed account mappings have been applied. Hosted tests passed for both workspace roles, owner-managed Rizz IDs and password resets, cross-workspace isolation, financial totals, anonymous denial and immediate deactivation. All temporary hosted records were cleaned up and all pre-existing rows retained. Fuwad is inactive, with his financial history retained. Owners use real verified emails; [team IDs and recovery](MANAGED_RIZZ_IDS.md) are managed by their workspace owner.
 
 ## Rehearse before cutover
 
-1. Back up the affected schema and application tables. Restore into an isolated database and execute both migrations in order: `202611070001_secure_workspaces.sql`, then `202611080001_firebase_identity.sql`. Run the existing schema/data preflight and resolve violations. `supabase/schema.sql` is historical context, not an executable migration.
+1. Back up the affected schema and application tables. For an initial cutover, restore into an isolated database and execute all migrations in version order: `202611070001_secure_workspaces.sql`, `202611080001_firebase_identity.sql`, `202611090001_managed_rizz_ids.sql`, then `202611090002_non_deliverable_rizz_logins.sql`. On an already migrated database, apply only pending migrations. Run the schema/data preflight and resolve violations. `supabase/schema.sql` is historical context, not an executable migration.
 2. Prepare explicit mappings between existing `public.users.id` and Firebase UIDs. Never attach a legacy account using an email supplied by a client. Preserve user IDs and financial relationships. Existing owners need a password reset and fresh Firebase email verification. The user requested removal of Fuwad's access; deactivate his profile while retaining his financial records.
-3. Install the migrations, reviewed mappings, and `private.identity_configuration` project pin in one controlled cutover. The new policies fail closed until the project is configured and identities are mapped. Record both migration versions in migration history. Verify row preservation, anonymous denial, workspace isolation and balances before completing cutover.
-4. Deploy `supabase/functions/account`. `verify_jwt = false` is deliberate: Firebase Admin verifies issuer, audience, signature, revocation, disabled state and email verification before privileged access. Supabase independently verifies Firebase tokens for direct data requests. Workspace roles and active status are authoritative in PostgreSQL.
+3. Install the migrations, reviewed mappings, and `private.identity_configuration` project pin in one controlled cutover. The new policies fail closed until the project is configured and identities are mapped. Record each migration version in migration history. Verify row preservation, anonymous denial, workspace isolation and balances before completing cutover.
+4. Deploy `supabase/functions/account`. `verify_jwt = false` is deliberate: Firebase Admin verifies issuer, audience, signature, revocation, disabled state and verified-owner or provisioned-member claims before privileged access. Supabase independently verifies Firebase tokens for direct data requests. Workspace roles and active status are authoritative in PostgreSQL.
 5. Store `FIREBASE_PROJECT_ID` and `FIREBASE_SERVICE_ACCOUNT_JSON` only in Supabase function secrets. Never upload a service account or Supabase service-role key to the browser, EAS or Vercel.
 
-The baseline migration replaces permissive policies, disables anonymous access to tables/reports, normalizes only reviewed cascade relationships, protects creator IDs and validates ledger constraints. Unexpected relationships or invalid records abort migration. The Firebase migration pins issuer/audience and requires verified email. The account function installs only the `authenticated` custom claim; it does not grant an owner role through a token.
+The baseline migration replaces permissive policies, disables anonymous access to tables/reports, normalizes only reviewed cascade relationships, protects creator IDs and validates ledger constraints. Unexpected relationships or invalid records abort migration. Firebase policies pin issuer/audience and require verified owner email or server-provisioned member claims with the current account version. Managed logins use non-deliverable internal aliases; only the owner resets their passwords. Tokens never grant workspace ownership.
 
 The ignored application snapshot has been restored locally. It covers application tables, not Supabase Auth, Storage or a complete cluster backup. Direct CLI database login currently encounters a hosted login-role permission error; the authenticated Management API is available. Use transactionally verified migration operations and preserve recovery evidence. Physical device acceptance remains separate from SQL and screen simulation.
 
 ## Public runtime configuration
 
-Copy `.env.production.example` to `.env.production.local` and populate its public settings. Firebase project and auth domain must match. The production Firebase project and Supabase URL pins prevent staging builds from connecting to production. Contract version `3` and the configured server Firebase project are checked remotely before release; setting an environment variable does not migrate a database.
+Copy `.env.production.example` to `.env.production.local` and populate its public settings. Firebase project and auth domain must match. The production Firebase project and Supabase URL pins prevent staging builds from connecting to production. Contract version `5` and the configured server Firebase project are checked remotely before release; setting an environment variable does not migrate a database.
 
 Local development uses `.env.local` with a separate Firebase/Supabase staging pair. Keep legacy `.env` credentials out of release commands. Release scripts set `EXPO_NO_DOTENV=1` and accept only the public allowlist from the production file.
 
@@ -38,7 +38,8 @@ npm run simulate
 npm run verify
 npm run bundle:check -- ios
 npm run bundle:check -- web
-npx deno@2 check --node-modules-dir=none supabase/functions/account/index.ts
+$env:DENO_NO_PACKAGE_JSON='1'
+npx deno@2 check --config supabase/functions/account/deno.json supabase/functions/account/index.ts
 npm run production:check
 ```
 
@@ -48,6 +49,8 @@ The explicit static builder uses `vercel-build` to run that same gate. This prev
 
 ```powershell
 npm run build:production:android
+# Installable Android APK:
+npm run build:production:apk
 # Requires Apple Developer access and signing:
 npm run build:production:ios
 ```

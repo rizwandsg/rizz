@@ -4,11 +4,11 @@ The website is deployed at https://rizzapp-sage.vercel.app with Firebase Authent
 
 ## Completed
 
-- Both SQL migrations were rehearsed against a restored application snapshot, then applied in one transaction with exact record-preservation checks and migration history.
+- The initial identity cutover and subsequent managed-login migrations were rehearsed against current application snapshots, then applied with atomic record-preservation checks and migration history. The live backend contract is version 5.
 - Existing owner mappings preserve profile IDs. Owners need a password reset and fresh Firebase email verification. Fuwad's access is disabled; his transaction history remains.
-- Anonymous table/report reads are denied. Active owners and members share their workspace; other workspaces are isolated. Tokens from an incorrect Firebase project and unverified identities fail closed.
-- Hosted smoke tests passed 14 checks covering real password login, verified/unverified accounts, owner/member data visibility, team permissions, ledger totals, report isolation, immediate deactivation and authenticated browser workflows. All temporary identities and records were removed, restoring original table counts.
-- 324 local tests pass across 29 files. The suite covers SQL constraints and permissions, authentication/session races, screen handlers and navigation, secure persistence, data validation, exports, build-archive exclusions and browser confirmation dialogs.
+- Anonymous table/report reads are denied. Active owners and members share their workspace; other workspaces are isolated. Tokens from an incorrect Firebase project and unverified, unprovisioned identities fail closed.
+- Hosted smoke tests passed 23 checks covering real password login, verified owner accounts, provisioned Rizz IDs, owner-managed password resets and revocation, owner/member data visibility, team permissions, ledger totals, report isolation, immediate deactivation and authenticated browser workflows. All temporary identities and records were removed, restoring original table counts.
+- 358 local tests pass across 30 files. The suite covers SQL constraints and permissions, authentication/session races, screen handlers and navigation, secure persistence, data validation, exports, build-archive exclusions and browser confirmation dialogs.
 - Browser checks passed on the deployed authentication forms at phone and desktop sizes, with visible validation and no horizontal overflow or uncaught page errors.
 - Android, iOS and web bundle exports passed. GitHub Actions also passed Linux native configuration generation and Deno function checking for the Firebase migration commit.
 - Dependency audit has no high/critical production findings. Five moderate Expo tooling findings remain; forcing the suggested SDK downgrade would be incompatible.
@@ -18,7 +18,7 @@ The website is deployed at https://rizzapp-sage.vercel.app with Firebase Authent
 
 ## Remaining acceptance and distribution work
 
-Install and test the signed Android release on a device through a Play testing track. Verify native session persistence across restart/sign-out, email verification/recovery, PDF sharing/printing and push delivery on actual hardware. Bundle validation and mocked native controls do not certify those behaviors.
+Install and test the signed Android release on a device using the signed APK linked in ANDROID_RELEASE.md. Verify native session persistence across restart/sign-out, email verification/recovery, PDF sharing/printing and push delivery on actual hardware. Bundle validation and mocked native controls do not certify those behaviors.
 
 Google Play publication needs the developer account, listing, privacy/support information, screenshots and store review. A production AAB build is separate from publication. iOS additionally needs Apple signing; `npm run configure:production:ios` loads the correct public production settings for an interactive local setup.
 

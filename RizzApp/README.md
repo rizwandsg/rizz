@@ -39,12 +39,14 @@ Production uses `.env.production.local` with only the approved public fields in 
 npm run production:check
 npm run build:web
 npm run build:production:android
+# Installable Android APK:
+npm run build:production:apk
 # Requires Apple Developer access and signing:
 npm run build:production:ios
 ```
 
-Release checks verify backend contract version 3 and the configured Firebase project before a production bundle/build. Vercel uses the checked-in SPA rewrites and build configuration. EAS uploads only the public production settings. A successful native build still requires device acceptance and store submission/review.
+Release checks verify backend contract version 5 and the configured Firebase project before a production bundle/build. Vercel uses the checked-in SPA rewrites and build configuration. EAS uploads only the public production settings. A successful native build still requires device acceptance and store submission/review. See [Rizz ID setup and owner-managed recovery](MANAGED_RIZZ_IDS.md).
 
-For existing databases, preserve profile IDs and provision reviewed Firebase mappings. Apply both versioned migrations in order. `scripts/prepare-cutover.cjs` generates an atomic SQL file that locks the affected tables, rejects a stale snapshot, checks record preservation, installs mappings and records migration history. Rehearse the exact generated file before applying it. It contains private snapshot data and belongs under ignored `test-results/`, never source control.
+For an initial database cutover, preserve profile IDs and provision reviewed Firebase mappings. Apply all four versioned migrations in order. Already migrated installations apply only pending migrations. `scripts/prepare-cutover.cjs` generates an atomic initial-cutover SQL file that locks the affected tables, rejects a stale snapshot, checks record preservation, installs mappings and records migration history. Rehearse the exact file before applying it. It contains private snapshot data and belongs under ignored `test-results/`, never source control.
 
 `supabase/schema.sql` is a historical snapshot, not an executable migration. `scripts/cleanupClerkUsers.ts` is a legacy administration script and is not used by the app or release workflow.

@@ -1,6 +1,6 @@
 # Simulation and hosted verification
 
-324 automated tests pass in 29 files. Run `npm run simulate` to produce `test-results/simulation.json` and a manifest with a source checksum. These files and all private hosted evidence are excluded from Git, EAS and Vercel uploads.
+358 automated tests pass in 30 files. Run `npm run simulate` to produce `test-results/simulation.json` and a manifest with a source checksum. These files and all private hosted evidence are excluded from Git, EAS and Vercel uploads.
 
 ## Coverage
 
@@ -8,13 +8,13 @@
 | --- | --- |
 | Route tree | Every one of the 29 screen routes and all 3 navigators has a simulation import; new unclassified business routes fail CI |
 | Authentication | Owner/member login, signup, email-link verification, password reset, password change, sign-out, duplicate submissions, failures/retries and field validation |
-| Session lifecycle | Unverified users cannot fetch workspace data; session switches and late foreground/profile responses cannot reveal another account; drafts survive valid foreground refresh |
+| Session lifecycle | Unverified owners and unprovisioned identities cannot fetch workspace data; session switches and late foreground/profile responses cannot reveal another account; drafts survive valid foreground refresh |
 | Native token storage | Chunk limits, Unicode, concurrent writes/sign-out, corrupt or missing chunks, capacity errors and preservation of prior state on failed writes |
-| Account function | Trusted verified identity, editable-field allowlist, owner/member permissions, inactive workspace denial, concurrent sync and compensated member provisioning |
+| Account function | Trusted verified owner or provisioned member identity, editable-field allowlist, owner/member permissions, inactive workspace denial, concurrent sync and compensated member provisioning |
 | Workspace roles | Two owners and their members, inactive users/workspaces, creator protection, cross-workspace reads/writes and report isolation |
 | Database workflows | Real migrations, row-level security, financial precision, balances, foreign keys, safe deletion, legacy report grants and rollback on invalid relationships |
-| Firebase policies | Pinned issuer/audience, verified email, unconfigured-project denial and protected server configuration |
-| Cutover | Exact generated SQL preserves member-created records, deactivates access, records both versions, refuses stale snapshots and rejects invalid mappings |
+| Firebase policies | Pinned issuer/audience, verified owner email or provisioned managed-member claims, unconfigured-project denial and protected server configuration |
+| Cutover | Exact generated SQL preserves member-created records, deactivates access, records all four versions, refuses stale snapshots and rejects invalid mappings |
 | Screens and data | Project/expense/payment forms, summaries, analytics, profile/team actions, loading/error states, stale requests, navigation and CSV/PDF generation boundaries |
 | Release/archive | Public environment allowlist, staging/production isolation, server credential rejection and Git-root archive exclusions while retaining build inputs |
 | Browser dialogs | Destructive cancellation/confirmation, acknowledgement callbacks, queued messages, escaped record text, Escape handling and clearing private dialogs on account changes |
@@ -23,9 +23,9 @@ Screen simulations execute actual React components with mocked native controls, 
 
 ## Hosted checks
 
-A separate live test exercised Firebase password sign-in, account synchronization, the deployed account function, Supabase token verification, SQL policies and authenticated browser flows. It passed 14 assertions: unverified denial, verified member synchronization, restricted team management, shared owner/member data, other-owner read/write denial, receipt/expense totals, report isolation, anonymous denial, owner/member browser workflows, owner deactivation, immediate revocation of data access and preservation of original table counts after cleanup.
+A separate live test exercised Firebase password sign-in, account synchronization, the deployed account function, Supabase token verification, SQL policies and authenticated browser flows. It passed 23 assertions, including non-deliverable Rizz ID logins, owner-only password reset, old-token revocation, stale-reset rejection, and: unverified denial, verified member synchronization, restricted team management, shared owner/member data, other-owner read/write denial, receipt/expense totals, report isolation, anonymous denial, owner/member browser workflows, owner deactivation, immediate revocation of data access and preservation of original table counts after cleanup.
 
-Three temporary identities/profiles and their synthetic ledger records were removed. The application retained 3 user profiles, 3 projects, 52 expenses and 7 payments; customer/vendor payment counts returned to zero. Original owners retain their profile IDs. The removed member is inactive, preserving his original records.
+Three temporary identities/profiles and their synthetic ledger records were removed. All pre-existing application rows were preserved. The test fixtures and their Firebase identities were removed.
 
 The affected application snapshot was restored locally before cutover. The exact generated cutover passed preservation checks locally and in the hosted transaction. It is an application-scoped recovery artifact, not a full provider backup.
 
